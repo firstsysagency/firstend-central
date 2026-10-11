@@ -7,7 +7,7 @@
 import { z } from 'zod';
 
 // ==============================================================================
-// 1. ESCOPOS MÍNIMOS OAUTH 2.1 (Princípio do Menor Privilégio)
+// 1. ESCOPOS MÍNIMOS OAUTH 2.1 (Princípio do Menor Privilégio & Ferramentas MCP)
 // ==============================================================================
 export const OAUTH_SCOPES = [
   'openid',
@@ -18,17 +18,69 @@ export const OAUTH_SCOPES = [
   'zatten:read',
   'zatten:write',
   'zatten:messages',
-  'audit:read'
+  'audit:read',
+
+  // 24 Ferramentas / Funções Zatten (Escopos Granulares por Função)
+  'firstsys_get_profile',
+  'zatten_list_connections',
+  'zatten_get_connection_status',
+  'zatten_get_leads',
+  'zatten_kanban_get',
+  'zatten_tags_get',
+  'zatten_leads_leadnumber_get',
+  'zatten_leads_leadnumber_notes_patch',
+  'zatten_leads_leadnumber_properties_patch',
+  'zatten_leads_leadnumber_threads_get',
+  'zatten_leads_leadnumber_thread_patch',
+  'zatten_leads_leadnumber_kanban_patch',
+  'zatten_leads_leadnumber_assignee_patch',
+  'zatten_leads_leadnumber_toggle_attendant_response_post',
+  'zatten_leads_leadnumber_tag_post',
+  'zatten_leads_leadnumber_tag_delete',
+  'zatten_messages_text_post',
+  'zatten_send_message',
+  'zatten_messages_template_post',
+  'zatten_messages_audio_post',
+  'zatten_messages_image_post',
+  'zatten_messages_file_post',
+  'zatten_messages_video_post',
+  'zatten_messages_history_get',
+
+  // Ferramentas com prefixo tool:
+  'tool:firstsys_get_profile',
+  'tool:zatten_list_connections',
+  'tool:zatten_get_connection_status',
+  'tool:zatten_get_leads',
+  'tool:zatten_kanban_get',
+  'tool:zatten_tags_get',
+  'tool:zatten_leads_leadnumber_get',
+  'tool:zatten_leads_leadnumber_notes_patch',
+  'tool:zatten_leads_leadnumber_properties_patch',
+  'tool:zatten_leads_leadnumber_threads_get',
+  'tool:zatten_leads_leadnumber_thread_patch',
+  'tool:zatten_leads_leadnumber_kanban_patch',
+  'tool:zatten_leads_leadnumber_assignee_patch',
+  'tool:zatten_leads_leadnumber_toggle_attendant_response_post',
+  'tool:zatten_leads_leadnumber_tag_post',
+  'tool:zatten_leads_leadnumber_tag_delete',
+  'tool:zatten_messages_text_post',
+  'tool:zatten_send_message',
+  'tool:zatten_messages_template_post',
+  'tool:zatten_messages_audio_post',
+  'tool:zatten_messages_image_post',
+  'tool:zatten_messages_file_post',
+  'tool:zatten_messages_video_post',
+  'tool:zatten_messages_history_get'
 ] as const;
 
-export type OAuthScope = typeof OAUTH_SCOPES[number];
+export type OAuthScope = typeof OAUTH_SCOPES[number] | string;
 
-export const OAuthScopeSchema = z.enum(OAUTH_SCOPES);
+export const OAuthScopeSchema = z.string();
 
 export const ScopesStringSchema = z.string().transform((val) => {
   const parts = val.trim().split(/\s+/).filter(Boolean);
   return parts;
-}).pipe(z.array(OAuthScopeSchema));
+}).pipe(z.array(z.string()));
 
 // ==============================================================================
 // 2. PAPÉIS DE USUÁRIO E ENTIDADES DE SEGURANÇA

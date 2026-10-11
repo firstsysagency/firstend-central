@@ -13,6 +13,7 @@ import {
   AuthorizationRequestSchema, 
   TokenRequestSchema, 
   RevocationRequestSchema,
+  OAUTH_SCOPES,
   type OAuthJwtPayload,
   type OAuthTokenResponse
 } from './oauthTypes.js';
@@ -92,12 +93,7 @@ const openIdConfigurationHandler = (req: Request, res: Response) => {
     subject_types_supported: ['public'],
     id_token_signing_alg_values_supported: ['RS256'],
     token_endpoint_auth_methods_supported: ['client_secret_basic', 'client_secret_post', 'none'],
-    scopes_supported: [
-      'openid', 'profile', 'email',
-      'connections:read', 'connections:manage',
-      'zatten:read', 'zatten:write', 'zatten:messages',
-      'audit:read'
-    ],
+    scopes_supported: [...OAUTH_SCOPES],
     claims_supported: ['sub', 'iss', 'aud', 'exp', 'email', 'role', 'org_id'],
     service_documentation: 'https://docs.firstsys.com.br/oauth'
   });
@@ -118,14 +114,7 @@ oauthRouter.get('/.well-known/oauth-protected-resource', (req: Request, res: Res
   res.json({
     resource: mcpResourceUrl,
     authorization_servers: [issuer],
-    scopes_supported: [
-      'connections:read',
-      'connections:manage',
-      'zatten:read',
-      'zatten:write',
-      'zatten:messages',
-      'audit:read'
-    ],
+    scopes_supported: [...OAUTH_SCOPES],
     bearer_methods_supported: ['header'],
     resource_documentation: 'https://docs.firstsys.com.br/mcp'
   });
