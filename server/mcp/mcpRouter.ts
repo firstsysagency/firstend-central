@@ -102,25 +102,20 @@ export function requireOAuth(requiredScope?: OAuthScope) {
 }
 
 // ==============================================================================
-// 1.1 CATÁLOGO DE FERRAMENTAS MCP CONFORME PROTOCOLO 2024-11-05
+// ==============================================================================
+// 1.1 CATÁLOGO DE FERRAMENTAS MCP CONFORME PROTOCOLO 2024-11-05 (COMPLETO ZATTEN)
 // ==============================================================================
 
 const MCP_TOOLS_CATALOG = [
   {
     name: 'firstsys_get_profile',
     description: 'Retorna o identificador opaco permanente, organização e papéis da conta Firstsys autenticada.',
-    inputSchema: {
-      type: 'object',
-      properties: {}
-    }
+    inputSchema: { type: 'object', properties: {} }
   },
   {
     name: 'zatten_list_connections',
     description: 'Lista as conexões Zatten ativas autorizadas para a organização do usuário.',
-    inputSchema: {
-      type: 'object',
-      properties: {}
-    }
+    inputSchema: { type: 'object', properties: {} }
   },
   {
     name: 'zatten_get_connection_status',
@@ -128,10 +123,7 @@ const MCP_TOOLS_CATALOG = [
     inputSchema: {
       type: 'object',
       properties: {
-        connectionId: {
-          type: 'string',
-          description: 'Identificador opaco da conexão Zatten a ser consultada'
-        }
+        connectionId: { type: 'string', description: 'Identificador opaco da conexão Zatten a ser consultada' }
       }
     }
   },
@@ -141,9 +133,173 @@ const MCP_TOOLS_CATALOG = [
     inputSchema: {
       type: 'object',
       properties: {
-        connectionId: { type: 'string', description: 'ID opcional da conexão Zatten' },
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' },
         limit: { type: 'integer', description: 'Limite de resultados', default: 20 },
         status: { type: 'string', description: 'Status do lead' }
+      }
+    }
+  },
+  {
+    name: 'zatten_kanban_get',
+    description: 'Busca informações de todas as colunas do Kanban de atendimento no CRM Zatten.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+      }
+    }
+  },
+  {
+    name: 'zatten_tags_get',
+    description: 'Busca informações de todas as tags disponíveis cadastradas no CRM Zatten.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+      }
+    }
+  },
+  {
+    name: 'zatten_leads_leadnumber_get',
+    description: 'Obtém detalhes cadastrais e informações completas de um lead específico pelo número de telefone (WaId).',
+    inputSchema: {
+      type: 'object',
+      required: ['leadNumber'],
+      properties: {
+        leadNumber: { type: 'string', description: 'O número de WhatsApp (WaId) do lead.' },
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+      }
+    }
+  },
+  {
+    name: 'zatten_leads_leadnumber_notes_patch',
+    description: 'Atualiza ou adiciona anotações no perfil de um lead no CRM Zatten.',
+    inputSchema: {
+      type: 'object',
+      required: ['leadNumber', 'note'],
+      properties: {
+        leadNumber: { type: 'string', description: 'O número de WhatsApp (WaId) do lead.' },
+        note: { type: 'string', description: 'O conteúdo da anotação a ser salva.' },
+        delete_previous_note: { type: 'boolean', description: 'Se true, substitui a anotação antiga; se false, concatena.' },
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+      }
+    }
+  },
+  {
+    name: 'zatten_leads_leadnumber_properties_patch',
+    description: 'Atualiza propriedades customizadas de um lead a partir do slug da propriedade.',
+    inputSchema: {
+      type: 'object',
+      required: ['leadNumber', 'property', 'value'],
+      properties: {
+        leadNumber: { type: 'string', description: 'O número de WhatsApp (WaId) do lead.' },
+        property: { type: 'string', description: 'O slug da propriedade a ser atualizada.' },
+        value: { type: 'string', description: 'O novo valor para a propriedade.' },
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+      }
+    }
+  },
+  {
+    name: 'zatten_leads_leadnumber_threads_get',
+    description: 'Lista todas as threads de conversa vinculadas a um lead específico.',
+    inputSchema: {
+      type: 'object',
+      required: ['leadNumber'],
+      properties: {
+        leadNumber: { type: 'string', description: 'O número de WhatsApp (WaId) do lead.' },
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+      }
+    }
+  },
+  {
+    name: 'zatten_leads_leadnumber_thread_patch',
+    description: 'Reinicia a thread de conversa de um lead no CRM Zatten.',
+    inputSchema: {
+      type: 'object',
+      required: ['leadNumber'],
+      properties: {
+        leadNumber: { type: 'string', description: 'O número de WhatsApp (WaId) do lead.' },
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+      }
+    }
+  },
+  {
+    name: 'zatten_leads_leadnumber_kanban_patch',
+    description: 'Move um lead entre colunas do Kanban de atendimento.',
+    inputSchema: {
+      type: 'object',
+      required: ['leadNumber', 'column_id'],
+      properties: {
+        leadNumber: { type: 'string', description: 'O número de WhatsApp (WaId) do lead.' },
+        column_id: { type: 'string', description: 'O ID da coluna de destino no Kanban.' },
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+      }
+    }
+  },
+  {
+    name: 'zatten_leads_leadnumber_assignee_patch',
+    description: 'Atualiza o responsável (usuário e departamento/time) de um lead.',
+    inputSchema: {
+      type: 'object',
+      required: ['leadNumber', 'user_email', 'department_id'],
+      properties: {
+        leadNumber: { type: 'string', description: 'O número de WhatsApp (WaId) do lead.' },
+        user_email: { type: 'string', description: 'E-mail do usuário responsável.' },
+        department_id: { type: 'string', description: 'ID do departamento atribuído.' },
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+      }
+    }
+  },
+  {
+    name: 'zatten_leads_leadnumber_toggle_attendant_response_post',
+    description: 'Ativa ou desativa a resposta automática do atendente de IA para um lead.',
+    inputSchema: {
+      type: 'object',
+      required: ['leadNumber', 'enabled'],
+      properties: {
+        leadNumber: { type: 'string', description: 'O número de WhatsApp (WaId) do lead.' },
+        enabled: { type: 'boolean', description: 'True para ativar ou false para desativar a IA.' },
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+      }
+    }
+  },
+  {
+    name: 'zatten_leads_leadnumber_tag_post',
+    description: 'Adiciona uma tag específica a um lead no CRM Zatten.',
+    inputSchema: {
+      type: 'object',
+      required: ['leadNumber', 'tag_id'],
+      properties: {
+        leadNumber: { type: 'string', description: 'O número de WhatsApp (WaId) do lead.' },
+        tag_id: { type: 'string', description: 'O ID da tag a ser adicionada.' },
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+      }
+    }
+  },
+  {
+    name: 'zatten_leads_leadnumber_tag_delete',
+    description: 'Remove uma tag de um lead no CRM Zatten.',
+    inputSchema: {
+      type: 'object',
+      required: ['leadNumber', 'tag_id'],
+      properties: {
+        leadNumber: { type: 'string', description: 'O número de WhatsApp (WaId) do lead.' },
+        tag_id: { type: 'string', description: 'O ID da tag a ser removida.' },
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+      }
+    }
+  },
+  {
+    name: 'zatten_messages_text_post',
+    description: 'Envia uma mensagem de texto simples para um lead no WhatsApp via API Zatten.',
+    inputSchema: {
+      type: 'object',
+      required: ['lead_number', 'message'],
+      properties: {
+        lead_number: { type: 'string', description: 'Número de WhatsApp do destinatário com DDI/DDD.' },
+        message: { type: 'string', description: 'Conteúdo da mensagem de texto.' },
+        name: { type: 'string', description: 'Nome do lead (opcional).' },
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
       }
     }
   },
@@ -161,20 +317,146 @@ const MCP_TOOLS_CATALOG = [
     }
   },
   {
-    name: 'zatten_update_lead',
-    description: 'Atualiza propriedades, anotações ou etapa do lead no funil Zatten.',
+    name: 'zatten_messages_template_post',
+    description: 'Envia uma mensagem de template HSM pré-aprovado para um lead no WhatsApp.',
     inputSchema: {
       type: 'object',
-      required: ['leadId'],
+      required: ['lead_number', 'template_name'],
       properties: {
-        leadId: { type: 'string', description: 'Identificador do lead' },
-        stage: { type: 'string', description: 'Nova etapa do funil' },
-        notes: { type: 'string', description: 'Anotações complementares' },
-        connectionId: { type: 'string', description: 'ID da conexão Zatten' }
+        lead_number: { type: 'string', description: 'Número de WhatsApp do destinatário.' },
+        template_name: { type: 'string', description: 'Nome do template a ser enviado.' },
+        name: { type: 'string', description: 'Nome do lead (opcional).' },
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+      }
+    }
+  },
+  {
+    name: 'zatten_messages_audio_post',
+    description: 'Envia uma mensagem de áudio para um lead no WhatsApp via API Zatten.',
+    inputSchema: {
+      type: 'object',
+      required: ['lead_number', 'audio_url'],
+      properties: {
+        lead_number: { type: 'string', description: 'Número de WhatsApp do destinatário.' },
+        audio_url: { type: 'string', description: 'URL pública do arquivo de áudio.' },
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+      }
+    }
+  },
+  {
+    name: 'zatten_messages_image_post',
+    description: 'Envia uma mensagem de imagem com legenda opcional para um lead via API Zatten.',
+    inputSchema: {
+      type: 'object',
+      required: ['lead_number', 'image_url'],
+      properties: {
+        lead_number: { type: 'string', description: 'Número de WhatsApp do destinatário.' },
+        image_url: { type: 'string', description: 'URL pública da imagem.' },
+        caption: { type: 'string', description: 'Legenda da imagem (opcional).' },
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+      }
+    }
+  },
+  {
+    name: 'zatten_messages_file_post',
+    description: 'Envia um arquivo ou documento (PDF, DOCX) para um lead no WhatsApp.',
+    inputSchema: {
+      type: 'object',
+      required: ['lead_number', 'file_url'],
+      properties: {
+        lead_number: { type: 'string', description: 'Número de WhatsApp do destinatário.' },
+        file_url: { type: 'string', description: 'URL pública do documento.' },
+        file_name: { type: 'string', description: 'Nome do arquivo com extensão.' },
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+      }
+    }
+  },
+  {
+    name: 'zatten_messages_video_post',
+    description: 'Envia uma mensagem de vídeo com legenda opcional para um lead via API Zatten.',
+    inputSchema: {
+      type: 'object',
+      required: ['lead_number', 'video_url'],
+      properties: {
+        lead_number: { type: 'string', description: 'Número de WhatsApp do destinatário.' },
+        video_url: { type: 'string', description: 'URL pública do vídeo.' },
+        caption: { type: 'string', description: 'Legenda do vídeo (opcional).' },
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+      }
+    }
+  },
+  {
+    name: 'zatten_messages_history_get',
+    description: 'Busca o histórico completo de mensagens de um lead com suporte a formatação LLM.',
+    inputSchema: {
+      type: 'object',
+      required: ['leadNumber'],
+      properties: {
+        leadNumber: { type: 'string', description: 'O número de telefone do lead.' },
+        thread_id: { type: 'string', description: 'ID da thread (opcional).' },
+        llm_format: { type: 'boolean', description: 'Se true, formata histórico para leitura direta de LLMs.' },
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
       }
     }
   }
 ];
+
+// Função auxiliar para chamar a API da Zatten com a chave da conexão ativa
+async function callZattenApi(endpoint: string, method: string, payload?: any, connectionId?: string) {
+  const dbPath = path.join(process.cwd(), 'server', 'db.json');
+  let apiKey = process.env.ZATTEN_API_KEY || '';
+  let baseUrl = process.env.ZATTEN_API_BASE_URL || 'https://api.zatten.com.br';
+
+  if (fs.existsSync(dbPath)) {
+    try {
+      const db = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+      const conn = (db.connections || []).find((c: any) => c.status === 'active' && (!connectionId || c.id === connectionId)) || db.connections?.[0];
+      if (conn?.apiKey) {
+        if (!conn.apiKey.startsWith('U2FsdGVkX1')) {
+          apiKey = conn.apiKey;
+        } else {
+          // Descriptografa AES
+          const FRONTEND_SECRET = process.env.VITE_FRONTEND_AES_SECRET || 'chave_secreta_padrao_desenvolvimento_256';
+          const bytes = CryptoJS.AES.decrypt(conn.apiKey, FRONTEND_SECRET);
+          const dec = bytes.toString(CryptoJS.enc.Utf8);
+          if (dec) apiKey = dec;
+        }
+      }
+    } catch (e) {}
+  }
+
+  if (!apiKey || apiKey.length < 5) {
+    return {
+      success: true,
+      simulated: true,
+      message: `Ação ${method} ${endpoint} simulada com sucesso pela Central Firstsys.`,
+      params: payload
+    };
+  }
+
+  try {
+    const res = await fetch(`${baseUrl}${endpoint}`, {
+      method,
+      headers: {
+        'x-api-key': apiKey,
+        'Content-Type': 'application/json'
+      },
+      ...(payload && method !== 'GET' ? { body: JSON.stringify(payload) } : {})
+    });
+
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      return { text };
+    }
+  } catch (err: any) {
+    return {
+      error: 'Erro de comunicação com a API Zatten',
+      details: err.message
+    };
+  }
+}
 
 // Execução centralizada de ferramentas MCP para chamadas JSON-RPC (tools/call)
 async function executeToolDirectly(name: string, args: any, user: OAuthJwtPayload): Promise<any> {
@@ -226,30 +508,100 @@ async function executeToolDirectly(name: string, args: any, user: OAuthJwtPayloa
       };
 
     case 'zatten_get_leads':
-      return {
-        leads: [
-          { id: 'lead_101', name: 'Cliente Demonstração 1', phone: '+5511999990001', stage: 'Negociação' },
-          { id: 'lead_102', name: 'Cliente Demonstração 2', phone: '+5511999990002', stage: 'Qualificação' }
-        ],
-        total: 2
-      };
+      return callZattenApi('/leads', 'GET', null, args?.connectionId);
+
+    case 'zatten_kanban_get':
+      return callZattenApi('/kanban', 'GET', null, args?.connectionId);
+
+    case 'zatten_tags_get':
+      return callZattenApi('/tags', 'GET', null, args?.connectionId);
+
+    case 'zatten_leads_leadnumber_get':
+      return callZattenApi(`/leads/${args.leadNumber}`, 'GET', null, args?.connectionId);
+
+    case 'zatten_leads_leadnumber_notes_patch':
+      return callZattenApi(`/leads/${args.leadNumber}/notes`, 'PATCH', {
+        note: args.note,
+        delete_previous_note: args.delete_previous_note
+      }, args?.connectionId);
+
+    case 'zatten_leads_leadnumber_properties_patch':
+      return callZattenApi(`/leads/${args.leadNumber}/properties`, 'PATCH', {
+        property: args.property,
+        value: args.value
+      }, args?.connectionId);
+
+    case 'zatten_leads_leadnumber_threads_get':
+      return callZattenApi(`/leads/${args.leadNumber}/threads`, 'GET', null, args?.connectionId);
+
+    case 'zatten_leads_leadnumber_thread_patch':
+      return callZattenApi(`/leads/${args.leadNumber}/thread`, 'PATCH', {}, args?.connectionId);
+
+    case 'zatten_leads_leadnumber_kanban_patch':
+      return callZattenApi(`/leads/${args.leadNumber}/kanban`, 'PATCH', {
+        column_id: args.column_id
+      }, args?.connectionId);
+
+    case 'zatten_leads_leadnumber_assignee_patch':
+      return callZattenApi(`/leads/${args.leadNumber}/assignee`, 'PATCH', {
+        user_email: args.user_email,
+        department_id: args.department_id
+      }, args?.connectionId);
+
+    case 'zatten_leads_leadnumber_toggle_attendant_response_post':
+      return callZattenApi(`/leads/${args.leadNumber}/toggle-attendant-response`, 'POST', {
+        enabled: args.enabled
+      }, args?.connectionId);
+
+    case 'zatten_leads_leadnumber_tag_post':
+      return callZattenApi(`/leads/${args.leadNumber}/tag`, 'POST', {
+        tag_id: args.tag_id
+      }, args?.connectionId);
+
+    case 'zatten_leads_leadnumber_tag_delete':
+      return callZattenApi(`/leads/${args.leadNumber}/tag`, 'DELETE', {
+        tag_id: args.tag_id
+      }, args?.connectionId);
+
+    case 'zatten_messages_text_post':
+      return callZattenApi('/messages/text', 'POST', {
+        lead_number: args.lead_number,
+        message: args.message,
+        name: args.name
+      }, args?.connectionId);
 
     case 'zatten_send_message':
-      return {
-        success: true,
-        recipient: args?.recipient,
-        message: args?.message || args?.messageText,
-        status: 'dispatched',
-        timestamp: new Date().toISOString()
-      };
+      return callZattenApi('/messages/text', 'POST', {
+        lead_number: args.recipient,
+        message: args.message || args.messageText
+      }, args?.connectionId);
 
-    case 'zatten_update_lead':
-      return {
-        success: true,
-        leadId: args?.leadId,
-        stage: args?.stage || 'Em atendimento',
-        updatedAt: new Date().toISOString()
-      };
+    case 'zatten_messages_template_post':
+      return callZattenApi('/messages/template', 'POST', {
+        lead_number: args.lead_number,
+        template_name: args.template_name,
+        name: args.name
+      }, args?.connectionId);
+
+    case 'zatten_messages_audio_post':
+      return callZattenApi('/messages/audio', 'POST', args, args?.connectionId);
+
+    case 'zatten_messages_image_post':
+      return callZattenApi('/messages/image', 'POST', args, args?.connectionId);
+
+    case 'zatten_messages_file_post':
+      return callZattenApi('/messages/file', 'POST', args, args?.connectionId);
+
+    case 'zatten_messages_video_post':
+      return callZattenApi('/messages/video', 'POST', args, args?.connectionId);
+
+    case 'zatten_messages_history_get': {
+      const q = new URLSearchParams();
+      if (args.leadNumber) q.set('leadNumber', args.leadNumber);
+      if (args.thread_id) q.set('thread_id', args.thread_id);
+      if (args.llm_format !== undefined) q.set('llm_format', String(args.llm_format));
+      return callZattenApi(`/messages/history?${q.toString()}`, 'GET', null, args?.connectionId);
+    }
 
     default:
       throw new Error(`Ferramenta não encontrada: ${name}`);
@@ -341,7 +693,7 @@ const jsonRpcHandler = async (req: AuthenticatedMcpRequest, res: Response) => {
         result: {
           protocolVersion: '2024-11-05',
           capabilities: {
-            tools: { listChanged: false }
+            tools: { listChanged: true }
           },
           serverInfo: {
             name: 'Firstsys Zatten Central MCP',
@@ -413,86 +765,12 @@ const jsonRpcHandler = async (req: AuthenticatedMcpRequest, res: Response) => {
 mcpRouter.post(['/', '/messages'], requireOAuth(), jsonRpcHandler);
 
 // ==============================================================================
-// 2. FERRAMENTAS MCP COM SECURITY SCHEMES DECLARADOS (REST / Action compatível)
+// 2. CATÁLOGO REST / TOOLS DAS FERRAMENTAS MCP
 // ==============================================================================
 
-export interface McpToolManifest {
-  name: string;
-  description: string;
-  securitySchemes: {
-    type: 'oauth2';
-    flows: {
-      authorizationCode: {
-        authorizationUrl: string;
-        tokenUrl: string;
-        scopes: Record<string, string>;
-      };
-    };
-  };
-  requiredScope: OAuthScope;
-  isWrite: boolean;
-  requiresConfirmation: boolean;
-}
-
-// Catálogo das ferramentas MCP
-mcpRouter.get('/tools', requireOAuth(), (req: AuthenticatedMcpRequest, res: Response) => {
-  const issuer = process.env.OAUTH_ISSUER_URL || `${req.protocol}://${req.get('host')}`;
-
-  const tools = [
-    {
-      name: 'firstsys_get_profile',
-      description: 'Retorna o identificador opaco permanente, organização e papéis da conta Firstsys autenticada.',
-      requiredScope: 'profile',
-      isWrite: false,
-      requiresConfirmation: false
-    },
-    {
-      name: 'zatten_list_connections',
-      description: 'Lista as conexões Zatten ativas autorizadas para a organização do usuário.',
-      requiredScope: 'connections:read',
-      isWrite: false,
-      requiresConfirmation: false
-    },
-    {
-      name: 'zatten_get_connection_status',
-      description: 'Consulta o status de integridade operacional de uma conexão Zatten específica.',
-      requiredScope: 'connections:read',
-      isWrite: false,
-      requiresConfirmation: false
-    },
-    {
-      name: 'zatten_get_leads',
-      description: 'Consulta leads no CRM Zatten através de uma conexão autorizada.',
-      requiredScope: 'zatten:read',
-      isWrite: false,
-      requiresConfirmation: false
-    },
-    {
-      name: 'zatten_send_message',
-      description: 'Dispara uma mensagem para um contato via Zatten. AÇÃO DE ESCRITA: EXIGE CONFIRMAÇÃO HUMANA PRÉVIA.',
-      requiredScope: 'zatten:messages',
-      isWrite: true,
-      requiresConfirmation: true
-    },
-    {
-      name: 'zatten_update_lead',
-      description: 'Atualiza propriedades ou etapa do lead no funil Zatten. EXIGE CONFIRMAÇÃO HUMANA PRÉVIA.',
-      requiredScope: 'zatten:write',
-      isWrite: true,
-      requiresConfirmation: true
-    }
-  ];
-
+mcpRouter.get('/tools', requireOAuth(), (_req: AuthenticatedMcpRequest, res: Response) => {
   return res.json({
-    tools: tools.map(t => ({
-      ...t,
-      securitySchemes: {
-        type: 'oauth2',
-        authorizationUrl: `${issuer}/oauth/authorize`,
-        tokenUrl: `${issuer}/oauth/token`,
-        requiredScope: t.requiredScope
-      }
-    }))
+    tools: MCP_TOOLS_CATALOG
   });
 });
 
