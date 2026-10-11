@@ -631,7 +631,7 @@ async function buildMediaFormData(
     } else {
       dummyContent = Buffer.from(`Mídia gerada para teste técnico MCP (${type})`);
     }
-    fileBlob = new Blob([dummyContent], { type: defaultMimeTypes[type] });
+    fileBlob = new Blob([new Uint8Array(dummyContent)], { type: defaultMimeTypes[type] });
   }
 
   form.append('file', fileBlob, filename);
@@ -1341,7 +1341,8 @@ mcpRouter.post('/tools/zatten_send_message', requireOAuth('zatten:messages'), as
 // diretamente via POST /mcp/tools/:toolName com autorização Bearer OAuth 2.1.
 // ==============================================================================
 mcpRouter.post('/tools/:toolName', requireOAuth(), async (req: AuthenticatedMcpRequest, res: Response) => {
-  const { toolName } = req.params;
+  const rawToolName = req.params.toolName;
+  const toolName = Array.isArray(rawToolName) ? rawToolName[0] : String(rawToolName || '');
   const user = req.oauthUser!;
   const args = req.body || {};
 
