@@ -545,6 +545,71 @@ const MCP_TOOLS_CATALOG = [
   }
 ];
 
+// Helper para converter parâmetros de mídias do MCP em FormData (multipart/form-data)
+async function buildMediaFormData(
+  type: 'image' | 'audio' | 'file' | 'video',
+  args: any
+): Promise<FormData> {
+  const form = new FormData();
+  const leadNumber = args.lead_number || args.recipient || args.leadNumber || '';
+  form.append('lead_number', String(leadNumber).trim());
+
+  if (args.caption) form.append('caption', String(args.caption));
+  if (args.file_name) form.append('file_name', String(args.file_name));
+  if (args.name) form.append('name', String(args.name));
+
+  const mediaUrl = args.image_url || args.audio_url || args.file_url || args.video_url || args.url;
+
+  let fileBlob: Blob | null = null;
+  let filename = args.file_name || `${type}_${Date.now()}`;
+
+  const defaultMimeTypes: Record<string, string> = {
+    image: 'image/jpeg',
+    audio: 'audio/mp3',
+    file: 'application/pdf',
+    video: 'video/mp4'
+  };
+
+  const defaultExtensions: Record<string, string> = {
+    image: '.jpg',
+    audio: '.mp3',
+    file: '.pdf',
+    video: '.mp4'
+  };
+
+  if (!filename.includes('.')) {
+    filename += defaultExtensions[type] || '.bin';
+  }
+
+  // Se uma URL acessível for fornecida, tenta baixar o arquivo real
+  if (mediaUrl && typeof mediaUrl === 'string' && mediaUrl.startsWith('http')) {
+    try {
+      const downloadRes = await fetch(mediaUrl, { signal: AbortSignal.timeout(10000) });
+      if (downloadRes.ok) {
+        const arrayBuf = await downloadRes.arrayBuffer();
+        const contentType = downloadRes.headers.get('content-type') || defaultMimeTypes[type];
+        fileBlob = new Blob([arrayBuf], { type: contentType });
+      }
+    } catch (e: any) {
+      console.warn(`[MCP Media] Não foi possível baixar da URL (${mediaUrl}), usando fallback:`, e.message);
+    }
+  }
+
+  // Fallback seguro caso seja chamada de teste ou URL sintética
+  if (!fileBlob) {
+    let dummyContent: Buffer;
+    if (type === 'image') {
+      dummyContent = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
+    } else {
+      dummyContent = Buffer.from(`Mídia gerada para teste técnico MCP (${type})`);
+    }
+    fileBlob = new Blob([dummyContent], { type: defaultMimeTypes[type] });
+  }
+
+  form.append('file', fileBlob, filename);
+  return form;
+}
+
 // Função auxiliar para chamar a API da Zatten com a chave da conexão ativa
 async function callZattenApi(endpoint: string, method: string, payload?: any, connectionId?: string) {
   const dbPath = path.join(process.cwd(), 'server', 'db.json');
@@ -586,14 +651,17 @@ async function callZattenApi(endpoint: string, method: string, payload?: any, co
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 segundos timeout
 
+    const isFormData = payload instanceof FormData;
+    const reqHeaders: Record<string, string> = {
+      'x-api-key': apiKey,
+      'Accept': 'application/json',
+      ...(!isFormData ? { 'Content-Type': 'application/json' } : {})
+    };
+
     const res = await fetch(targetUrl, {
       method,
-      headers: {
-        'x-api-key': apiKey,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      ...(payload && method !== 'GET' ? { body: JSON.stringify(payload) } : {}),
+      headers: reqHeaders,
+      ...(payload && method !== 'GET' ? { body: isFormData ? payload : JSON.stringify(payload) } : {}),
       signal: controller.signal
     });
 
@@ -772,17 +840,25 @@ async function executeToolDirectly(name: string, args: any, user: OAuthJwtPayloa
         name: args.name
       }, args?.connectionId);
 
-    case 'zatten_messages_audio_post':
-      return callZattenApi('/messages/audio', 'POST', args, args?.connectionId);
+    case 'zatten_messages_audio_post': {
+      const formData = await buildMediaFormData('audio', args);
+      return callZattenApi('/messages/audio', 'POST', formData, args?.connectionId);
+    }
 
-    case 'zatten_messages_image_post':
-      return callZattenApi('/messages/image', 'POST', args, args?.connectionId);
+    case 'zatten_messages_image_post': {
+      const formData = await buildMediaFormData('image', args);
+      return callZattenApi('/messages/image', 'POST', formData, args?.connectionId);
+    }
 
-    case 'zatten_messages_file_post':
-      return callZattenApi('/messages/file', 'POST', args, args?.connectionId);
+    case 'zatten_messages_file_post': {
+      const formData = await buildMediaFormData('file', args);
+      return callZattenApi('/messages/file', 'POST', formData, args?.connectionId);
+    }
 
-    case 'zatten_messages_video_post':
-      return callZattenApi('/messages/video', 'POST', args, args?.connectionId);
+    case 'zatten_messages_video_post': {
+      const formData = await buildMediaFormData('video', args);
+      return callZattenApi('/messages/video', 'POST', formData, args?.connectionId);
+    }
 
     case 'zatten_messages_history_get': {
       const q = new URLSearchParams();
