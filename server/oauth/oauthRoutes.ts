@@ -166,8 +166,10 @@ oauthRouter.get('/oauth/authorize', (req: Request, res: Response) => {
     } = parseResult.data;
 
     // 1. Validação estrita de Redirect URI (Sem curingas)
+    console.log('🔑 [OAuth Authorize]', { client_id, redirect_uri });
     const isUriAllowed = oauthStore.validateRedirectUri(client_id, redirect_uri);
     if (!isUriAllowed) {
+      console.warn('⚠️ [OAuth Authorize Rejeitado: Redirect URI não permitida]', { client_id, redirect_uri });
       return res.status(400).json({
         error: 'invalid_request',
         error_description: 'Redirect URI não autorizada ou incompatível com a allowlist estrita do cliente.'

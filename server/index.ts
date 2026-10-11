@@ -452,10 +452,10 @@ app.post('/api/login', loginLimiter, (req, res) => {
       { expiresIn: '12h' }
     );
 
-    // Proteção E: Set-Cookie HttpOnly com SameSite=Strict (Mitigação de XSS)
+    // Proteção E: Set-Cookie HttpOnly com SameSite=Lax (Suporte a top-level redirects OAuth)
     const isProd = process.env.NODE_ENV === 'production';
     res.setHeader('Set-Cookie', [
-      `zatten_session=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=43200${isProd ? '; Secure' : ''}`
+      `zatten_session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=43200${isProd ? '; Secure' : ''}`
     ]);
 
     res.json({ 
