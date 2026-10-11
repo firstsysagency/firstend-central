@@ -254,25 +254,6 @@ const MCP_TOOLS_CATALOG = [
     tags: ['crm', 'leads', 'threads']
   },
   {
-    name: 'zatten_leads_leadnumber_thread_patch',
-    title: 'Reiniciar Thread de Conversa do Lead (Ação Destrutiva)',
-    description: 'Reinicia a thread de conversa de um lead no CRM Zatten. AÇÃO DESTRUTIVA: Apaga o contexto da thread atual de IA/conversa do lead. Exige confirmação explícita (confirm: true).',
-    inputSchema: {
-      type: 'object',
-      required: ['leadNumber', 'confirm'],
-      properties: {
-        leadNumber: { type: 'string', description: 'O número de WhatsApp (WaId) do lead.' },
-        confirm: { type: 'boolean', description: 'Confirmação consciente de que deseja reiniciar e apagar o contexto da thread do lead.' },
-        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
-      }
-    },
-    securitySchemes: [
-      { type: 'oauth2', scopes: ['zatten:write', 'zatten_leads_leadnumber_thread_patch', 'tool:zatten_leads_leadnumber_thread_patch'] }
-    ],
-    annotations: { readOnlyHint: false, destructiveHint: true },
-    tags: ['crm', 'leads', 'threads', 'destructive']
-  },
-  {
     name: 'zatten_leads_leadnumber_kanban_patch',
     title: 'Mover Lead no Kanban',
     description: 'Move um lead entre colunas do Kanban de atendimento.',
@@ -589,23 +570,6 @@ const MCP_TOOLS_CATALOG = [
     ],
     annotations: { readOnlyHint: true, destructiveHint: false },
     tags: ['messages', 'templates', 'hsm']
-  },
-  {
-    name: 'zatten_explain_lead_lookup',
-    title: 'Orientações de Consulta de Leads no CRM Zatten',
-    description: 'Explica as diretrizes de busca de leads no CRM Zatten. Orienta o LLM a sempre utilizar zatten_leads_leadnumber_get fornecendo o número de telefone/WhatsApp (WaId) ou zatten_kanban_get para as colunas.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        leadNumber: { type: 'string', description: 'Número de WhatsApp (WaId) do lead para consulta direta (opcional)' },
-        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
-      }
-    },
-    securitySchemes: [
-      { type: 'oauth2', scopes: ['zatten:read', 'zatten_explain_lead_lookup', 'tool:zatten_explain_lead_lookup'] }
-    ],
-    annotations: { readOnlyHint: true, destructiveHint: false },
-    tags: ['crm', 'leads', 'guide']
   }
 ];
 
@@ -967,10 +931,21 @@ async function executeToolDirectly(name: string, args: any, user: OAuthJwtPayloa
           dbDepartments = dbData.departments || [];
         } catch {}
       }
+      const usersList = dbAttendants.map(a => ({
+        id: a.id,
+        name: a.name,
+        email: a.email,
+        role: a.role,
+        departmentId: a.department?.id || (dbDepartments[0]?.id || ''),
+        departmentName: a.department?.name || (dbDepartments[0]?.name || '')
+      }));
       return {
-        attendants: dbAttendants,
+        users: usersList,
+        attendants: usersList,
+        responsaveis: usersList,
         departments: dbDepartments,
-        total: dbAttendants.length
+        total: usersList.length,
+        help: "Utilize o e-mail (user_email) e o department_id de um dos responsáveis acima para atribuir o lead via zatten_leads_leadnumber_assignee_patch."
       };
     }
 
@@ -985,8 +960,9 @@ async function executeToolDirectly(name: string, args: any, user: OAuthJwtPayloa
       }
       return {
         templates: dbTemplates,
+        hsm_templates: dbTemplates,
         total: dbTemplates.length,
-        info: 'Templates HSM cadastrados e aprovados pela Meta WhatsApp Business API para envio via zatten_messages_template_post.'
+        info: 'Templates HSM cadastrados e aprovados pela Meta WhatsApp Business API disponíveis para envio via zatten_messages_template_post.'
       };
     }
 
