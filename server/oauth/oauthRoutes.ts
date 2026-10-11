@@ -816,6 +816,99 @@ const openApiHandler = (req: Request, res: Response) => {
             }
           }
         }
+      },
+      '/mcp/tools/zatten_attendants_list': {
+        post: {
+          operationId: 'zatten_attendants_list',
+          summary: 'Listar atendentes e departamentos ativos',
+          description: 'Obtém a lista de atendentes ativos cadastrados na Zatten (com e-mail, ID e departamento) para uso na atribuição de responsáveis via zatten_leads_leadnumber_assignee_patch.',
+          requestBody: {
+            required: false,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    connectionId: { type: 'string', description: 'ID opcional da conexão Zatten' }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            '200': {
+              description: 'Lista de atendentes e departamentos retornada com sucesso',
+              content: {
+                'application/json': {
+                  schema: { type: 'object' }
+                }
+              }
+            }
+          }
+        }
+      },
+      '/mcp/tools/zatten_templates_list': {
+        post: {
+          operationId: 'zatten_templates_list',
+          summary: 'Listar templates HSM aprovados',
+          description: 'Consulta a lista de templates HSM aprovados pela Meta WhatsApp Business API disponíveis para envio através de zatten_messages_template_post.',
+          requestBody: {
+            required: false,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    connectionId: { type: 'string', description: 'ID opcional da conexão Zatten' }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            '200': {
+              description: 'Templates HSM retornados com sucesso',
+              content: {
+                'application/json': {
+                  schema: { type: 'object' }
+                }
+              }
+            }
+          }
+        }
+      },
+      '/mcp/tools/zatten_leads_leadnumber_thread_patch': {
+        post: {
+          operationId: 'zatten_leads_leadnumber_thread_patch',
+          summary: 'Reiniciar thread de conversa do lead (Ação Destrutiva)',
+          description: 'AÇÃO DESTRUTIVA: Apaga o contexto da thread ativa de IA/conversa de um lead. Exige confirmação consciente fornecendo confirm: true.',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['leadNumber', 'confirm'],
+                  properties: {
+                    leadNumber: { type: 'string', description: 'Número de WhatsApp (WaId) do lead' },
+                    confirm: { type: 'boolean', description: 'Confirmação consciente de reinício da thread (obrigatório: true)' },
+                    connectionId: { type: 'string', description: 'ID opcional da conexão Zatten' }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            '200': {
+              description: 'Thread reiniciada com sucesso',
+              content: {
+                'application/json': {
+                  schema: { type: 'object' }
+                }
+              }
+            }
+          }
+        }
       }
     },
     components: {

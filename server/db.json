@@ -168,5 +168,41 @@
       "description": "Busca informações de todas as tags disponíveis.",
       "enabled": true
     }
+  ],
+  "attendants": [
+    {
+      "id": "fb0c39bd-b88f-4dcf-880c-ef945c61654e",
+      "name": "Lucas Santos",
+      "email": "contato@firstsys.com.br",
+      "role": "Consultor Comercial & Atendimento",
+      "status": "active",
+      "department": {
+        "id": "9fe6b1ec-2cac-49d9-b18b-4f7750f60a39",
+        "name": "Comercial e Atendimento"
+      }
+    }
+  ],
+  "departments": [
+    {
+      "id": "9fe6b1ec-2cac-49d9-b18b-4f7750f60a39",
+      "name": "Comercial e Atendimento",
+      "description": "Equipe responsável por atendimento, qualificação e suporte a clientes"
+    }
+  ],
+  "templates": [
+    {
+      "name": "hello_world",
+      "category": "UTILITY",
+      "language": "pt_BR",
+      "status": "APPROVED",
+      "description": "Template padrão de introdução e boas-vindas aprovado pela Meta WhatsApp Business API."
+    },
+    {
+      "name": "confirmacao_atendimento",
+      "category": "UTILITY",
+      "language": "pt_BR",
+      "status": "APPROVED",
+      "description": "Template de confirmação de agendamento e alinhamento de atendimento ao lead."
+    }
   ]
 }

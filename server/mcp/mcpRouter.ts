@@ -255,21 +255,22 @@ const MCP_TOOLS_CATALOG = [
   },
   {
     name: 'zatten_leads_leadnumber_thread_patch',
-    title: 'Reiniciar Thread de Conversa do Lead',
-    description: 'Reinicia a thread de conversa de um lead no CRM Zatten.',
+    title: 'Reiniciar Thread de Conversa do Lead (Ação Destrutiva)',
+    description: 'Reinicia a thread de conversa de um lead no CRM Zatten. AÇÃO DESTRUTIVA: Apaga o contexto da thread atual de IA/conversa do lead. Exige confirmação explícita (confirm: true).',
     inputSchema: {
       type: 'object',
-      required: ['leadNumber'],
+      required: ['leadNumber', 'confirm'],
       properties: {
         leadNumber: { type: 'string', description: 'O número de WhatsApp (WaId) do lead.' },
+        confirm: { type: 'boolean', description: 'Confirmação consciente de que deseja reiniciar e apagar o contexto da thread do lead.' },
         connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
       }
     },
     securitySchemes: [
       { type: 'oauth2', scopes: ['zatten:write', 'zatten_leads_leadnumber_thread_patch', 'tool:zatten_leads_leadnumber_thread_patch'] }
     ],
-    annotations: { readOnlyHint: false, destructiveHint: false },
-    tags: ['crm', 'leads', 'threads']
+    annotations: { readOnlyHint: false, destructiveHint: true },
+    tags: ['crm', 'leads', 'threads', 'destructive']
   },
   {
     name: 'zatten_leads_leadnumber_kanban_patch',
@@ -524,6 +525,38 @@ const MCP_TOOLS_CATALOG = [
     ],
     annotations: { readOnlyHint: true, destructiveHint: false },
     tags: ['messages', 'history', 'whatsapp']
+  },
+  {
+    name: 'zatten_attendants_list',
+    title: 'Listar Atendentes e Departamentos Ativos',
+    description: 'Obtém a lista de atendentes ativos cadastrados na Zatten (com e-mail, ID e departamento) para uso na atribuição de responsáveis via zatten_leads_leadnumber_assignee_patch.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['zatten:read', 'zatten_attendants_list', 'tool:zatten_attendants_list'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['crm', 'attendants', 'team']
+  },
+  {
+    name: 'zatten_templates_list',
+    title: 'Listar Templates HSM Aprovados',
+    description: 'Consulta a lista de templates HSM aprovados pela Meta WhatsApp Business API disponíveis para envio através de zatten_messages_template_post.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['zatten:read', 'zatten_templates_list', 'tool:zatten_templates_list'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['messages', 'templates', 'hsm']
   }
 ];
 
@@ -788,8 +821,16 @@ async function executeToolDirectly(name: string, args: any, user: OAuthJwtPayloa
     case 'zatten_leads_leadnumber_threads_get':
       return callZattenApi(`/leads/${args.leadNumber}/threads`, 'GET', null, args?.connectionId);
 
-    case 'zatten_leads_leadnumber_thread_patch':
+    case 'zatten_leads_leadnumber_thread_patch': {
+      if (args?.confirm !== true) {
+        return {
+          isError: true,
+          error: 'Operação destrutiva não confirmada. Reiniciar a thread apaga o contexto ativo da conversa com a IA. Para prosseguir com segurança, forneça confirm: true.',
+          destructive: true
+        };
+      }
       return callZattenApi(`/leads/${args.leadNumber}/thread`, 'PATCH', {}, args?.connectionId);
+    }
 
     case 'zatten_leads_leadnumber_kanban_patch':
       return callZattenApi(`/leads/${args.leadNumber}/kanban`, 'PATCH', {
@@ -863,6 +904,38 @@ async function executeToolDirectly(name: string, args: any, user: OAuthJwtPayloa
       if (args.thread_id) q.set('thread_id', args.thread_id);
       if (args.llm_format !== undefined) q.set('llm_format', String(args.llm_format));
       return callZattenApi(`/messages/history?${q.toString()}`, 'GET', null, args?.connectionId);
+    }
+
+    case 'zatten_attendants_list': {
+      let dbAttendants: any[] = [];
+      let dbDepartments: any[] = [];
+      if (fs.existsSync(dbPath)) {
+        try {
+          const dbData = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+          dbAttendants = dbData.attendants || [];
+          dbDepartments = dbData.departments || [];
+        } catch {}
+      }
+      return {
+        attendants: dbAttendants,
+        departments: dbDepartments,
+        total: dbAttendants.length
+      };
+    }
+
+    case 'zatten_templates_list': {
+      let dbTemplates: any[] = [];
+      if (fs.existsSync(dbPath)) {
+        try {
+          const dbData = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+          dbTemplates = dbData.templates || [];
+        } catch {}
+      }
+      return {
+        templates: dbTemplates,
+        total: dbTemplates.length,
+        info: 'Templates HSM cadastrados e aprovados pela Meta WhatsApp Business API para envio via zatten_messages_template_post.'
+      };
     }
 
     default:
