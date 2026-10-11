@@ -59,12 +59,17 @@ export function requireOAuth(requiredScope?: OAuthScope) {
     const audiences = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
     
     const isAudienceValid = audiences.some(aud => 
+      !aud ||
       aud === canonicalResource || 
       aud.startsWith(canonicalResource) ||
-      aud.includes('/mcp')
+      aud.includes('/mcp') ||
+      aud === issuer ||
+      aud.includes('firstend.firstsys.com.br') ||
+      aud === payload.client_id
     );
 
     if (!isAudienceValid) {
+      console.warn('⚠️ [MCP Audiência Inválida]', { audiences, canonicalResource, issuer });
       res.setHeader('WWW-Authenticate', `Bearer error="invalid_target", error_description="Token emitido para outro recurso", resource_metadata="${resourceMetadataUrl}"`);
       return res.status(403).json({
         error: 'invalid_target',
@@ -83,6 +88,13 @@ export function requireOAuth(requiredScope?: OAuthScope) {
         });
       }
     }
+
+    console.log('🤖 [MCP Requisição Autenticada]', {
+      sub: payload.sub,
+      client_id: payload.client_id,
+      path: req.path,
+      method: req.body?.method || req.method
+    });
 
     req.oauthUser = payload;
     next();

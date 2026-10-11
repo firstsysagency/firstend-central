@@ -73,17 +73,17 @@ export type AuthorizationRequest = z.infer<typeof AuthorizationRequestSchema>;
  */
 export const TokenExchangeCodeSchema = z.object({
   grant_type: z.literal('authorization_code'),
-  client_id: z.string().min(1),
+  client_id: z.string().min(1).optional(),
   client_secret: z.string().optional(), // Clientes confidenciais ou ChatGPT Actions enviam client_secret
   code: z.string().min(16, 'Código de autorização inválido'),
-  redirect_uri: z.string().url(),
+  redirect_uri: z.string().url().optional(),
   code_verifier: z.string().min(43).max(128, 'code_verifier deve ter entre 43 e 128 caracteres').optional(),
   resource: z.string().url().optional(),
 });
 
 export const TokenRefreshSchema = z.object({
   grant_type: z.literal('refresh_token'),
-  client_id: z.string().min(1),
+  client_id: z.string().min(1).optional(),
   client_secret: z.string().optional(),
   refresh_token: z.string().min(32, 'refresh_token inválido'),
   scope: ScopesStringSchema.optional(),

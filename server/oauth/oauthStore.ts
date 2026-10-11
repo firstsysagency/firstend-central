@@ -187,6 +187,13 @@ class OAuthStore {
   }
 
   /**
+   * Consulta um código de autorização sem consumi-lo (para inspecionar metadados como clientId)
+   */
+  public peekAuthorizationCode(code: string): AuthorizationCodeRecord | undefined {
+    return this.authCodes.get(code);
+  }
+
+  /**
    * Consome um código de autorização garantindo uso estritamente único
    */
   public consumeAuthorizationCode(code: string): AuthorizationCodeRecord | { error: string } {

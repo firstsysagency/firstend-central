@@ -91,7 +91,7 @@ const openIdConfigurationHandler = (req: Request, res: Response) => {
     code_challenge_methods_supported: ['S256'],
     subject_types_supported: ['public'],
     id_token_signing_alg_values_supported: ['RS256'],
-    token_endpoint_auth_methods_supported: ['none', 'client_secret_post'],
+    token_endpoint_auth_methods_supported: ['client_secret_basic', 'client_secret_post', 'none'],
     scopes_supported: [
       'openid', 'profile', 'email',
       'connections:read', 'connections:manage',
@@ -235,8 +235,41 @@ oauthRouter.get('/oauth/authorize', (req: Request, res: Response) => {
 
 oauthRouter.post('/oauth/token', express.urlencoded({ extended: true }), express.json(), (req: Request, res: Response) => {
   try {
+    // 1. Suporte RFC 6749 Seção 2.3.1 (client_secret_basic via HTTP Basic Auth)
+    if (req.headers.authorization && req.headers.authorization.startsWith('Basic ')) {
+      try {
+        const credentials = Buffer.from(req.headers.authorization.slice(6).trim(), 'base64').toString('utf8');
+        const colonIdx = credentials.indexOf(':');
+        if (colonIdx !== -1) {
+          const clientId = decodeURIComponent(credentials.slice(0, colonIdx));
+          const clientSecret = decodeURIComponent(credentials.slice(colonIdx + 1));
+          if (!req.body.client_id) req.body.client_id = clientId;
+          if (!req.body.client_secret) req.body.client_secret = clientSecret;
+        }
+      } catch (e) {
+        console.warn('⚠️ [OAuth Token] Falha ao extrair Basic Auth:', e);
+      }
+    }
+
+    // 2. Se client_id não foi informado no body, deduz do registro do código
+    if (!req.body.client_id && req.body.code) {
+      const peeked = oauthStore.peekAuthorizationCode(req.body.code);
+      if (peeked) {
+        req.body.client_id = peeked.clientId;
+      }
+    }
+
+    console.log('🔑 [OAuth Token Request Recebido]', {
+      grant_type: req.body?.grant_type,
+      client_id: req.body?.client_id,
+      redirect_uri: req.body?.redirect_uri,
+      has_code: !!req.body?.code,
+      has_code_verifier: !!req.body?.code_verifier
+    });
+
     const parseResult = TokenRequestSchema.safeParse(req.body);
     if (!parseResult.success) {
+      console.warn('⚠️ [OAuth Token Rejeitado por Schema]', parseResult.error.issues);
       return res.status(400).json({
         error: 'invalid_request',
         error_description: parseResult.error.issues.map(i => i.message).join('; ')
@@ -250,6 +283,7 @@ oauthRouter.post('/oauth/token', express.urlencoded({ extended: true }), express
     if (body.grant_type === 'authorization_code') {
       const codeRecord = oauthStore.consumeAuthorizationCode(body.code);
       if ('error' in codeRecord) {
+        console.warn('⚠️ [OAuth Token Rejeitado por Código]', codeRecord.error);
         return res.status(400).json({
           error: 'invalid_grant',
           error_description: codeRecord.error
@@ -257,15 +291,18 @@ oauthRouter.post('/oauth/token', express.urlencoded({ extended: true }), express
       }
 
       // Valida client_id
-      if (codeRecord.clientId !== body.client_id) {
+      const effectiveClientId = body.client_id || codeRecord.clientId;
+      if (body.client_id && codeRecord.clientId !== body.client_id) {
+        console.warn('⚠️ [OAuth Token Client ID Divergente]', { codeClientId: codeRecord.clientId, bodyClientId: body.client_id });
         return res.status(400).json({
           error: 'invalid_grant',
           error_description: 'Código de autorização não pertence a este client_id'
         });
       }
 
-      // Valida redirect_uri exata
-      if (codeRecord.redirectUri !== body.redirect_uri) {
+      // Valida redirect_uri se informada
+      if (body.redirect_uri && codeRecord.redirectUri !== body.redirect_uri) {
+        console.warn('⚠️ [OAuth Token Redirect URI Divergente]', { codeUri: codeRecord.redirectUri, bodyUri: body.redirect_uri });
         return res.status(400).json({
           error: 'invalid_grant',
           error_description: 'redirect_uri divergente da especificada na requisição de autorização'
@@ -275,6 +312,7 @@ oauthRouter.post('/oauth/token', express.urlencoded({ extended: true }), express
       // VALIDAÇÃO PKCE S256 (Obrigatória se code_challenge tiver sido fornecido)
       if (codeRecord.codeChallenge) {
         if (!body.code_verifier) {
+          console.warn('⚠️ [OAuth Token Falta code_verifier]');
           return res.status(400).json({
             error: 'invalid_grant',
             error_description: 'code_verifier é obrigatório para códigos gerados com PKCE'
@@ -284,14 +322,15 @@ oauthRouter.post('/oauth/token', express.urlencoded({ extended: true }), express
         const isPkceValid = verifyPkceChallenge(body.code_verifier, codeRecord.codeChallenge);
         if (!isPkceValid) {
           logAuditEvent({
-            actor: body.client_id,
+            actor: effectiveClientId,
             action: 'oauth.pkce.failed',
             category: 'security',
             severity: 'critical',
-            description: `Falha na verificação PKCE S256 para o cliente ${body.client_id}`,
+            description: `Falha na verificação PKCE S256 para o cliente ${effectiveClientId}`,
             ipAddress: req.ip || '127.0.0.1'
           });
 
+          console.warn('⚠️ [OAuth Token PKCE Inválido]');
           return res.status(400).json({
             error: 'invalid_grant',
             error_description: 'code_verifier inválido para o code_challenge registrado'
@@ -310,7 +349,7 @@ oauthRouter.post('/oauth/token', express.urlencoded({ extended: true }), express
       const targetAudience = body.resource || codeRecord.resource || `${issuer}/mcp`;
       const jti = `jti_${crypto.randomBytes(16).toString('hex')}`;
       const nowSec = Math.floor(Date.now() / 1000);
-      const expiresInSec = 900; // 15 minutos (Access Token curto)
+      const expiresInSec = 3600; // 1 hora de validade
 
       // Emissão de Access Token JWT assinado assimetricamente (RS256)
       const tokenPayload: OAuthJwtPayload = {
@@ -324,14 +363,14 @@ oauthRouter.post('/oauth/token', express.urlencoded({ extended: true }), express
         org_id: codeRecord.orgId,
         role: codeRecord.role,
         scope: codeRecord.scope,
-        client_id: codeRecord.clientId
+        client_id: effectiveClientId
       };
 
       const accessToken = signJwt(tokenPayload);
 
       // Emissão de Refresh Token com Família de Rastreamento
       const refreshToken = oauthStore.issueRefreshToken({
-        clientId: codeRecord.clientId,
+        clientId: effectiveClientId,
         userId: codeRecord.userId,
         userEmail: codeRecord.userEmail,
         orgId: codeRecord.orgId,
@@ -340,13 +379,35 @@ oauthRouter.post('/oauth/token', express.urlencoded({ extended: true }), express
         resource: targetAudience
       });
 
+      // Emissão de id_token se escopo openid estiver presente (OIDC Core 1.0)
+      let idToken: string | undefined;
+      if (codeRecord.scope.includes('openid')) {
+        idToken = signJwt({
+          iss: issuer,
+          sub: codeRecord.userId,
+          aud: effectiveClientId,
+          exp: nowSec + 3600,
+          iat: nowSec,
+          email: codeRecord.userEmail,
+          email_verified: true,
+          nonce: codeRecord.nonce
+        });
+      }
+
       const responsePayload: OAuthTokenResponse = {
         access_token: accessToken,
         token_type: 'Bearer',
         expires_in: expiresInSec,
         refresh_token: refreshToken,
-        scope: codeRecord.scope
+        scope: codeRecord.scope,
+        ...(idToken ? { id_token: idToken } : {})
       };
+
+      console.log('🎉 [OAuth Token Emitido com Sucesso]', {
+        client_id: effectiveClientId,
+        user: codeRecord.userEmail,
+        has_id_token: !!idToken
+      });
 
       res.setHeader('Cache-Control', 'no-store');
       res.setHeader('Pragma', 'no-cache');
