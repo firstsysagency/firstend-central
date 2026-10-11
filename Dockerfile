@@ -10,9 +10,9 @@ WORKDIR /app
 # Instalar dependências necessárias do sistema
 RUN apk add --no-cache libc6-compat wget
 
-# Instalar dependências do projeto
+# Instalar todas as dependências necessárias para o build (incluindo devDependencies como typescript)
 COPY package*.json ./
-RUN npm install
+RUN npm install --include=dev
 
 # Copiar código fonte completo
 COPY . .
