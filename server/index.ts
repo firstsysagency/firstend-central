@@ -846,12 +846,20 @@ const distPath = path.join(process.cwd(), 'dist');
 app.use(express.static(distPath));
 
 // 3. Middleware Universal para SPA (Rotas com slash / no Express 5)
-// Garante que /dashboard, /configuracoes, /mcp retornem 200 OK com index.html sem conflitar com APIs
+// Garante que /, /dashboard, /configuracoes, /settings, /new, /login, /mcp retornem index.html para o navegador
 app.use((req, res, next) => {
-  if (req.method === 'GET' && !req.path.startsWith('/api') && !req.path.startsWith('/oauth') && !req.path.startsWith('/mcp') && !req.path.startsWith('/.well-known') && !req.path.startsWith('/health')) {
-    const indexPath = path.join(distPath, 'index.html');
-    if (fs.existsSync(indexPath)) {
-      return res.sendFile(indexPath);
+  if (req.method === 'GET') {
+    const isApiOrInternal = req.path.startsWith('/api') || 
+                            req.path.startsWith('/oauth') || 
+                            req.path.startsWith('/.well-known') || 
+                            req.path === '/health';
+
+    // Se não for rota de API interna OU for /mcp acessado via navegador (Accept: text/html)
+    if (!isApiOrInternal || (req.path === '/mcp' && req.headers.accept?.includes('text/html'))) {
+      const indexPath = path.join(distPath, 'index.html');
+      if (fs.existsSync(indexPath)) {
+        return res.sendFile(indexPath);
+      }
     }
   }
   next();
