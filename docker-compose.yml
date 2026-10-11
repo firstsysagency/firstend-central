@@ -1,0 +1,183 @@
+# ==============================================================================
+# CENTRAL PRIVADA DE CONEXÕES ZATTEN — DOCKER COMPOSE MULTI-SERVIÇOS
+# Arquitetura VPS Segura: Apenas Nginx exposto nas portas 80/443
+# PostgreSQL, OpenBao, Valkey e App isolados em rede interna dos containers
+# ==============================================================================
+
+version: '3.8'
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. NGINX REVERSE PROXY & WAF DE BORDA (Único serviço com portas públicas)
+  # ----------------------------------------------------------------------------
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: firstsys_zatten_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./dist:/usr/share/nginx/html:ro
+      - firstsys_zatten_certbot_etc:/etc/letsencrypt
+      - firstsys_zatten_certbot_var:/var/www/certbot
+    networks:
+      - zatten_public
+      - zatten_internal
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ----------------------------------------------------------------------------
+  # 2. APLICAÇÃO TYPESCRIPT (Backend API, OAuth 2.1 & Servidor MCP)
+  # ----------------------------------------------------------------------------
+  app:
+    image: firstsys/zatten-central/backend:latest
+    container_name: firstsys_zatten_backend
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - OAUTH_ISSUER_URL=${AUTH_ISSUER_URL:-https://auth.firstsys.com.br}
+      - MCP_RESOURCE_IDENTIFIER=${MCP_RESOURCE_IDENTIFIER:-https://mcp.firstsys.com.br/mcp}
+      - POSTGRES_URL=postgresql://${POSTGRES_USER:-zatten_admin}:${POSTGRES_PASSWORD:-zatten_secure_pass_2026}@db:5432/${POSTGRES_DB:-zatten_central_prod}
+      - OPENBAO_URL=${OPENBAO_ADDR:-http://openbao:8200}
+      - OPENBAO_TOKEN=${OPENBAO_SERVICE_TOKEN:-${OPENBAO_TOKEN}}
+      - VALKEY_URL=redis://valkey:6379
+      - ENCRYPTION_MASTER_KEY=${APP_ENCRYPTION_KEY_HEX:-${ENCRYPTION_MASTER_KEY}}
+      # Variáveis de Conexão Zatten Coolify (Sem trânsito no frontend)
+      - ZATTEN_API_KEY=${ZATTEN_API_KEY:-}
+      - ZATTEN_CONNECTION_NAME=${ZATTEN_CONNECTION_NAME:-Zatten Produção (Coolify)}
+      - ZATTEN_ENVIRONMENT=${ZATTEN_ENVIRONMENT:-production}
+      - ZATTEN_CONNECTION_ID=${ZATTEN_CONNECTION_ID:-conn_coolify_principal}
+      - ZATTEN_CONNECTIONS_JSON=${ZATTEN_CONNECTIONS_JSON:-}
+    networks:
+      - zatten_internal
+    depends_on:
+      db:
+        condition: service_healthy
+      openbao:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/.well-known/oauth-protected-resource"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # ----------------------------------------------------------------------------
+  # 3. BANCO DE DADOS: PostgreSQL 16 com RLS Militar (Isolado na rede interna)
+  # ----------------------------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    container_name: firstsys_zatten_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-zatten_central_prod}
+      POSTGRES_USER: ${POSTGRES_USER:-zatten_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-zatten_secure_pass_2026}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - firstsys_zatten_pg_data:/var/lib/postgresql/data
+      - ./server/db/schema.sql:/docker-entrypoint-initdb.d/01-schema-rls.sql:ro
+    networks:
+      - zatten_internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-zatten_admin} -d ${POSTGRES_DB:-zatten_central_prod}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ----------------------------------------------------------------------------
+  # 4. COFRE / KMS: OpenBao (Trânsito Criptográfico fora do Banco)
+  # ----------------------------------------------------------------------------
+  openbao:
+    image: firstsys/zatten-central/openbao:latest
+    container_name: firstsys_zatten_openbao
+    restart: unless-stopped
+    cap_add:
+      - IPC_LOCK
+    command: server -config=/openbao/config/config.hcl
+    volumes:
+      - firstsys_zatten_openbao_data:/openbao/data
+      - ./docker/openbao/config.hcl:/openbao/config/config.hcl:ro
+      - ./docker/openbao/init-openbao.sh:/openbao/scripts/init.sh:ro
+    environment:
+      - BAO_ADDR=http://0.0.0.0:8200
+      - BAO_API_ADDR=http://openbao:8200
+    networks:
+      - zatten_internal
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8200/v1/sys/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # ----------------------------------------------------------------------------
+  # 5. VALKEY / REDIS: Fila por Conexão Zatten e Rate Limiting
+  # ----------------------------------------------------------------------------
+  valkey:
+    image: valkey/valkey:8-alpine
+    container_name: firstsys_zatten_valkey
+    restart: unless-stopped
+    command: valkey-server --save 60 1 --loglevel warning --requirepass ${VALKEY_PASSWORD:-valkey_secure_pass_2026}
+    volumes:
+      - firstsys_zatten_valkey_data:/data
+    networks:
+      - zatten_internal
+    healthcheck:
+      test: ["CMD", "valkey-cli", "-a", "${VALKEY_PASSWORD:-valkey_secure_pass_2026}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ----------------------------------------------------------------------------
+  # 6. CERTBOT: Renovação Automática TLS Let's Encrypt a cada 12 horas
+  # ----------------------------------------------------------------------------
+  certbot:
+    image: certbot/certbot:latest
+    container_name: firstsys_zatten_certbot
+    restart: unless-stopped
+    volumes:
+      - firstsys_zatten_certbot_etc:/etc/letsencrypt
+      - firstsys_zatten_certbot_var:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    networks:
+      - zatten_public
+
+# ------------------------------------------------------------------------------
+# REDES ISOLADAS
+# ------------------------------------------------------------------------------
+networks:
+  zatten_public:
+    name: firstsys_zatten_public
+    driver: bridge
+  zatten_internal:
+    name: firstsys_zatten_internal
+    driver: bridge
+    internal: true # Isolamento total: sem gateway externo para tráfego direto da internet
+
+# ------------------------------------------------------------------------------
+# VOLUMES NOMEADOS PERSISTENTES
+# ------------------------------------------------------------------------------
+volumes:
+  firstsys_zatten_pg_data:
+    name: firstsys_zatten_pg_data
+  firstsys_zatten_openbao_data:
+    name: firstsys_zatten_openbao_data
+  firstsys_zatten_valkey_data:
+    name: firstsys_zatten_valkey_data
+  firstsys_zatten_certbot_etc:
+    name: firstsys_zatten_certbot_etc
+  firstsys_zatten_certbot_var:
+    name: firstsys_zatten_certbot_var

@@ -1,0 +1,320 @@
+/**
+ * REPOSITÓRIO E GERENCIADOR DE ESTADO OAUTH 2.1
+ * Armazenamento de Códigos de Autorização, Rotação de Refresh Tokens e Detecção de Reuso de Família
+ * Central Privada de Conexões Zatten — Firstsys
+ */
+
+import crypto from 'crypto';
+import type { OAuthScope, UserRole } from './oauthTypes.js';
+
+export interface OAuthClient {
+  id: string;
+  name: string;
+  redirectUris: string[];
+  isConfidential: boolean;
+  hashedSecret?: string;
+  allowedScopes: OAuthScope[];
+}
+
+export interface AuthorizationCodeRecord {
+  code: string;
+  clientId: string;
+  redirectUri: string;
+  codeChallenge: string;
+  codeChallengeMethod: 'S256';
+  userId: string;
+  userEmail: string;
+  orgId: string;
+  role: UserRole;
+  scope: string;
+  resource?: string;
+  nonce?: string;
+  expiresAt: number;
+  consumed: boolean;
+}
+
+export interface RefreshTokenRecord {
+  token: string;
+  familyId: string;
+  clientId: string;
+  userId: string;
+  userEmail: string;
+  orgId: string;
+  role: UserRole;
+  scope: string;
+  resource?: string;
+  expiresAt: number;
+  consumed: boolean;
+  revoked: boolean;
+}
+
+export interface RevokedTokenEntry {
+  jti: string;
+  revokedAt: number;
+  expiresAt: number;
+}
+
+class OAuthStore {
+  // Catálogo de clientes registrados (sem curingas!)
+  private clients: Map<string, OAuthClient> = new Map();
+  // Códigos de autorização temporários
+  private authCodes: Map<string, AuthorizationCodeRecord> = new Map();
+  // Famílias de refresh tokens (mapeadas por token string)
+  private refreshTokens: Map<string, RefreshTokenRecord> = new Map();
+  // Mapeamento de famílias revogadas por suspeita de reuso
+  private revokedFamilies: Set<string> = new Set();
+  // Blacklist de JWTs revogados (por JTI)
+  private revokedJtis: Map<string, RevokedTokenEntry> = new Map();
+
+  constructor() {
+    this.seedDefaultClients();
+  }
+
+  private seedDefaultClients(): void {
+    // 1. Cliente oficial da Central Web
+    this.registerClient({
+      id: 'zatten-central-web',
+      name: 'Painel Central Zatten',
+      redirectUris: [
+        'https://keys.firstsys.com.br/oauth/callback',
+        'http://localhost:5173/oauth/callback',
+        'http://localhost:5174/oauth/callback'
+      ],
+      isConfidential: false,
+      allowedScopes: [
+        'openid', 'profile', 'email',
+        'connections:read', 'connections:manage',
+        'zatten:read', 'zatten:write', 'zatten:messages',
+        'audit:read'
+      ]
+    });
+
+    // 2. Cliente oficial OpenAI / ChatGPT (com suporte a CIMD)
+    this.registerClient({
+      id: 'chatgpt-firstsys-mcp',
+      name: 'ChatGPT Custom Action / MCP Client',
+      redirectUris: [
+        'https://chatgpt.com/aip/oauth/callback',
+        'https://chat.openai.com/aip/oauth/callback',
+        'https://openai.com/oauth/callback',
+        'http://localhost:3000/oauth/callback' // para testes
+      ],
+      isConfidential: false, // Público com PKCE S256 obrigatório
+      allowedScopes: [
+        'openid', 'profile',
+        'connections:read',
+        'zatten:read', 'zatten:write', 'zatten:messages'
+      ]
+    });
+  }
+
+  public registerClient(client: OAuthClient): void {
+    this.clients.set(client.id, client);
+  }
+
+  public getClient(clientId: string): OAuthClient | undefined {
+    return this.clients.get(clientId);
+  }
+
+  /**
+   * Validação estrita de Redirect URI: igualdade exata, sem wildcards ou correspondência parcial
+   */
+  public validateRedirectUri(clientId: string, candidateUri: string): boolean {
+    const client = this.getClient(clientId);
+    if (!client) return false;
+
+    // Regra rígida: nenhuma URL de retorno pode conter caracteres curinga (*)
+    if (candidateUri.includes('*')) return false;
+
+    return client.redirectUris.includes(candidateUri);
+  }
+
+  /**
+   * Grava um novo código de autorização após consentimento bem-sucedido
+   */
+  public createAuthorizationCode(params: Omit<AuthorizationCodeRecord, 'code' | 'consumed' | 'expiresAt'>): string {
+    const code = `code_${crypto.randomBytes(32).toString('hex')}`;
+    const record: AuthorizationCodeRecord = {
+      ...params,
+      code,
+      consumed: false,
+      expiresAt: Date.now() + 5 * 60 * 1000 // 5 minutos de validade
+    };
+
+    this.authCodes.set(code, record);
+    return code;
+  }
+
+  /**
+   * Consome um código de autorização garantindo uso estritamente único
+   */
+  public consumeAuthorizationCode(code: string): AuthorizationCodeRecord | { error: string } {
+    const record = this.authCodes.get(code);
+    if (!record) {
+      return { error: 'Código de autorização inválido ou inexistente' };
+    }
+
+    if (record.consumed) {
+      // Reuso de código detectado! Invalida por segurança
+      this.authCodes.delete(code);
+      return { error: 'Código de autorização já utilizado anteriormente (Tentativa de Replay)' };
+    }
+
+    if (Date.now() > record.expiresAt) {
+      this.authCodes.delete(code);
+      return { error: 'Código de autorização expirado' };
+    }
+
+    record.consumed = true;
+    return record;
+  }
+
+  /**
+   * Cria um novo refresh token e sua família de rastreamento
+   */
+  public issueRefreshToken(params: {
+    familyId?: string;
+    clientId: string;
+    userId: string;
+    userEmail: string;
+    orgId: string;
+    role: UserRole;
+    scope: string;
+    resource?: string;
+  }): string {
+    const token = `rt_${crypto.randomBytes(40).toString('hex')}`;
+    const familyId = params.familyId || `fam_${crypto.randomBytes(16).toString('hex')}`;
+
+    const record: RefreshTokenRecord = {
+      token,
+      familyId,
+      clientId: params.clientId,
+      userId: params.userId,
+      userEmail: params.userEmail,
+      orgId: params.orgId,
+      role: params.role,
+      scope: params.scope,
+      resource: params.resource,
+      expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000, // 30 dias
+      consumed: false,
+      revoked: false
+    };
+
+    this.refreshTokens.set(token, record);
+    return token;
+  }
+
+  /**
+   * Rotação de Refresh Token com Detecção de Reuso (RFC 6749 / OAuth 2.1)
+   */
+  public rotateRefreshToken(presentedToken: string): { 
+    valid: true; 
+    record: RefreshTokenRecord; 
+    newRefreshToken: string 
+  } | { 
+    valid: false; 
+    error: string; 
+    familyCompromised?: boolean 
+  } {
+    const record = this.refreshTokens.get(presentedToken);
+    if (!record) {
+      return { valid: false, error: 'Refresh token não reconhecido' };
+    }
+
+    // Verifica se a família inteira já foi revogada
+    if (this.revokedFamilies.has(record.familyId) || record.revoked) {
+      return { 
+        valid: false, 
+        error: 'Sessão revogada permanentemente por suspeita de comprometimento',
+        familyCompromised: true
+      };
+    }
+
+    // DETECÇÃO DE REUTILIZAÇÃO (Refresh Token Reuse Detection)
+    // Se o token já foi consumido e foi apresentado novamente: ALERTA CRÍTICO!
+    if (record.consumed) {
+      this.revokeTokenFamily(record.familyId);
+      return { 
+        valid: false, 
+        error: 'Reutilização de refresh token detectada! Toda a sessão foi revogada por segurança.',
+        familyCompromised: true 
+      };
+    }
+
+    if (Date.now() > record.expiresAt) {
+      return { valid: false, error: 'Refresh token expirado' };
+    }
+
+    // Marca o token anterior como consumido (uso único)
+    record.consumed = true;
+
+    // Emite o próximo refresh token rotacionado na mesma família
+    const newRefreshToken = this.issueRefreshToken({
+      familyId: record.familyId,
+      clientId: record.clientId,
+      userId: record.userId,
+      userEmail: record.userEmail,
+      orgId: record.orgId,
+      role: record.role,
+      scope: record.scope,
+      resource: record.resource
+    });
+
+    return {
+      valid: true,
+      record,
+      newRefreshToken
+    };
+  }
+
+  /**
+   * Revoga todos os tokens pertencentes a uma família inteira
+   */
+  public revokeTokenFamily(familyId: string): void {
+    this.revokedFamilies.add(familyId);
+    for (const record of this.refreshTokens.values()) {
+      if (record.familyId === familyId) {
+        record.revoked = true;
+      }
+    }
+  }
+
+  /**
+   * Revoga um token específico (Access Token por JTI ou Refresh Token)
+   */
+  public revokeToken(tokenString: string): boolean {
+    // 1. Se for refresh token
+    const rtRecord = this.refreshTokens.get(tokenString);
+    if (rtRecord) {
+      this.revokeTokenFamily(rtRecord.familyId);
+      return true;
+    }
+
+    // 2. Se for um JWT (revoga adicionando JTI na blacklist temporária)
+    try {
+      const parts = tokenString.split('.');
+      if (parts.length === 3) {
+        const payloadJson = Buffer.from(parts[1], 'base64').toString('utf8');
+        const payload = JSON.parse(payloadJson);
+        if (payload.jti) {
+          this.revokedJtis.set(payload.jti, {
+            jti: payload.jti,
+            revokedAt: Date.now(),
+            expiresAt: (payload.exp || 0) * 1000
+          });
+          return true;
+        }
+      }
+    } catch {
+      // Ignora erro de parsing
+    }
+
+    return false;
+  }
+
+  public isJtiRevoked(jti: string): boolean {
+    return this.revokedJtis.has(jti);
+  }
+}
+
+export const oauthStore = new OAuthStore();

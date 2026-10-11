@@ -1,0 +1,30 @@
+# Dependências locais
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Git e controle de versão
+.git/
+.gitignore
+
+# Variáveis de ambiente locais e segredos
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+.keys/
+server/.keys/
+
+# Pasta de suporte e documentação non-deploy (Obrigatório conforme regra global)
+../non-deploy/
+non-deploy/
+
+# Builds e temporários
+dist/
+build/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

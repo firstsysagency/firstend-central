@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: #09090b;
+  --color-foreground: #fafafa;
+  --color-primary: #6366f1;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #27272a;
+  --color-secondary-foreground: #fafafa;
+  --color-border: #27272a;
+  --color-input: #27272a;
+  --color-ring: #6366f1;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+.glass {
+  background-color: rgb(255 255 255 / 0.05);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgb(255 255 255 / 0.1);
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+}

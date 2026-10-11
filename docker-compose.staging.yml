@@ -1,0 +1,79 @@
+# ==============================================================================
+# CENTRAL DE CHAVES ZATTEN — DOCKER COMPOSE DE HOMOLOGAÇÃO (STAGING)
+# Ambiente Separado de Produção com Dados e Portas Independentes (Checklist 297)
+# ==============================================================================
+
+version: '3.8'
+
+services:
+  # Frontend Staging
+  frontend-staging:
+    image: firstsys/zatten-central-staging/frontend:latest
+    container_name: firstsys_zatten_staging_frontend
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${STAGING_FRONTEND_PORT:-8081}:80"
+    environment:
+      - NODE_ENV=staging
+      - VITE_APP_ENV=staging
+      - VITE_API_URL=https://keys-staging.firstsys.com.br/api
+      - VITE_OPENBAO_URL=http://openbao-staging:8200
+    networks:
+      - zatten_staging_public
+      - zatten_staging_internal
+    depends_on:
+      - db-staging
+      - openbao-staging
+
+  # OpenBao Staging
+  openbao-staging:
+    image: openbao/openbao:latest
+    container_name: firstsys_zatten_staging_openbao
+    restart: unless-stopped
+    cap_add:
+      - IPC_LOCK
+    command: server -config=/openbao/config/config.hcl
+    volumes:
+      - firstsys_zatten_staging_openbao_data:/openbao/data
+      - ./docker/openbao/config.hcl:/openbao/config/config.hcl:ro
+    environment:
+      - BAO_ADDR=http://0.0.0.0:8200
+    ports:
+      - "${STAGING_OPENBAO_PORT:-8201}:8200"
+    networks:
+      - zatten_staging_internal
+
+  # PostgreSQL Staging
+  db-staging:
+    image: postgres:16-alpine
+    container_name: firstsys_zatten_staging_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: zatten_central_staging
+      POSTGRES_USER: zatten_staging_user
+      POSTGRES_PASSWORD: zatten_staging_pass_secure
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - firstsys_zatten_staging_pg_data:/var/lib/postgresql/data
+      - ./src/db/schema.sql:/docker-entrypoint-initdb.d/01-schema-rls.sql:ro
+    ports:
+      - "${STAGING_POSTGRES_PORT:-5433}:5432"
+    networks:
+      - zatten_staging_internal
+
+networks:
+  zatten_staging_public:
+    name: firstsys_zatten_staging_public
+    driver: bridge
+  zatten_staging_internal:
+    name: firstsys_zatten_staging_internal
+    driver: bridge
+
+volumes:
+  firstsys_zatten_staging_pg_data:
+    name: firstsys_zatten_staging_pg_data
+  firstsys_zatten_staging_openbao_data:
+    name: firstsys_zatten_staging_openbao_data
