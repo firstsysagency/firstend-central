@@ -852,13 +852,20 @@ app.use(express.static(distPath));
 // Garante que /, /dashboard, /configuracoes, /settings, /new, /login, /mcp retornem index.html para o navegador
 app.use((req, res, next) => {
   if (req.method === 'GET') {
-    const isApiOrInternal = req.path.startsWith('/api') || 
+    const isMcpApiRequest = req.path.startsWith('/mcp') && (
+      Boolean(req.headers.authorization) || 
+      !req.headers.accept?.includes('text/html') ||
+      req.headers['content-type']?.includes('json')
+    );
+
+    const isApiOrInternal = isMcpApiRequest ||
+                            req.path.startsWith('/api') || 
                             req.path.startsWith('/oauth') || 
                             req.path.startsWith('/.well-known') || 
+                            req.path === '/openapi.json' ||
                             req.path === '/health';
 
-    // Se não for rota de API interna OU for /mcp acessado via navegador (Accept: text/html)
-    if (!isApiOrInternal || (req.path === '/mcp' && req.headers.accept?.includes('text/html'))) {
+    if (!isApiOrInternal) {
       const indexPath = path.join(distPath, 'index.html');
       if (fs.existsSync(indexPath)) {
         return res.sendFile(indexPath);
