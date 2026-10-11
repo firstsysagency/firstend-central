@@ -82,11 +82,34 @@ class ZattenRateLimitedQueue {
 
 const connectionQueue = new ZattenRateLimitedQueue();
 
+export function buildZattenUrl(endpoint: string, customBaseUrl?: string): string {
+  let base = (customBaseUrl || process.env.ZATTEN_API_BASE_URL || 'https://api.zatten.com/api/v1').trim();
+  base = base.replace(/zatten\.com\.br/g, 'zatten.com');
+  base = base.replace(/api\.api\.zatten\.com/g, 'api.zatten.com');
+  base = base.replace(/\/$/, '');
+  if (!base.endsWith('/api/v1')) {
+    if (base.endsWith('/v1')) {
+      base = base.replace(/\/v1$/, '/api/v1');
+    } else {
+      base = `${base}/api/v1`;
+    }
+  }
+
+  let clean = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  if (clean.startsWith('/api/v1/')) {
+    clean = clean.replace('/api/v1', '');
+  } else if (clean.startsWith('/v1/')) {
+    clean = clean.replace('/v1', '');
+  }
+
+  return `${base}${clean}`;
+}
+
 export class ZattenApiClient {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = process.env.ZATTEN_API_BASE_URL || 'https://api.zatten.com';
+    this.baseUrl = process.env.ZATTEN_API_BASE_URL || 'https://api.zatten.com/api/v1';
   }
 
   /**
@@ -107,7 +130,7 @@ export class ZattenApiClient {
       // 1. Descriptografa a chave Zatten em memória temporária
       const rawApiKey = await secretsVault.resolveZattenKey(secretRef);
 
-      const url = `${this.baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+      const url = buildZattenUrl(endpoint, this.baseUrl);
       const headers: Record<string, string> = {
         'x-api-key': rawApiKey,
         'Content-Type': 'application/json',

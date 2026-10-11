@@ -11,7 +11,7 @@ import path from 'path';
 import { z } from 'zod';
 import { verifyJwt } from '../oauth/cryptoEngine.js';
 import { type OAuthJwtPayload, type OAuthScope } from '../oauth/oauthTypes.js';
-import { zattenClient } from '../zatten/zattenClient.js';
+import { zattenClient, buildZattenUrl } from '../zatten/zattenClient.js';
 import { logAuditEvent } from '../../src/lib/audit.js';
 
 export const mcpRouter = Router();
@@ -549,7 +549,6 @@ const MCP_TOOLS_CATALOG = [
 async function callZattenApi(endpoint: string, method: string, payload?: any, connectionId?: string) {
   const dbPath = path.join(process.cwd(), 'server', 'db.json');
   let apiKey = process.env.ZATTEN_API_KEY || '';
-  let baseUrl = process.env.ZATTEN_API_BASE_URL || 'https://api.zatten.com.br';
 
   if (fs.existsSync(dbPath)) {
     try {
@@ -569,35 +568,81 @@ async function callZattenApi(endpoint: string, method: string, payload?: any, co
     } catch (e) {}
   }
 
+  // Sanitização e resolução da URL canônica da Zatten (garante https://api.zatten.com/api/v1)
+  const targetUrl = buildZattenUrl(endpoint);
+
   if (!apiKey || apiKey.length < 5) {
     return {
-      success: true,
-      simulated: true,
-      message: `Ação ${method} ${endpoint} simulada com sucesso pela Central Firstsys.`,
-      params: payload
+      isError: true,
+      error: 'Nenhuma chave de API Zatten válida (x-api-key) encontrada na conexão ou variáveis de ambiente.',
+      message: 'Configure a x-api-key da Zatten na Central Firstsys para executar chamadas reais.',
+      endpoint,
+      method,
+      targetUrl
     };
   }
 
   try {
-    const res = await fetch(`${baseUrl}${endpoint}`, {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 segundos timeout
+
+    const res = await fetch(targetUrl, {
       method,
       headers: {
         'x-api-key': apiKey,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
       },
-      ...(payload && method !== 'GET' ? { body: JSON.stringify(payload) } : {})
+      ...(payload && method !== 'GET' ? { body: JSON.stringify(payload) } : {}),
+      signal: controller.signal
     });
 
+    clearTimeout(timeoutId);
+
     const text = await res.text();
+    let data: any;
     try {
-      return JSON.parse(text);
+      data = JSON.parse(text);
     } catch {
-      return { text };
+      data = { text };
     }
+
+    if (!res.ok) {
+      console.warn(`⚠️ [API Zatten Respondeu HTTP ${res.status}]`, {
+        targetUrl,
+        method,
+        status: res.status,
+        statusText: res.statusText
+      });
+
+      return {
+        isError: true,
+        error: `API Zatten respondeu com erro HTTP ${res.status} (${res.statusText || 'Erro'})`,
+        status: res.status,
+        details: data,
+        targetUrl
+      };
+    }
+
+    return data;
   } catch (err: any) {
+    const isTimeout = err.name === 'AbortError';
+    const errorCode = isTimeout ? 'ETIMEDOUT' : (err.cause?.code || err.code || 'FETCH_FAILED');
+
+    // Log detalhado e seguro no servidor (sem expor a x-api-key)
+    console.error('❌ [Falha de Conexão MCP -> Zatten]', {
+      targetUrl,
+      method,
+      errorCode,
+      message: err.message
+    });
+
     return {
+      isError: true,
       error: 'Erro de comunicação com a API Zatten',
-      details: err.message
+      code: errorCode,
+      details: isTimeout ? 'Tempo limite de requisição à Zatten esgotado (15s).' : (err.message || 'fetch failed'),
+      targetUrl
     };
   }
 }
@@ -870,6 +915,17 @@ const jsonRpcHandler = async (req: AuthenticatedMcpRequest, res: Response) => {
       const args = body.params?.arguments || {};
       try {
         const output = await executeToolDirectly(toolName, args, user);
+
+        // Protocolo MCP: sinaliza isError: true explicitamente para que clientes e LLMs
+        // reconheçam quando a operação falhou em vez de tratá-la como concluída com sucesso
+        const isFailure = !!(
+          output &&
+          (output.isError === true ||
+           output.error !== undefined ||
+           (typeof output.status === 'number' && output.status >= 400) ||
+           output.success === false)
+        );
+
         return res.json({
           jsonrpc: '2.0',
           id,
@@ -877,18 +933,27 @@ const jsonRpcHandler = async (req: AuthenticatedMcpRequest, res: Response) => {
             content: [
               {
                 type: 'text',
-                text: JSON.stringify(output, null, 2)
+                text: typeof output === 'string' ? output : JSON.stringify(output, null, 2)
               }
-            ]
+            ],
+            isError: isFailure
           }
         });
       } catch (err: any) {
         return res.json({
           jsonrpc: '2.0',
           id,
-          error: {
-            code: -32000,
-            message: err.message || 'Erro ao executar ferramenta'
+          result: {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  error: 'Falha interna ao executar ferramenta MCP',
+                  details: err.message || 'Erro inesperado'
+                }, null, 2)
+              }
+            ],
+            isError: true
           }
         });
       }

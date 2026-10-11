@@ -16,6 +16,7 @@ import { secretsVault } from './vault/secretsVault.js';
 import { generateOpaqueId } from './oauth/cryptoEngine.js';
 import { logAuditEvent } from '../src/lib/audit.js';
 import { syncEnvConnections, parseEnvConnections } from './vault/envConnectionsManager.js';
+import { buildZattenUrl } from './zatten/zattenClient.js';
 dotenv.config();
 
 // Helper de Hashing PBKDF2 com Salt Individual (Padrão NIST SP 800-132)
@@ -275,8 +276,8 @@ app.post('/api/mcp/proxy', async (req, res) => {
       });
     }
 
-    const baseUrl = environment === 'production' ? 'https://api.zatten.com' : 'https://sandbox.api.zatten.com';
-    const finalUrl = `${baseUrl}${targetPath}`;
+    const baseUrl = environment === 'production' ? 'https://api.zatten.com/api/v1' : 'https://sandbox.api.zatten.com/api/v1';
+    const finalUrl = buildZattenUrl(targetPath, baseUrl);
     console.log(`[Zatten API] Realizando chamada real para: ${targetMethod} ${finalUrl}`);
 
     const fetchOptions: any = {
