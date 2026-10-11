@@ -146,7 +146,7 @@ class OAuthStore {
   public validateRedirectUri(clientId: string, candidateUri: string): boolean {
     if (!candidateUri || candidateUri.includes('*')) return false;
 
-    // 1. Suporte universal e seguro a domínios oficiais da OpenAI / ChatGPT
+    // 1. Suporte universal e seguro a domínios oficiais da OpenAI / ChatGPT (HTTPS)
     try {
       const parsed = new URL(candidateUri);
       const hostname = parsed.hostname.toLowerCase();
@@ -156,14 +156,8 @@ class OAuthStore {
         hostname === 'openai.com' ||
         hostname.endsWith('.openai.com');
 
-      const pathname = parsed.pathname.toLowerCase();
-      const isCallbackPath = 
-        pathname.endsWith('/oauth/callback') ||
-        pathname.endsWith('/callback') ||
-        pathname.includes('/oauth/callback') ||
-        pathname.includes('/callback');
-
-      if (isOfficialOpenAi && isCallbackPath) {
+      // Se for domínio oficial da OpenAI sob HTTPS (cobre /connector/oauth/*, /api/v1/mcp/oauth/*, /aip/*, etc.)
+      if (isOfficialOpenAi && parsed.protocol === 'https:') {
         return true;
       }
     } catch {
