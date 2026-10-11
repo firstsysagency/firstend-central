@@ -67,7 +67,7 @@ export default function McpZatten() {
   useEffect(() => {
     async function loadServerPermissions() {
       try {
-        const res = await fetch('http://localhost:3000/api/mcp/permissions');
+        const res = await fetch('/api/mcp/permissions');
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data.permissions) && data.permissions.length > 0) {
@@ -116,7 +116,7 @@ export default function McpZatten() {
 
       // 2. Persistência no backend (Cofre Central)
       try {
-        await fetch('http://localhost:3000/api/mcp/permissions', {
+        await fetch('/api/mcp/permissions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ permissions })

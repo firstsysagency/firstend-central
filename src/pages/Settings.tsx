@@ -71,7 +71,7 @@ export default function Settings() {
   const handleDisableMfa = async () => {
     try {
       const token = localStorage.getItem('zatten_token');
-      await fetch('http://localhost:3000/api/2fa/disable', {
+      await fetch('/api/2fa/disable', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });

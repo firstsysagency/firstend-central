@@ -42,6 +42,9 @@ function verifyPassword(password: string, storedHash: string, storedSalt?: strin
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Configuração para proxies reversos (Cloudflare / Traefik / Coolify)
+app.set('trust proxy', 1);
+
 // Segurança: Proteção de cabeçalhos HTTP
 app.use(helmet());
 
@@ -368,7 +371,7 @@ app.post('/api/mcp/permissions', (req, res) => {
 // Segurança: Rate Limiting específico para o Login (Prevenção de Brute Force agressiva por IP)
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 5, // Limita a 5 tentativas de login por IP a cada 15 minutos
+  max: 30, // Limita a 30 tentativas de login por IP a cada 15 minutos
   message: { error: 'Muitas tentativas de login deste IP, tente novamente em 15 minutos.' },
   standardHeaders: true,
   legacyHeaders: false,
