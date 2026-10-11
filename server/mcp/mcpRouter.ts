@@ -146,23 +146,6 @@ const MCP_TOOLS_CATALOG = [
     tags: ['connections', 'status']
   },
   {
-    name: 'zatten_get_leads',
-    title: 'Consultar Leads ou Kanban no CRM Zatten',
-    description: 'Consulta informações de leads no CRM Zatten. Se informado leadNumber, retorna os dados do lead específico. Se omitido, retorna a visão geral do Kanban e colunas ativas do CRM.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        leadNumber: { type: 'string', description: 'Número de telefone/identificador do lead (DDI+DDD+Número, ex: 5511999999999). Opcional.' },
-        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
-      }
-    },
-    securitySchemes: [
-      { type: 'oauth2', scopes: ['zatten:read', 'zatten_get_leads', 'tool:zatten_get_leads'] }
-    ],
-    annotations: { readOnlyHint: true, destructiveHint: false },
-    tags: ['crm', 'leads']
-  },
-  {
     name: 'zatten_kanban_get',
     title: 'Buscar Colunas do Kanban Zatten',
     description: 'Busca informações de todas as colunas do Kanban de atendimento no CRM Zatten.',
@@ -768,7 +751,10 @@ async function executeToolDirectly(name: string, args: any, user: OAuthJwtPayloa
       if (leadNum) {
         return callZattenApi(`/leads/${leadNum}`, 'GET', null, args?.connectionId);
       }
-      return callZattenApi('/kanban', 'GET', null, args?.connectionId);
+      return {
+        leads: [],
+        message: "A API da Zatten organiza leads pelo identificador de telefone (WaId) e não possui listagem global não filtrada. Utilize a ferramenta 'zatten_leads_leadnumber_get' informando o parâmetro 'leadNumber' (ex: 5511999999999) para consultar os dados do lead, ou 'zatten_kanban_get' para consultar as colunas do funil."
+      };
     }
 
     case 'zatten_kanban_get':
@@ -786,11 +772,18 @@ async function executeToolDirectly(name: string, args: any, user: OAuthJwtPayloa
         delete_previous_note: args.delete_previous_note
       }, args?.connectionId);
 
-    case 'zatten_leads_leadnumber_properties_patch':
+    case 'zatten_leads_leadnumber_properties_patch': {
+      let propValue = args?.value;
+      // Regra da API Zatten: não aceita string vazia "" com erro 400 (Value must be at least 1 character long).
+      // Para limpar ou desatribuir a propriedade, normaliza valores vazios/nulos para " " (espaço aceito com HTTP 200).
+      if (propValue === null || propValue === undefined || (typeof propValue === 'string' && propValue.trim() === '')) {
+        propValue = ' ';
+      }
       return callZattenApi(`/leads/${args.leadNumber}/properties`, 'PATCH', {
         property: args.property,
-        value: args.value
+        value: propValue
       }, args?.connectionId);
+    }
 
     case 'zatten_leads_leadnumber_threads_get':
       return callZattenApi(`/leads/${args.leadNumber}/threads`, 'GET', null, args?.connectionId);

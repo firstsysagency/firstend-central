@@ -654,11 +654,11 @@ const openApiHandler = (req: Request, res: Response) => {
           }
         }
       },
-      '/mcp/tools/zatten_get_leads': {
+      '/mcp/tools/zatten_kanban_get': {
         post: {
-          operationId: 'zatten_get_leads',
-          summary: 'Consultar leads ou Kanban no CRM Zatten',
-          description: 'Consulta informações de leads no CRM Zatten. Se informado leadNumber, retorna os dados do lead específico. Se omitido, retorna a visão geral do Kanban e colunas ativas do CRM.',
+          operationId: 'zatten_kanban_get',
+          summary: 'Consultar colunas do Kanban no CRM Zatten',
+          description: 'Busca informações de todas as colunas do Kanban de atendimento no CRM Zatten.',
           requestBody: {
             required: false,
             content: {
@@ -666,7 +666,6 @@ const openApiHandler = (req: Request, res: Response) => {
                 schema: {
                   type: 'object',
                   properties: {
-                    leadNumber: { type: 'string', description: 'Número de telefone/identificador do lead (DDI+DDD+Número, ex: 5511999999999). Opcional.' },
                     connectionId: { type: 'string', description: 'ID opcional da conexão Zatten' }
                   }
                 }
@@ -675,7 +674,73 @@ const openApiHandler = (req: Request, res: Response) => {
           },
           responses: {
             '200': {
-              description: 'Lista de leads retornada com sucesso',
+              description: 'Colunas do Kanban retornadas com sucesso',
+              content: {
+                'application/json': {
+                  schema: { type: 'object' }
+                }
+              }
+            }
+          }
+        }
+      },
+      '/mcp/tools/zatten_leads_leadnumber_get': {
+        post: {
+          operationId: 'zatten_leads_leadnumber_get',
+          summary: 'Obter dados cadastrais do lead por telefone',
+          description: 'Obtém informações cadastrais completas, tags, responsável e metadados de um lead específico pelo número de telefone (WaId).',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['leadNumber'],
+                  properties: {
+                    leadNumber: { type: 'string', description: 'Número de WhatsApp (WaId) do lead com DDI+DDD (ex: 5511999999999)' },
+                    connectionId: { type: 'string', description: 'ID opcional da conexão Zatten' }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            '200': {
+              description: 'Dados do lead retornados com sucesso',
+              content: {
+                'application/json': {
+                  schema: { type: 'object' }
+                }
+              }
+            }
+          }
+        }
+      },
+      '/mcp/tools/zatten_leads_leadnumber_properties_patch': {
+        post: {
+          operationId: 'zatten_leads_leadnumber_properties_patch',
+          summary: 'Atualizar ou limpar propriedade customizada do lead',
+          description: 'Atualiza o valor de uma propriedade customizada do lead a partir do slug. Para limpar ou remover o valor, envie uma string vazia ou espaço.',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['leadNumber', 'property', 'value'],
+                  properties: {
+                    leadNumber: { type: 'string', description: 'Número de WhatsApp (WaId) do lead' },
+                    property: { type: 'string', description: 'Slug da propriedade a ser atualizada' },
+                    value: { type: 'string', description: 'Novo valor da propriedade. Para limpar, envie " "' },
+                    connectionId: { type: 'string', description: 'ID opcional da conexão Zatten' }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            '200': {
+              description: 'Propriedade atualizada com sucesso',
               content: {
                 'application/json': {
                   schema: { type: 'object' }
