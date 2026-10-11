@@ -6,6 +6,9 @@
 
 import express, { Router, type Request, type Response } from 'express';
 import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
+import fs from 'fs';
+import path from 'path';
 import { 
   AuthorizationRequestSchema, 
   TokenRequestSchema, 
@@ -32,6 +35,40 @@ function getBaseIssuer(req: Request): string {
   const host = req.get('host') || 'localhost:3000';
   const protocol = req.secure || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
   return `${protocol}://${host}`;
+}
+
+// Recupera o usuário autenticado por sessão ativa (cookie HttpOnly zatten_session ou Bearer token)
+function getAuthenticatedUserFromRequest(req: Request): any | null {
+  if ((req as any).user) return (req as any).user;
+
+  try {
+    const authHeader = req.headers.authorization;
+    const cookieHeader = req.headers.cookie;
+    let token: string | undefined;
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
+    } else if (cookieHeader) {
+      const match = cookieHeader.split(';').find(c => c.trim().startsWith('zatten_session='));
+      if (match) token = match.split('=')[1].trim();
+    }
+
+    if (!token) return null;
+
+    const jwtSecret = process.env.JWT_SECRET || 'super-secret-jwt-key';
+    const decoded: any = jwt.verify(token, jwtSecret);
+    const dbPath = path.join(process.cwd(), 'server', 'db.json');
+    if (fs.existsSync(dbPath)) {
+      const db = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+      const user = db.users?.find((u: any) => u.id === decoded.id || u.email === decoded.email);
+      if (user && user.status !== 'suspended') {
+        return user;
+      }
+    }
+  } catch {
+    // Ignora token inválido ou expirado
+  }
+  return null;
 }
 
 // ==============================================================================
@@ -138,9 +175,8 @@ oauthRouter.get('/oauth/authorize', (req: Request, res: Response) => {
     }
 
     // 2. Verificação de Sessão do Usuário
-    // Em um fluxo web real, a sessão vem de cookie HttpOnly ou token
-    // Se não estiver logado, redireciona para login com return_to
-    const sessionUser = (req as any).user;
+    // Obtém usuário da sessão ativa (cookie HttpOnly zatten_session ou header Bearer)
+    const sessionUser = getAuthenticatedUserFromRequest(req);
     if (!sessionUser) {
       const returnUrl = encodeURIComponent(req.originalUrl);
       return res.redirect(`/login?return_to=${returnUrl}`);
@@ -234,22 +270,31 @@ oauthRouter.post('/oauth/token', express.urlencoded({ extended: true }), express
         });
       }
 
-      // VALIDAÇÃO PKCE S256 OBRIGATÓRIA
-      const isPkceValid = verifyPkceChallenge(body.code_verifier, codeRecord.codeChallenge);
-      if (!isPkceValid) {
-        logAuditEvent({
-          actor: body.client_id,
-          action: 'oauth.pkce.failed',
-          category: 'security',
-          severity: 'critical',
-          description: `Falha na verificação PKCE S256 para o cliente ${body.client_id}`,
-          ipAddress: req.ip || '127.0.0.1'
-        });
+      // VALIDAÇÃO PKCE S256 (Obrigatória se code_challenge tiver sido fornecido)
+      if (codeRecord.codeChallenge) {
+        if (!body.code_verifier) {
+          return res.status(400).json({
+            error: 'invalid_grant',
+            error_description: 'code_verifier é obrigatório para códigos gerados com PKCE'
+          });
+        }
 
-        return res.status(400).json({
-          error: 'invalid_grant',
-          error_description: 'code_verifier inválido para o code_challenge registrado'
-        });
+        const isPkceValid = verifyPkceChallenge(body.code_verifier, codeRecord.codeChallenge);
+        if (!isPkceValid) {
+          logAuditEvent({
+            actor: body.client_id,
+            action: 'oauth.pkce.failed',
+            category: 'security',
+            severity: 'critical',
+            description: `Falha na verificação PKCE S256 para o cliente ${body.client_id}`,
+            ipAddress: req.ip || '127.0.0.1'
+          });
+
+          return res.status(400).json({
+            error: 'invalid_grant',
+            error_description: 'code_verifier inválido para o code_challenge registrado'
+          });
+        }
       }
 
       // Validação de Parâmetro Resource (Audiência MCP)
@@ -445,3 +490,241 @@ oauthRouter.get('/oauth/userinfo', (req: Request, res: Response) => {
     email_verified: true
   });
 });
+
+// ==============================================================================
+// 8. MANIFESTO OPENAPI 3.1.0 PARA CHATGPT ACTIONS / MCP
+// ==============================================================================
+
+const openApiHandler = (req: Request, res: Response) => {
+  const issuer = getBaseIssuer(req);
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.json({
+    openapi: '3.1.0',
+    info: {
+      title: 'Firstsys Zatten Central MCP API',
+      description: 'API e Servidor MCP remoto para integração segura do ChatGPT com a Zatten via Firstsys OAuth 2.1.',
+      version: '1.0.0'
+    },
+    servers: [
+      {
+        url: issuer,
+        description: 'Servidor Principal de Produção'
+      }
+    ],
+    paths: {
+      '/mcp/tools/firstsys_get_profile': {
+        post: {
+          operationId: 'firstsys_get_profile',
+          summary: 'Obter perfil da conta Firstsys autenticada',
+          description: 'Retorna o identificador opaco permanente, organização e papéis da conta Firstsys autorizada.',
+          responses: {
+            '200': {
+              description: 'Perfil autenticado retornado com sucesso',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      id: { type: 'string' },
+                      organizationId: { type: 'string' },
+                      role: { type: 'string' },
+                      scope: { type: 'string' },
+                      client: { type: 'string' }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      '/mcp/tools/zatten_list_connections': {
+        post: {
+          operationId: 'zatten_list_connections',
+          summary: 'Listar conexões Zatten ativas',
+          description: 'Lista todas as conexões Zatten ativas e operacionais autorizadas para a organização.',
+          responses: {
+            '200': {
+              description: 'Lista de conexões ativas',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      connections: {
+                        type: 'array',
+                        items: {
+                          type: 'object',
+                          properties: {
+                            id: { type: 'string' },
+                            name: { type: 'string' },
+                            status: { type: 'string' },
+                            environment: { type: 'string' }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      '/mcp/tools/zatten_get_connection_status': {
+        post: {
+          operationId: 'zatten_get_connection_status',
+          summary: 'Consultar status da conexão Zatten',
+          description: 'Consulta o status de integridade e prontidão operacional de uma conexão Zatten específica.',
+          requestBody: {
+            required: false,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    connectionId: { type: 'string', description: 'ID da conexão a ser consultada' }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            '200': {
+              description: 'Status da conexão retornado com sucesso',
+              content: {
+                'application/json': {
+                  schema: { type: 'object' }
+                }
+              }
+            }
+          }
+        }
+      },
+      '/mcp/tools/zatten_get_leads': {
+        post: {
+          operationId: 'zatten_get_leads',
+          summary: 'Consultar leads no CRM Zatten',
+          description: 'Consulta e lista leads no CRM Zatten filtrados por conexão autorizada.',
+          requestBody: {
+            required: false,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    connectionId: { type: 'string', description: 'ID opcional da conexão Zatten' },
+                    limit: { type: 'integer', default: 20 },
+                    status: { type: 'string' }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            '200': {
+              description: 'Lista de leads retornada com sucesso',
+              content: {
+                'application/json': {
+                  schema: { type: 'object' }
+                }
+              }
+            }
+          }
+        }
+      },
+      '/mcp/tools/zatten_send_message': {
+        post: {
+          operationId: 'zatten_send_message',
+          summary: 'Disparar mensagem para contato via Zatten',
+          description: 'Dispara uma mensagem para um contato via API Zatten. AÇÃO DE ESCRITA: EXIGE CONFIRMAÇÃO DO USUÁRIO.',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['recipient', 'message'],
+                  properties: {
+                    recipient: { type: 'string', description: 'Número do destinatário com DDI e DDD' },
+                    message: { type: 'string', description: 'Texto da mensagem a ser enviada' },
+                    connectionId: { type: 'string', description: 'ID da conexão Zatten específica (opcional)' }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            '200': {
+              description: 'Mensagem enviada com sucesso',
+              content: {
+                'application/json': {
+                  schema: { type: 'object' }
+                }
+              }
+            }
+          }
+        }
+      },
+      '/mcp/tools/zatten_update_lead': {
+        post: {
+          operationId: 'zatten_update_lead',
+          summary: 'Atualizar lead no funil Zatten',
+          description: 'Atualiza propriedades, anotações ou etapa do lead no funil Zatten.',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['leadId'],
+                  properties: {
+                    leadId: { type: 'string', description: 'Identificador do lead' },
+                    stage: { type: 'string', description: 'Nova etapa do funil' },
+                    notes: { type: 'string', description: 'Anotações complementares' },
+                    connectionId: { type: 'string', description: 'ID da conexão Zatten' }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            '200': {
+              description: 'Lead atualizado com sucesso',
+              content: {
+                'application/json': {
+                  schema: { type: 'object' }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    components: {
+      securitySchemes: {
+        OAuth2: {
+          type: 'oauth2',
+          description: 'Autenticação OAuth 2.1 Firstsys Central',
+          flows: {
+            authorizationCode: {
+              authorizationUrl: `${issuer}/oauth/authorize`,
+              tokenUrl: `${issuer}/oauth/token`,
+              scopes: {
+                'profile': 'Acessar dados do perfil e organização',
+                'connections:read': 'Listar conexões ativas',
+                'zatten:read': 'Consultar leads e dados Zatten',
+                'zatten:write': 'Atualizar propriedades no CRM Zatten',
+                'zatten:messages': 'Disparar mensagens via Zatten'
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+};
+
+oauthRouter.get('/openapi.json', openApiHandler);
+oauthRouter.get('/mcp/openapi.json', openApiHandler);

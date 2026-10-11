@@ -56,11 +56,11 @@ export const AuthorizationRequestSchema = z.object({
   client_id: z.string().min(1, 'client_id é obrigatório'),
   redirect_uri: z.string().url('redirect_uri deve ser uma URL válida'),
   scope: ScopesStringSchema,
-  state: z.string().min(8, 'state é obrigatório e deve ter alta entropia para prevenir CSRF'),
-  code_challenge: z.string().min(43).max(128, 'code_challenge PKCE é obrigatório (RFC 7636)'),
+  state: z.string().min(4, 'state é obrigatório e deve ter alta entropia para prevenir CSRF'),
+  code_challenge: z.string().min(43).max(128, 'code_challenge PKCE inválido').optional(),
   code_challenge_method: z.literal('S256', {
     error: 'OAuth 2.1 exige code_challenge_method=S256; plain foi descontinuado.'
-  }),
+  }).optional(),
   nonce: z.string().optional(),
   resource: z.string().url('resource deve ser um identificador canônico de URI válido').optional(),
 });
@@ -74,10 +74,10 @@ export type AuthorizationRequest = z.infer<typeof AuthorizationRequestSchema>;
 export const TokenExchangeCodeSchema = z.object({
   grant_type: z.literal('authorization_code'),
   client_id: z.string().min(1),
-  client_secret: z.string().optional(), // Clientes públicos (como ChatGPT via CIMD) usam PKCE sem client_secret
+  client_secret: z.string().optional(), // Clientes confidenciais ou ChatGPT Actions enviam client_secret
   code: z.string().min(16, 'Código de autorização inválido'),
   redirect_uri: z.string().url(),
-  code_verifier: z.string().min(43).max(128, 'code_verifier é obrigatório para PKCE S256'),
+  code_verifier: z.string().min(43).max(128, 'code_verifier deve ter entre 43 e 128 caracteres').optional(),
   resource: z.string().url().optional(),
 });
 

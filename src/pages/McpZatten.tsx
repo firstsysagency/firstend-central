@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, Shield, Check, X, ShieldAlert, Search, Save, CheckCircle2, RotateCcw, Loader2 } from 'lucide-react';
+import { Bot, Shield, Check, X, ShieldAlert, Search, Save, CheckCircle2, RotateCcw, Loader2, Copy, ExternalLink, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import { logAuditEvent } from '../lib/audit';
 
 interface McpPermission {
@@ -62,6 +62,9 @@ export default function McpZatten() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [copiedOpenApi, setCopiedOpenApi] = useState(false);
+  const [copiedConfig, setCopiedConfig] = useState(false);
+  const [showChatGptInstructions, setShowChatGptInstructions] = useState(false);
 
   // Sincroniza com o servidor ao inicializar
   useEffect(() => {
@@ -156,6 +159,46 @@ export default function McpZatten() {
     showToast('Alterações descartadas.');
   };
 
+  const handleCopyOpenApi = async () => {
+    try {
+      const res = await fetch('/openapi.json');
+      if (res.ok) {
+        const json = await res.json();
+        await navigator.clipboard.writeText(JSON.stringify(json, null, 2));
+        setCopiedOpenApi(true);
+        showToast('Schema OpenAPI copiado para a área de transferência!');
+        setTimeout(() => setCopiedOpenApi(false), 3000);
+      } else {
+        const schemaUrl = `${window.location.origin}/openapi.json`;
+        await navigator.clipboard.writeText(schemaUrl);
+        setCopiedOpenApi(true);
+        showToast('URL do Schema OpenAPI copiada!');
+        setTimeout(() => setCopiedOpenApi(false), 3000);
+      }
+    } catch {
+      const schemaUrl = `${window.location.origin}/openapi.json`;
+      await navigator.clipboard.writeText(schemaUrl);
+      setCopiedOpenApi(true);
+      showToast('URL do Schema copiada!');
+      setTimeout(() => setCopiedOpenApi(false), 3000);
+    }
+  };
+
+  const handleCopyConfig = async () => {
+    const origin = window.location.origin;
+    const configText = `Client ID: chatgpt-firstsys-mcp
+Client Secret: firstsys_chatgpt_mcp_secret_2026
+Authorization URL: ${origin}/oauth/authorize
+Token URL: ${origin}/oauth/token
+Scope: connections:read zatten:read zatten:write zatten:messages profile
+Token Exchange: Default (POST Request)`;
+
+    await navigator.clipboard.writeText(configText);
+    setCopiedConfig(true);
+    showToast('Parâmetros OAuth copiados para a área de transferência!');
+    setTimeout(() => setCopiedConfig(false), 3000);
+  };
+
   const filteredPermissions = useMemo(() => {
     const term = searchTerm.toLowerCase();
     return permissions.filter(p => 
@@ -188,6 +231,146 @@ export default function McpZatten() {
           Gerencie o acesso e as permissões do seu agente de Inteligência Artificial via Model Context Protocol.
         </p>
       </div>
+
+      {/* Card de Integração com o ChatGPT / Custom Actions */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="glass rounded-2xl p-6 md:p-8 border border-primary/20 relative overflow-hidden"
+      >
+        <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+        
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-4">
+          <div className="flex items-start sm:items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500/20 to-primary/20 flex items-center justify-center border border-emerald-500/30 flex-shrink-0">
+              <Sparkles className="text-emerald-400" size={24} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-xl font-bold text-foreground">Conectar ao ChatGPT</h3>
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-medium flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  OAuth 2.1 Ativo
+                </span>
+              </div>
+              <p className="text-sm text-zinc-400 mt-1">
+                Servidor MCP e Custom Actions prontos com autenticação RFC 6749 / 8414 e isolamento de chaves Zatten.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 flex-wrap">
+            <button
+              type="button"
+              onClick={handleCopyOpenApi}
+              className="px-4 py-2.5 rounded-xl text-xs font-semibold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+            >
+              {copiedOpenApi ? <Check size={14} className="text-emerald-300" /> : <Copy size={14} />}
+              {copiedOpenApi ? 'Schema Copiado!' : 'Copiar Schema OpenAPI'}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleCopyConfig}
+              className="px-4 py-2.5 rounded-xl text-xs font-semibold bg-secondary hover:bg-secondary/80 text-foreground border border-border transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+            >
+              {copiedConfig ? <Check size={14} className="text-emerald-300" /> : <Copy size={14} />}
+              {copiedConfig ? 'Parâmetros Copiados!' : 'Copiar Dados OAuth'}
+            </button>
+
+            <a
+              href="/openapi.json"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3.5 py-2.5 rounded-xl text-xs font-semibold bg-secondary hover:bg-secondary/80 text-foreground border border-border transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+              title="Abrir especificação OpenAPI em nova aba"
+            >
+              <ExternalLink size={13} className="text-zinc-400" />
+              <span>Ver Raw</span>
+            </a>
+
+            <button
+              type="button"
+              onClick={() => setShowChatGptInstructions(prev => !prev)}
+              className="p-2.5 rounded-xl text-xs font-medium text-zinc-400 hover:text-foreground hover:bg-white/5 border border-border transition-colors flex items-center gap-1.5 cursor-pointer"
+              title="Passo a Passo de Configuração"
+            >
+              <span className="text-xs">Tutorial</span>
+              {showChatGptInstructions ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+            </button>
+          </div>
+        </div>
+
+        {/* Guia Expansível de Configuração no ChatGPT */}
+        <AnimatePresence>
+          {showChatGptInstructions && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="pt-6 border-t border-border flex flex-col gap-4 text-xs text-zinc-300 overflow-hidden"
+            >
+              <div className="grid md:grid-cols-3 gap-4">
+                <div className="p-4 rounded-xl bg-secondary/30 border border-border flex flex-col gap-2">
+                  <div className="flex items-center gap-2 font-semibold text-foreground">
+                    <span className="w-5 h-5 rounded-full bg-primary/20 text-primary text-[11px] flex items-center justify-center font-bold">1</span>
+                    Criar GPT / Action
+                  </div>
+                  <p className="text-zinc-400 leading-relaxed">
+                    No ChatGPT, vá em <strong>Explore GPTs</strong> &rarr; <strong>Create a GPT</strong> &rarr; <strong>Configure</strong> &rarr; <strong>Create new action</strong>.
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-xl bg-secondary/30 border border-border flex flex-col gap-2">
+                  <div className="flex items-center gap-2 font-semibold text-foreground">
+                    <span className="w-5 h-5 rounded-full bg-primary/20 text-primary text-[11px] flex items-center justify-center font-bold">2</span>
+                    Importar OpenAPI Schema
+                  </div>
+                  <p className="text-zinc-400 leading-relaxed">
+                    Clique em <strong>Copiar Schema OpenAPI</strong> acima e cole no campo <strong>Schema</strong> do Custom GPT, ou importe a URL <code>{window.location.origin}/openapi.json</code>.
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-xl bg-secondary/30 border border-border flex flex-col gap-2">
+                  <div className="flex items-center gap-2 font-semibold text-foreground">
+                    <span className="w-5 h-5 rounded-full bg-primary/20 text-primary text-[11px] flex items-center justify-center font-bold">3</span>
+                    Configurar OAuth
+                  </div>
+                  <p className="text-zinc-400 leading-relaxed">
+                    Em <strong>Authentication</strong>, selecione <strong>OAuth</strong>. Cole o Client ID, Auth URL, Token URL e Scopes.
+                  </p>
+                </div>
+              </div>
+
+              {/* Tabela de Parâmetros OAuth */}
+              <div className="mt-2 p-4 rounded-xl bg-secondary/40 border border-border flex flex-col gap-3 font-mono text-[11px]">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-zinc-300">
+                  <div>
+                    <span className="text-zinc-500 font-sans block text-[10px]">Client ID:</span>
+                    <span className="text-primary font-semibold select-all">chatgpt-firstsys-mcp</span>
+                  </div>
+                  <div>
+                    <span className="text-zinc-500 font-sans block text-[10px]">Client Secret:</span>
+                    <span className="text-zinc-200 select-all">firstsys_chatgpt_mcp_secret_2026</span>
+                  </div>
+                  <div>
+                    <span className="text-zinc-500 font-sans block text-[10px]">Authorization URL:</span>
+                    <span className="text-zinc-200 select-all">{window.location.origin}/oauth/authorize</span>
+                  </div>
+                  <div>
+                    <span className="text-zinc-500 font-sans block text-[10px]">Token URL:</span>
+                    <span className="text-zinc-200 select-all">{window.location.origin}/oauth/token</span>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <span className="text-zinc-500 font-sans block text-[10px]">Scope:</span>
+                    <span className="text-zinc-200 select-all">connections:read zatten:read zatten:write zatten:messages profile</span>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
 
       <div className="grid md:grid-cols-4 gap-8">
         <div className="md:col-span-4 flex flex-col gap-6">

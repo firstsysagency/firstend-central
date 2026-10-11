@@ -42,7 +42,13 @@ export default function Login() {
       const data = await response.json();
       if (data.success && data.token) {
         login(data.token, data.user);
-        navigate('/');
+        const searchParams = new URLSearchParams(window.location.search);
+        const returnTo = searchParams.get('return_to');
+        if (returnTo && (returnTo.startsWith('/') || returnTo.startsWith(window.location.origin))) {
+          window.location.href = returnTo;
+        } else {
+          navigate('/');
+        }
       }
     } catch (err) {
       setError('Credenciais inválidas.');

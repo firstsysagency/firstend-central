@@ -20,8 +20,8 @@ export interface AuthorizationCodeRecord {
   code: string;
   clientId: string;
   redirectUri: string;
-  codeChallenge: string;
-  codeChallengeMethod: 'S256';
+  codeChallenge?: string;
+  codeChallengeMethod?: 'S256';
   userId: string;
   userEmail: string;
   orgId: string;
@@ -89,7 +89,7 @@ class OAuthStore {
       ]
     });
 
-    // 2. Cliente oficial OpenAI / ChatGPT (com suporte a CIMD)
+    // 2. Cliente oficial OpenAI / ChatGPT (com suporte a CIMD e Custom Actions)
     this.registerClient({
       id: 'chatgpt-firstsys-mcp',
       name: 'ChatGPT Custom Action / MCP Client',
@@ -99,7 +99,7 @@ class OAuthStore {
         'https://openai.com/oauth/callback',
         'http://localhost:3000/oauth/callback' // para testes
       ],
-      isConfidential: false, // Público com PKCE S256 obrigatório
+      isConfidential: false, // Público com PKCE S256 obrigatório ou Client Secret
       allowedScopes: [
         'openid', 'profile',
         'connections:read',
@@ -117,7 +117,7 @@ class OAuthStore {
   }
 
   /**
-   * Validação estrita de Redirect URI: igualdade exata, sem wildcards ou correspondência parcial
+   * Validação estrita de Redirect URI: igualdade exata na allowlist ou padrão oficial OpenAI
    */
   public validateRedirectUri(clientId: string, candidateUri: string): boolean {
     const client = this.getClient(clientId);
@@ -126,7 +126,24 @@ class OAuthStore {
     // Regra rígida: nenhuma URL de retorno pode conter caracteres curinga (*)
     if (candidateUri.includes('*')) return false;
 
-    return client.redirectUris.includes(candidateUri);
+    // Validação direta na allowlist exata
+    if (client.redirectUris.includes(candidateUri)) return true;
+
+    // Suporte seguro aos formatos oficiais de callback da OpenAI/ChatGPT
+    if (clientId === 'chatgpt-firstsys-mcp') {
+      try {
+        const parsed = new URL(candidateUri);
+        const isOfficialHost = ['chatgpt.com', 'chat.openai.com', 'openai.com'].includes(parsed.hostname);
+        const isOfficialCallback = /^\/aip\/([a-zA-Z0-9_-]+\/)?oauth\/callback$/.test(parsed.pathname) || parsed.pathname === '/oauth/callback';
+        if (isOfficialHost && isOfficialCallback) {
+          return true;
+        }
+      } catch {
+        return false;
+      }
+    }
+
+    return false;
   }
 
   /**
