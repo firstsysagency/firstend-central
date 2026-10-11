@@ -179,14 +179,17 @@ export interface OAuthJwtPayload {
   sub: string;                 // ID opaco permanente do usuário (ex: usr_01j7...)
   aud: string | string[];      // Recurso MCP autorizado (ex: https://mcp.firstsys.com.br/mcp)
   exp: number;                 // Expiração curta (UNIX timestamp em segundos)
-  nbf: number;                 // Not Before
+  nbf?: number;                // Not Before
   iat: number;                 // Issued At
-  jti: string;                 // ID único do token para prevenção de replay
-  org_id: string;              // Organização associada (ex: org_firstsys_prod)
-  role: UserRole;              // Papel do usuário
-  scope: string;               // Escopos concedidos separados por espaço
-  client_id: string;           // ID do cliente que solicitou o token
+  jti?: string;                // ID único do token para prevenção de replay
+  org_id?: string;             // Organização associada (ex: org_firstsys_prod)
+  role?: UserRole;             // Papel do usuário
+  scope?: string;              // Escopos concedidos separados por espaço
+  client_id?: string;          // ID do cliente que solicitou o token
   token_family_id?: string;    // ID de rastreamento de rotação de refresh token
+  email?: string;              // Claim de e-mail OIDC (RFC / OIDC Core 1.0)
+  email_verified?: boolean;    // Claim de verificação OIDC
+  nonce?: string;              // Claim de nonce OIDC
 }
 
 export interface OAuthTokenResponse {

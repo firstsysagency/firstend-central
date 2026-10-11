@@ -409,7 +409,7 @@ oauthRouter.post('/oauth/token', express.urlencoded({ extended: true }), express
 
       if (!rotationResult.valid) {
         logAuditEvent({
-          actor: body.client_id,
+          actor: body.client_id || 'oauth_client_unknown',
           action: 'oauth.token_reuse.detected',
           category: 'security',
           severity: 'critical',
