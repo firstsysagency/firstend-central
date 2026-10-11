@@ -657,8 +657,8 @@ const openApiHandler = (req: Request, res: Response) => {
       '/mcp/tools/zatten_get_leads': {
         post: {
           operationId: 'zatten_get_leads',
-          summary: 'Consultar leads no CRM Zatten',
-          description: 'Consulta e lista leads no CRM Zatten filtrados por conexão autorizada.',
+          summary: 'Consultar leads ou Kanban no CRM Zatten',
+          description: 'Consulta informações de leads no CRM Zatten. Se informado leadNumber, retorna os dados do lead específico. Se omitido, retorna a visão geral do Kanban e colunas ativas do CRM.',
           requestBody: {
             required: false,
             content: {
@@ -666,9 +666,8 @@ const openApiHandler = (req: Request, res: Response) => {
                 schema: {
                   type: 'object',
                   properties: {
-                    connectionId: { type: 'string', description: 'ID opcional da conexão Zatten' },
-                    limit: { type: 'integer', default: 20 },
-                    status: { type: 'string' }
+                    leadNumber: { type: 'string', description: 'Número de telefone/identificador do lead (DDI+DDD+Número, ex: 5511999999999). Opcional.' },
+                    connectionId: { type: 'string', description: 'ID opcional da conexão Zatten' }
                   }
                 }
               }

@@ -147,14 +147,13 @@ const MCP_TOOLS_CATALOG = [
   },
   {
     name: 'zatten_get_leads',
-    title: 'Consultar Leads no CRM Zatten',
-    description: 'Consulta e lista leads no CRM Zatten filtrados por conexão autorizada.',
+    title: 'Consultar Leads ou Kanban no CRM Zatten',
+    description: 'Consulta informações de leads no CRM Zatten. Se informado leadNumber, retorna os dados do lead específico. Se omitido, retorna a visão geral do Kanban e colunas ativas do CRM.',
     inputSchema: {
       type: 'object',
       properties: {
-        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' },
-        limit: { type: 'integer', description: 'Limite de resultados', default: 20 },
-        status: { type: 'string', description: 'Status do lead' }
+        leadNumber: { type: 'string', description: 'Número de telefone/identificador do lead (DDI+DDD+Número, ex: 5511999999999). Opcional.' },
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
       }
     },
     securitySchemes: [
@@ -764,8 +763,13 @@ async function executeToolDirectly(name: string, args: any, user: OAuthJwtPayloa
         lastCheck: new Date().toISOString()
       };
 
-    case 'zatten_get_leads':
-      return callZattenApi('/leads', 'GET', null, args?.connectionId);
+    case 'zatten_get_leads': {
+      const leadNum = args?.leadNumber || args?.lead_number;
+      if (leadNum) {
+        return callZattenApi(`/leads/${leadNum}`, 'GET', null, args?.connectionId);
+      }
+      return callZattenApi('/kanban', 'GET', null, args?.connectionId);
+    }
 
     case 'zatten_kanban_get':
       return callZattenApi('/kanban', 'GET', null, args?.connectionId);

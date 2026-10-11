@@ -39,6 +39,35 @@ class AsymmetricKeyManager {
   }
 
   private initKeys(): void {
+    const persistentJsonPath = path.join(process.cwd(), 'server', 'oauth', 'oauth_rsa_persistent.json');
+
+    // 1. Prioridade Máxima: carrega par de chaves RSA permanente para estabilidade absoluta entre deploys
+    if (fs.existsSync(persistentJsonPath)) {
+      try {
+        const data = JSON.parse(fs.readFileSync(persistentJsonPath, 'utf8'));
+        if (data.privateKeyPem && data.publicKeyPem) {
+          this.privateKeyPem = data.privateKeyPem;
+          this.publicKeyPem = data.publicKeyPem;
+          this.activeKid = data.activeKid || 'firstsys-central-key-2026';
+
+          const keyObject = crypto.createPublicKey(this.publicKeyPem);
+          const exportedJwk = keyObject.export({ format: 'jwk' });
+
+          this.jwkPublic = {
+            kty: exportedJwk.kty || 'RSA',
+            n: exportedJwk.n || '',
+            e: exportedJwk.e || '',
+            alg: 'RS256',
+            use: 'sig',
+            kid: this.activeKid
+          };
+          return;
+        }
+      } catch (e) {
+        console.warn('⚠️ [OAuth Keys] Falha ao carregar oauth_rsa_persistent.json:', e);
+      }
+    }
+
     if (!fs.existsSync(KEYS_DIR)) {
       fs.mkdirSync(KEYS_DIR, { recursive: true, mode: 0o700 });
     }
