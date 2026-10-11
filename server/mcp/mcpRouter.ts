@@ -557,6 +557,55 @@ const MCP_TOOLS_CATALOG = [
     ],
     annotations: { readOnlyHint: true, destructiveHint: false },
     tags: ['messages', 'templates', 'hsm']
+  },
+  {
+    name: 'zatten_users_get',
+    title: 'Consultar Usuários e Atendentes Ativos',
+    description: 'Consulta a lista de todos os usuários e atendentes ativos cadastrados no CRM Zatten com ID, e-mail e departamentos para atribuição de responsável via zatten_leads_leadnumber_assignee_patch.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['zatten:read', 'zatten_users_get', 'tool:zatten_users_get'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['crm', 'users', 'attendants', 'team']
+  },
+  {
+    name: 'zatten_templates_get',
+    title: 'Consultar Templates HSM Aprovados',
+    description: 'Consulta os templates HSM oficiais cadastrados e aprovados pela Meta WhatsApp Business API disponíveis para envio através de zatten_messages_template_post.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['zatten:read', 'zatten_templates_get', 'tool:zatten_templates_get'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['messages', 'templates', 'hsm']
+  },
+  {
+    name: 'zatten_explain_lead_lookup',
+    title: 'Orientações de Consulta de Leads no CRM Zatten',
+    description: 'Explica as diretrizes de busca de leads no CRM Zatten. Orienta o LLM a sempre utilizar zatten_leads_leadnumber_get fornecendo o número de telefone/WhatsApp (WaId) ou zatten_kanban_get para as colunas.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        leadNumber: { type: 'string', description: 'Número de WhatsApp (WaId) do lead para consulta direta (opcional)' },
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['zatten:read', 'zatten_explain_lead_lookup', 'tool:zatten_explain_lead_lookup'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['crm', 'leads', 'guide']
   }
 ];
 
@@ -779,6 +828,7 @@ async function executeToolDirectly(name: string, args: any, user: OAuthJwtPayloa
         lastCheck: new Date().toISOString()
       };
 
+    case 'zatten_explain_lead_lookup':
     case 'zatten_get_leads': {
       const leadNum = args?.leadNumber || args?.lead_number;
       if (leadNum) {
@@ -906,6 +956,7 @@ async function executeToolDirectly(name: string, args: any, user: OAuthJwtPayloa
       return callZattenApi(`/messages/history?${q.toString()}`, 'GET', null, args?.connectionId);
     }
 
+    case 'zatten_users_get':
     case 'zatten_attendants_list': {
       let dbAttendants: any[] = [];
       let dbDepartments: any[] = [];
@@ -923,6 +974,7 @@ async function executeToolDirectly(name: string, args: any, user: OAuthJwtPayloa
       };
     }
 
+    case 'zatten_templates_get':
     case 'zatten_templates_list': {
       let dbTemplates: any[] = [];
       if (fs.existsSync(dbPath)) {
@@ -1304,5 +1356,27 @@ mcpRouter.post('/tools/zatten_send_message', requireOAuth('zatten:messages'), as
   } catch (err: unknown) {
     console.error('[MCP send_message] Erro:', err);
     return res.status(500).json({ error: 'server_error', message: 'Falha ao executar operação MCP' });
+  }
+});
+
+// ==============================================================================
+// 6. ROTEADOR REST DINÂMICO PARA FERRAMENTAS MCP / OPENAPI
+// Permite que Custom Actions do ChatGPT e chamadas REST executem qualquer ferramenta
+// diretamente via POST /mcp/tools/:toolName com autorização Bearer OAuth 2.1.
+// ==============================================================================
+mcpRouter.post('/tools/:toolName', requireOAuth(), async (req: AuthenticatedMcpRequest, res: Response) => {
+  const { toolName } = req.params;
+  const user = req.oauthUser!;
+  const args = req.body || {};
+
+  try {
+    const result = await executeToolDirectly(toolName, args, user);
+    return res.json(result);
+  } catch (err: any) {
+    console.error(`[MCP REST] Erro ao executar ${toolName}:`, err);
+    return res.status(err.message?.includes('não encontrada') ? 404 : 500).json({
+      error: 'tool_execution_failed',
+      message: err.message || 'Erro ao processar chamada da ferramenta'
+    });
   }
 });

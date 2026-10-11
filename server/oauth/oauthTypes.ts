@@ -47,6 +47,9 @@ export const OAUTH_SCOPES = [
   'zatten_messages_history_get',
   'zatten_attendants_list',
   'zatten_templates_list',
+  'zatten_users_get',
+  'zatten_templates_get',
+  'zatten_explain_lead_lookup',
 
   // Ferramentas com prefixo tool:
   'tool:firstsys_get_profile',
@@ -74,7 +77,10 @@ export const OAUTH_SCOPES = [
   'tool:zatten_messages_video_post',
   'tool:zatten_messages_history_get',
   'tool:zatten_attendants_list',
-  'tool:zatten_templates_list'
+  'tool:zatten_templates_list',
+  'tool:zatten_users_get',
+  'tool:zatten_templates_get',
+  'tool:zatten_explain_lead_lookup'
 ] as const;
 
 export type OAuthScope = typeof OAUTH_SCOPES[number] | string;

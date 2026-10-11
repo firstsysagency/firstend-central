@@ -550,7 +550,9 @@ oauthRouter.get('/oauth/userinfo', (req: Request, res: Response) => {
 const openApiHandler = (req: Request, res: Response) => {
   const issuer = getBaseIssuer(req);
   res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   res.json({
     openapi: '3.1.0',
     info: {
@@ -901,6 +903,128 @@ const openApiHandler = (req: Request, res: Response) => {
           responses: {
             '200': {
               description: 'Thread reiniciada com sucesso',
+              content: {
+                'application/json': {
+                  schema: { type: 'object' }
+                }
+              }
+            }
+          }
+        }
+      },
+      '/mcp/tools/zatten_users_get': {
+        post: {
+          operationId: 'zatten_users_get',
+          summary: 'Consultar usuários e atendentes ativos',
+          description: 'Consulta a lista de todos os usuários e atendentes ativos cadastrados no CRM Zatten com ID, e-mail e departamentos para atribuição de responsável via zatten_leads_leadnumber_assignee_patch.',
+          requestBody: {
+            required: false,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    connectionId: { type: 'string', description: 'ID opcional da conexão Zatten' }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            '200': {
+              description: 'Lista de usuários e atendentes retornada com sucesso',
+              content: {
+                'application/json': {
+                  schema: { type: 'object' }
+                }
+              }
+            }
+          }
+        }
+      },
+      '/mcp/tools/zatten_templates_get': {
+        post: {
+          operationId: 'zatten_templates_get',
+          summary: 'Consultar templates HSM aprovados',
+          description: 'Consulta os templates HSM oficiais cadastrados e aprovados pela Meta WhatsApp Business API disponíveis para envio através de zatten_messages_template_post.',
+          requestBody: {
+            required: false,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    connectionId: { type: 'string', description: 'ID opcional da conexão Zatten' }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            '200': {
+              description: 'Templates HSM retornados com sucesso',
+              content: {
+                'application/json': {
+                  schema: { type: 'object' }
+                }
+              }
+            }
+          }
+        }
+      },
+      '/mcp/tools/zatten_explain_lead_lookup': {
+        post: {
+          operationId: 'zatten_explain_lead_lookup',
+          summary: 'Orientações de consulta de leads no CRM Zatten',
+          description: 'Explica as diretrizes de busca de leads no CRM Zatten. Orienta a sempre utilizar zatten_leads_leadnumber_get fornecendo o número de telefone/WhatsApp (WaId) ou zatten_kanban_get para as colunas.',
+          requestBody: {
+            required: false,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    leadNumber: { type: 'string', description: 'Número de WhatsApp (WaId) do lead para consulta direta (opcional)' },
+                    connectionId: { type: 'string', description: 'ID opcional da conexão Zatten' }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            '200': {
+              description: 'Orientações retornadas com sucesso',
+              content: {
+                'application/json': {
+                  schema: { type: 'object' }
+                }
+              }
+            }
+          }
+        }
+      },
+      '/mcp/tools/zatten_get_leads': {
+        post: {
+          operationId: 'zatten_get_leads',
+          summary: 'Consultar dados do lead ou receber instruções de busca',
+          description: 'Consulta lead por leadNumber se fornecido, ou retorna instruções de direcionamento para o WaId no CRM Zatten.',
+          requestBody: {
+            required: false,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    leadNumber: { type: 'string', description: 'Número de WhatsApp (WaId) do lead' },
+                    connectionId: { type: 'string', description: 'ID opcional da conexão Zatten' }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            '200': {
+              description: 'Resposta de consulta de lead ou orientações retornadas',
               content: {
                 'application/json': {
                   schema: { type: 'object' }
