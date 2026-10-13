@@ -344,10 +344,13 @@ app.post('/api/sync-mock-db', (req, res) => {
 });
 
 // === ROTAS DE PERMISSÕES DO MCP ===
+let inMemoryMcpPermissions: any[] | null = null;
+
 app.get('/api/mcp/permissions', (_req, res) => {
   try {
     const db = getDatabase();
-    res.json({ success: true, permissions: db.mcpPermissions || [] });
+    const perms = inMemoryMcpPermissions || db.mcpPermissions || [];
+    res.json({ success: true, permissions: perms });
   } catch (err) {
     console.error('Erro ao buscar permissões MCP', err);
     res.status(500).json({ error: 'Erro ao buscar permissões' });
@@ -357,6 +360,7 @@ app.get('/api/mcp/permissions', (_req, res) => {
 app.post('/api/mcp/permissions', (req, res) => {
   try {
     const { permissions } = req.body;
+    inMemoryMcpPermissions = permissions;
     const db = getDatabase();
     db.mcpPermissions = permissions;
     fs.writeFileSync(MOCK_DB_PATH, JSON.stringify(db, null, 2));

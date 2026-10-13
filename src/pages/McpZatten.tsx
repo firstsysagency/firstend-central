@@ -15,16 +15,19 @@ const STORAGE_KEY = 'zatten_mcp_permissions';
 
 const ALL_PERMISSIONS: McpPermission[] = [
   { id: 'zatten_kanban_get', name: 'Buscar Colunas (zatten_kanban_get)', description: 'Busca informações de todas as colunas do Kanban.', enabled: true },
-  { id: 'zatten_leads_leadnumber_assignee_patch', name: 'Atualizar Responsável (zatten_leads_leadnumber_assignee_patch)', description: 'Atualiza o responsável (usuário e departamento) de um lead.', enabled: false, danger: true },
+  { id: 'zatten_leads_leadnumber_assignee_patch', name: 'Atualizar Responsável (zatten_leads_leadnumber_assignee_patch)', description: 'Atualiza o responsável (usuário e departamento) de um lead.', enabled: true, danger: true },
   { id: 'zatten_leads_leadnumber_get', name: 'Obter Lead (zatten_leads_leadnumber_get)', description: 'Obtém informações de um lead específico.', enabled: true },
-  { id: 'zatten_leads_leadnumber_kanban_patch', name: 'Mover Lead no Kanban (zatten_leads_leadnumber_kanban_patch)', description: 'Move um lead entre colunas no Kanban.', enabled: false, danger: true },
-  { id: 'zatten_leads_leadnumber_notes_patch', name: 'Atualizar Anotação (zatten_leads_leadnumber_notes_patch)', description: 'Atualiza ou adiciona anotações em um lead.', enabled: false, danger: true },
-  { id: 'zatten_leads_leadnumber_properties_patch', name: 'Atualizar Propriedade (zatten_leads_leadnumber_properties_patch)', description: 'Atualiza propriedades customizadas de um lead.', enabled: false, danger: true },
-  { id: 'zatten_leads_leadnumber_tag_delete', name: 'Remover Tag (zatten_leads_leadnumber_tag_delete)', description: 'Remove uma tag associada a um lead.', enabled: false, danger: true },
-  { id: 'zatten_leads_leadnumber_tag_post', name: 'Adicionar Tag (zatten_leads_leadnumber_tag_post)', description: 'Adiciona uma tag a um lead.', enabled: false, danger: true },
-  { id: 'zatten_leads_leadnumber_thread_patch', name: 'Reiniciar Thread (zatten_leads_leadnumber_thread_patch)', description: 'Reinicia a thread de conversa de um lead.', enabled: false, danger: true },
+  { id: 'zatten_leads_leadnumber_kanban_patch', name: 'Mover Lead no Kanban (zatten_leads_leadnumber_kanban_patch)', description: 'Move um lead entre colunas no Kanban.', enabled: true, danger: true },
+  { id: 'zatten_leads_leadnumber_notes_patch', name: 'Atualizar Anotação (zatten_leads_leadnumber_notes_patch)', description: 'Atualiza ou adiciona anotações em um lead.', enabled: true, danger: true },
+  { id: 'zatten_leads_leadnumber_properties_patch', name: 'Atualizar Propriedade (zatten_leads_leadnumber_properties_patch)', description: 'Atualiza propriedades customizadas de um lead.', enabled: true, danger: true },
+  { id: 'zatten_leads_leadnumber_tag_delete', name: 'Remover Tag (zatten_leads_leadnumber_tag_delete)', description: 'Remove uma tag associada a um lead.', enabled: true, danger: true },
+  { id: 'zatten_leads_leadnumber_tag_post', name: 'Adicionar Tag (zatten_leads_leadnumber_tag_post)', description: 'Adiciona uma tag a um lead.', enabled: true, danger: true },
   { id: 'zatten_leads_leadnumber_threads_get', name: 'Listar Threads do Lead (zatten_leads_leadnumber_threads_get)', description: 'Lista todas as threads vinculadas a um lead.', enabled: true },
-  { id: 'zatten_leads_leadnumber_toggle_attendant_response_post', name: 'Alternar IA (zatten_leads_leadnumber_toggle_attendant_response_post)', description: 'Ativa ou desativa a resposta automática do atendente de IA para um lead.', enabled: false, danger: true },
+  { id: 'zatten_leads_leadnumber_toggle_attendant_response_post', name: 'Alternar IA (zatten_leads_leadnumber_toggle_attendant_response_post)', description: 'Ativa ou desativa a resposta automática do atendente de IA para um lead.', enabled: true, danger: true },
+  { id: 'zatten_users_get', name: 'Listar Usuários e Atendentes (zatten_users_get)', description: 'Consulta atendentes, usuários e responsáveis cadastrados no CRM Zatten.', enabled: true },
+  { id: 'zatten_templates_get', name: 'Listar Templates HSM (zatten_templates_get)', description: 'Consulta os templates HSM aprovados pela Meta WhatsApp Business API.', enabled: true },
+  { id: 'zatten_attendants_list', name: 'Listar Equipe (zatten_attendants_list)', description: 'Lista membros da equipe cadastrados para atribuição de responsável.', enabled: true },
+  { id: 'zatten_templates_list', name: 'Templates HSM Legados (zatten_templates_list)', description: 'Consulta lista de templates cadastrados.', enabled: true },
   { id: 'zatten_list_connections', name: 'Listar Conexões (zatten_list_connections)', description: 'Lista as conexões Zatten ativas na organização.', enabled: true },
   { id: 'zatten_messages_audio_post', name: 'Enviar Áudio (zatten_messages_audio_post)', description: 'Envia uma mensagem de áudio.', enabled: true },
   { id: 'zatten_messages_file_post', name: 'Enviar Arquivo (zatten_messages_file_post)', description: 'Envia uma mensagem de arquivo (documentos).', enabled: true },
@@ -66,25 +69,40 @@ export default function McpZatten() {
   const [copiedConfig, setCopiedConfig] = useState(false);
   const [showChatGptInstructions, setShowChatGptInstructions] = useState(false);
 
-  // Sincroniza com o servidor ao inicializar
+  // Sincroniza com o servidor ao inicializar com preservação de estado
   useEffect(() => {
     async function loadServerPermissions() {
       try {
         const res = await fetch('/api/mcp/permissions');
         if (res.ok) {
           const data = await res.json();
-          if (Array.isArray(data.permissions) && data.permissions.length > 0) {
-            const merged = ALL_PERMISSIONS.map(def => {
-              const found = data.permissions.find((p: McpPermission) => p.id === def.id);
-              return found ? { ...def, enabled: found.enabled } : def;
-            });
-            setPermissions(merged);
-            setSavedPermissions(merged);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-          }
+          const serverList: McpPermission[] = Array.isArray(data.permissions) ? data.permissions : [];
+          
+          let localList: McpPermission[] = [];
+          try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (raw) localList = JSON.parse(raw);
+          } catch {}
+
+          const merged = ALL_PERMISSIONS.map(def => {
+            const foundServer = serverList.find(p => p.id === def.id);
+            const foundLocal = localList.find(p => p.id === def.id);
+            // Se o usuário já ativou localmente ou no servidor, prioriza manter ativado
+            let isEnabled = def.enabled;
+            if (foundLocal !== undefined) {
+              isEnabled = foundLocal.enabled;
+            } else if (foundServer !== undefined) {
+              isEnabled = foundServer.enabled;
+            }
+            return { ...def, enabled: isEnabled };
+          });
+
+          setPermissions(merged);
+          setSavedPermissions(merged);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
         }
       } catch {
-        // Fallback para os dados locais já carregados
+        // Mantém os dados locais já carregados sem sobrescrever
       }
     }
     loadServerPermissions();
@@ -98,9 +116,33 @@ export default function McpZatten() {
   };
 
   const togglePermission = (id: string) => {
-    setPermissions(prev => prev.map(p => 
-      p.id === id ? { ...p, enabled: !p.enabled } : p
-    ));
+    setPermissions(prev => {
+      const updated = prev.map(p => 
+        p.id === id ? { ...p, enabled: !p.enabled } : p
+      );
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  };
+
+  const handleEnableAll = () => {
+    const updated = permissions.map(p => ({ ...p, enabled: true }));
+    setPermissions(updated);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    } catch {}
+    showToast('Todas as ações foram habilitadas! Clique em Salvar para fixar no servidor.');
+  };
+
+  const handleDisableAll = () => {
+    const updated = permissions.map(p => ({ ...p, enabled: false }));
+    setPermissions(updated);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    } catch {}
+    showToast('Todas as ações foram desabilitadas.');
   };
 
   const hasUnsavedChanges = useMemo(() => {
@@ -389,15 +431,35 @@ Token Exchange: Default (POST Request)`;
                   <p className="text-sm text-zinc-400">Ative ou desative as ferramentas disponíveis para a IA.</p>
                 </div>
               </div>
-              <div className="relative w-full md:w-72">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={16} />
-                <input 
-                  type="text" 
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Pesquisar ação..." 
-                  className="w-full bg-secondary/50 border border-border focus:border-primary focus:ring-1 focus:ring-primary rounded-xl pl-9 pr-4 py-2 text-sm text-foreground outline-none transition-all"
-                />
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleEnableAll}
+                    className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                  >
+                    <Sparkles size={14} />
+                    <span>Habilitar Todas (Acesso Total)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDisableAll}
+                    className="px-3 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-foreground hover:bg-white/5 border border-border transition-all flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    <X size={14} />
+                    <span>Desabilitar Todas</span>
+                  </button>
+                </div>
+                <div className="relative w-full sm:w-60">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={16} />
+                  <input 
+                    type="text" 
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Pesquisar ação..." 
+                    className="w-full bg-secondary/50 border border-border focus:border-primary focus:ring-1 focus:ring-primary rounded-xl pl-9 pr-4 py-2 text-sm text-foreground outline-none transition-all"
+                  />
+                </div>
               </div>
             </div>
 

@@ -44,7 +44,7 @@
       "id": "zatten_leads_leadnumber_assignee_patch",
       "name": "Atualizar Responsável (zatten_leads_leadnumber_assignee_patch)",
       "description": "Atualiza o responsável (usuário e departamento) de um lead.",
-      "enabled": false,
+      "enabled": true,
       "danger": true
     },
     {
@@ -57,42 +57,35 @@
       "id": "zatten_leads_leadnumber_kanban_patch",
       "name": "Mover Lead no Kanban (zatten_leads_leadnumber_kanban_patch)",
       "description": "Move um lead entre colunas no Kanban.",
-      "enabled": false,
+      "enabled": true,
       "danger": true
     },
     {
       "id": "zatten_leads_leadnumber_notes_patch",
       "name": "Atualizar Anotação (zatten_leads_leadnumber_notes_patch)",
       "description": "Atualiza ou adiciona anotações em um lead.",
-      "enabled": false,
+      "enabled": true,
       "danger": true
     },
     {
       "id": "zatten_leads_leadnumber_properties_patch",
       "name": "Atualizar Propriedade (zatten_leads_leadnumber_properties_patch)",
       "description": "Atualiza propriedades customizadas de um lead.",
-      "enabled": false,
+      "enabled": true,
       "danger": true
     },
     {
       "id": "zatten_leads_leadnumber_tag_delete",
       "name": "Remover Tag (zatten_leads_leadnumber_tag_delete)",
       "description": "Remove uma tag associada a um lead.",
-      "enabled": false,
+      "enabled": true,
       "danger": true
     },
     {
       "id": "zatten_leads_leadnumber_tag_post",
       "name": "Adicionar Tag (zatten_leads_leadnumber_tag_post)",
       "description": "Adiciona uma tag a um lead.",
-      "enabled": false,
-      "danger": true
-    },
-    {
-      "id": "zatten_leads_leadnumber_thread_patch",
-      "name": "Reiniciar Thread (zatten_leads_leadnumber_thread_patch)",
-      "description": "Reinicia a thread de conversa de um lead.",
-      "enabled": false,
+      "enabled": true,
       "danger": true
     },
     {
@@ -105,8 +98,32 @@
       "id": "zatten_leads_leadnumber_toggle_attendant_response_post",
       "name": "Alternar IA (zatten_leads_leadnumber_toggle_attendant_response_post)",
       "description": "Ativa ou desativa a resposta automática do atendente de IA para um lead.",
-      "enabled": false,
+      "enabled": true,
       "danger": true
+    },
+    {
+      "id": "zatten_users_get",
+      "name": "Listar Usuários e Atendentes (zatten_users_get)",
+      "description": "Consulta atendentes, usuários e responsáveis cadastrados no CRM Zatten.",
+      "enabled": true
+    },
+    {
+      "id": "zatten_templates_get",
+      "name": "Listar Templates HSM (zatten_templates_get)",
+      "description": "Consulta os templates HSM aprovados pela Meta WhatsApp Business API.",
+      "enabled": true
+    },
+    {
+      "id": "zatten_attendants_list",
+      "name": "Listar Equipe (zatten_attendants_list)",
+      "description": "Lista membros da equipe cadastrados para atribuição de responsável.",
+      "enabled": true
+    },
+    {
+      "id": "zatten_templates_list",
+      "name": "Templates HSM Legados (zatten_templates_list)",
+      "description": "Consulta lista de templates cadastrados.",
+      "enabled": true
     },
     {
       "id": "zatten_list_connections",
