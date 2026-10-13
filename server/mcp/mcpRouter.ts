@@ -13,6 +13,7 @@ import { verifyJwt } from '../oauth/cryptoEngine.js';
 import { type OAuthJwtPayload, type OAuthScope } from '../oauth/oauthTypes.js';
 import { zattenClient, buildZattenUrl } from '../zatten/zattenClient.js';
 import { logAuditEvent } from '../../src/lib/audit.js';
+import CryptoJS from 'crypto-js';
 
 export const mcpRouter = Router();
 
@@ -79,7 +80,7 @@ export function requireOAuth(requiredScope?: OAuthScope) {
 
     // Validação de Escopo Mínimo Necessário
     if (requiredScope) {
-      const grantedScopes = payload.scope.split(' ');
+      const grantedScopes = (payload.scope || '').split(' ');
       if (!grantedScopes.includes(requiredScope)) {
         res.setHeader('WWW-Authenticate', `Bearer error="insufficient_scope", scope="${requiredScope}", resource_metadata="${resourceMetadataUrl}"`);
         return res.status(403).json({
@@ -1267,7 +1268,7 @@ mcpRouter.post('/tools/zatten_send_message', requireOAuth('zatten:messages'), as
       confirmationTokens.set(token, {
         tool: 'zatten_send_message',
         parameters: { connectionId, recipient, messageText },
-        orgId: user.org_id,
+        orgId: user.org_id || 'org_firstsys_prod',
         expiresAt: Date.now() + 5 * 60 * 1000
       });
 
@@ -1290,7 +1291,7 @@ mcpRouter.post('/tools/zatten_send_message', requireOAuth('zatten:messages'), as
       return res.status(400).json({ error: 'invalid_confirmation', message: 'Token de confirmação expirado ou inválido.' });
     }
 
-    if (record.orgId !== user.org_id) {
+    if (record.orgId !== (user.org_id || 'org_firstsys_prod')) {
       return res.status(403).json({ error: 'forbidden', message: 'Token de confirmação pertence a outra organização.' });
     }
 
