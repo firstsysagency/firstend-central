@@ -23,7 +23,7 @@ const ALL_PERMISSIONS: McpPermission[] = [
   { id: 'zatten_leads_leadnumber_tag_delete', name: 'Remover Tag (zatten_leads_leadnumber_tag_delete)', description: 'Remove uma tag associada a um lead.', enabled: true, danger: true },
   { id: 'zatten_leads_leadnumber_tag_post', name: 'Adicionar Tag (zatten_leads_leadnumber_tag_post)', description: 'Adiciona uma tag a um lead.', enabled: true, danger: true },
   { id: 'zatten_leads_leadnumber_threads_get', name: 'Listar Threads do Lead (zatten_leads_leadnumber_threads_get)', description: 'Lista todas as threads vinculadas a um lead.', enabled: true },
-  { id: 'zatten_leads_leadnumber_toggle_attendant_response_post', name: 'Alternar IA (zatten_leads_leadnumber_toggle_attendant_response_post)', description: 'Ativa ou desativa a resposta automática do atendente de IA para um lead.', enabled: true, danger: true },
+  { id: 'zatten_leads_leadnumber_toggle_attendant_response_post', name: 'Alternar IA (zatten_leads_leadnumber_toggle_attendant_response_post)', description: 'Ativa, pausa ou desativa a resposta automática da IA para um lead.', enabled: true, danger: true },
   { id: 'zatten_users_get', name: 'Listar Usuários e Atendentes (zatten_users_get)', description: 'Consulta atendentes, usuários e responsáveis cadastrados no CRM Zatten.', enabled: true },
   { id: 'zatten_templates_get', name: 'Listar Templates HSM (zatten_templates_get)', description: 'Consulta os templates HSM aprovados pela Meta WhatsApp Business API.', enabled: true },
   { id: 'zatten_attendants_list', name: 'Listar Equipe (zatten_attendants_list)', description: 'Lista membros da equipe cadastrados para atribuição de responsável.', enabled: true },
@@ -37,7 +37,15 @@ const ALL_PERMISSIONS: McpPermission[] = [
   { id: 'zatten_messages_text_post', name: 'Enviar Texto (zatten_messages_text_post)', description: 'Envia uma mensagem de texto simples.', enabled: true },
   { id: 'zatten_messages_video_post', name: 'Enviar Vídeo (zatten_messages_video_post)', description: 'Envia uma mensagem de vídeo.', enabled: true },
   { id: 'zatten_send_message', name: 'Enviar Mensagem Segura (zatten_send_message)', description: 'Envia mensagem a um contato via API Zatten. EXIGE CONFIRMAÇÃO DO USUÁRIO.', enabled: true },
-  { id: 'zatten_tags_get', name: 'Buscar Tags (zatten_tags_get)', description: 'Busca informações de todas as tags disponíveis.', enabled: true }
+  { id: 'zatten_tags_get', name: 'Buscar Tags (zatten_tags_get)', description: 'Busca informações de todas as tags disponíveis.', enabled: true },
+  { id: 'zatten_properties_get', name: 'Listar Propriedades (zatten_properties_get)', description: 'Lista as propriedades personalizadas cadastradas no projeto (slug, name, is_enum).', enabled: true },
+  { id: 'zatten_properties_slug_values_get', name: 'Listar Valores Enum (zatten_properties_slug_values_get)', description: 'Retorna os valores permitidos de uma propriedade do tipo enum/lista.', enabled: true },
+  { id: 'zatten_leads_leadnumber_notification_post', name: 'Notificar Responsável (zatten_leads_leadnumber_notification_post)', description: 'Envia notificação push interna ao atendente responsável pelo lead.', enabled: true, danger: true },
+  { id: 'zatten_automations_trigger_post', name: 'Disparar Automações (zatten_automations_trigger_post)', description: 'Solicita disparo de automações compatíveis com o estado atual do lead.', enabled: true, danger: true },
+  { id: 'zatten_flows_trigger_post', name: 'Disparar Trigger Flow (zatten_flows_trigger_post)', description: 'Dispara um Trigger Flow com chave de idempotência para um lead.', enabled: true, danger: true },
+  { id: 'zatten_hooks_path_post', name: 'Disparar Webhook (zatten_hooks_path_post)', description: 'Dispara webhook de entrada configurado na Zatten com payload JSON.', enabled: true, danger: true },
+  { id: 'zatten_agent_config_get', name: 'Ler Config do Agente (zatten_agent_config_get)', description: 'Lê o template e configuração do agente Zatten com dados sensíveis protegidos.', enabled: true },
+  { id: 'zatten_agent_config_update', name: 'Atualizar Config do Agente (zatten_agent_config_update)', description: 'Atualiza blocos do agente Zatten preservando segredos e sem publicação automática.', enabled: true, danger: true }
 ].sort((a, b) => a.name.localeCompare(b.name));
 
 function getInitialPermissions(): McpPermission[] {

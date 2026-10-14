@@ -1,7 +1,7 @@
 /**
  * SERVIDOR E ROTAS MCP REMOTO COM PROTEÇÃO OAUTH 2.1 E CHATGPT
  * Central Privada de Conexões Zatten — Firstsys
- * Implementação conforme RFC Protected Resource Metadata e MCP Specification
+ * Implementação conforme RFC Protected Resource Metadata, MCP Specification e non-deploy/mcp-zatten.md
  */
 
 import { Router, type Request, type Response } from 'express';
@@ -9,16 +9,79 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { z } from 'zod';
+import CryptoJS from 'crypto-js';
 import { verifyJwt } from '../oauth/cryptoEngine.js';
 import { type OAuthJwtPayload, type OAuthScope } from '../oauth/oauthTypes.js';
 import { zattenClient, buildZattenUrl } from '../zatten/zattenClient.js';
 import { logAuditEvent } from '../../src/lib/audit.js';
-import CryptoJS from 'crypto-js';
+import {
+  ZattenPropertiesGetSchema,
+  ZattenPropertiesSlugValuesGetSchema,
+  ZattenLeadsLeadNumberNotificationPostSchema,
+  ZattenAutomationsTriggerPostSchema,
+  ZattenFlowsTriggerPostSchema,
+  ZattenHooksPathPostSchema,
+  ZattenAgentConfigGetSchema,
+  ZattenAgentConfigUpdateSchema,
+  ZattenLeadsLeadNumberAssigneePatchSchema,
+  ZattenLeadsLeadNumberAiPatchSchema
+} from './mcpSchemas.js';
+import {
+  sanitizeTemplateSecrets,
+  validateNoRedactedOrEmptySecrets,
+  mergeTemplatePatch
+} from './templateSanitizer.js';
 
 export const mcpRouter = Router();
 
 // ==============================================================================
-// 1. MIDDLEWARE DE AUTENTICAÇÃO OAUTH 2.1 PARA RECURSO PROTEGIDO MCP
+// 1. HELPERS DE AUDITORIA, CORRELATION ID E RESPOSTAS NORMALIZADAS
+// ==============================================================================
+
+export interface NormalizedMcpError {
+  ok: false;
+  error: {
+    code: string;
+    message: string;
+    httpStatus: number;
+    retryable: boolean;
+    correlationId: string;
+    details?: unknown;
+  };
+  isError: true;
+}
+
+export function formatMcpError(params: {
+  code: string;
+  message: string;
+  httpStatus: number;
+  retryable?: boolean;
+  correlationId: string;
+  details?: unknown;
+}): NormalizedMcpError {
+  return {
+    ok: false,
+    error: {
+      code: params.code,
+      message: params.message,
+      httpStatus: params.httpStatus,
+      retryable: params.retryable ?? false,
+      correlationId: params.correlationId,
+      ...(params.details !== undefined ? { details: params.details } : {})
+    },
+    isError: true
+  };
+}
+
+function maskLeadNumber(leadNumber?: string): string | undefined {
+  if (!leadNumber) return undefined;
+  const cleaned = String(leadNumber).replace(/\D/g, '');
+  if (cleaned.length < 6) return '****';
+  return `${cleaned.slice(0, 4)}****${cleaned.slice(-2)}`;
+}
+
+// ==============================================================================
+// 2. MIDDLEWARE DE AUTENTICAÇÃO OAUTH 2.1 PARA RECURSO PROTEGIDO MCP
 // ==============================================================================
 
 export interface AuthenticatedMcpRequest extends Request {
@@ -55,7 +118,6 @@ export function requireOAuth(requiredScope?: OAuthScope) {
     const payload = verification.payload;
 
     // Validação estrita da Audiência do Recurso Protegido (Requisito ChatGPT / RFC)
-    // O valor de 'resource' DEVE estar presente no array/string de aud
     const canonicalResource = process.env.MCP_RESOURCE_IDENTIFIER || `${issuer}/mcp`;
     const audiences = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
     
@@ -90,24 +152,17 @@ export function requireOAuth(requiredScope?: OAuthScope) {
       }
     }
 
-    console.log('🤖 [MCP Requisição Autenticada]', {
-      sub: payload.sub,
-      client_id: payload.client_id,
-      path: req.path,
-      method: req.body?.method || req.method
-    });
-
     req.oauthUser = payload;
     next();
   };
 }
 
 // ==============================================================================
-// ==============================================================================
-// 1.1 CATÁLOGO DE FERRAMENTAS MCP CONFORME PROTOCOLO 2024-11-05 (COMPLETO ZATTEN)
+// 3. CATÁLOGO COMPLETO DE FERRAMENTAS MCP CONFORME PROTOCOLO 2024-11-05
 // ==============================================================================
 
 const MCP_TOOLS_CATALOG = [
+  // --- IDENTIDADE E CONEXÕES FIRSTSYS ---
   {
     name: 'firstsys_get_profile',
     title: 'Consultar Perfil Firstsys',
@@ -146,6 +201,8 @@ const MCP_TOOLS_CATALOG = [
     annotations: { readOnlyHint: true, destructiveHint: false },
     tags: ['connections', 'status']
   },
+
+  // --- CRM & LEADS ---
   {
     name: 'zatten_kanban_get',
     title: 'Buscar Colunas do Kanban Zatten',
@@ -153,7 +210,8 @@ const MCP_TOOLS_CATALOG = [
     inputSchema: {
       type: 'object',
       properties: {
-        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' },
+        connection_id: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
       }
     },
     securitySchemes: [
@@ -169,7 +227,8 @@ const MCP_TOOLS_CATALOG = [
     inputSchema: {
       type: 'object',
       properties: {
-        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' },
+        connection_id: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
       }
     },
     securitySchemes: [
@@ -187,7 +246,9 @@ const MCP_TOOLS_CATALOG = [
       required: ['leadNumber'],
       properties: {
         leadNumber: { type: 'string', description: 'O número de WhatsApp (WaId) do lead.' },
-        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+        lead_number: { type: 'string', description: 'O número de WhatsApp (WaId) do lead.' },
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' },
+        connection_id: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
       }
     },
     securitySchemes: [
@@ -199,15 +260,17 @@ const MCP_TOOLS_CATALOG = [
   {
     name: 'zatten_leads_leadnumber_notes_patch',
     title: 'Atualizar Anotações do Lead',
-    description: 'Atualiza ou adiciona anotações no perfil de um lead no CRM Zatten.',
+    description: 'Atualiza ou adiciona anotações no perfil de um lead no CRM Zatten. Modifica dados no CRM.',
     inputSchema: {
       type: 'object',
       required: ['leadNumber', 'note'],
       properties: {
         leadNumber: { type: 'string', description: 'O número de WhatsApp (WaId) do lead.' },
+        lead_number: { type: 'string', description: 'O número de WhatsApp (WaId) do lead.' },
         note: { type: 'string', description: 'O conteúdo da anotação a ser salva.' },
         delete_previous_note: { type: 'boolean', description: 'Se true, substitui a anotação antiga; se false, concatena.' },
-        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' },
+        connection_id: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
       }
     },
     securitySchemes: [
@@ -219,15 +282,17 @@ const MCP_TOOLS_CATALOG = [
   {
     name: 'zatten_leads_leadnumber_properties_patch',
     title: 'Atualizar Propriedades Customizadas do Lead',
-    description: 'Atualiza propriedades customizadas de um lead a partir do slug da propriedade.',
+    description: 'Atualiza propriedades customizadas de um lead a partir do slug da propriedade. Modifica dados no CRM.',
     inputSchema: {
       type: 'object',
       required: ['leadNumber', 'property', 'value'],
       properties: {
         leadNumber: { type: 'string', description: 'O número de WhatsApp (WaId) do lead.' },
+        lead_number: { type: 'string', description: 'O número de WhatsApp (WaId) do lead.' },
         property: { type: 'string', description: 'O slug da propriedade a ser atualizada.' },
         value: { type: 'string', description: 'O novo valor para a propriedade.' },
-        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' },
+        connection_id: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
       }
     },
     securitySchemes: [
@@ -245,7 +310,9 @@ const MCP_TOOLS_CATALOG = [
       required: ['leadNumber'],
       properties: {
         leadNumber: { type: 'string', description: 'O número de WhatsApp (WaId) do lead.' },
-        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+        lead_number: { type: 'string', description: 'O número de WhatsApp (WaId) do lead.' },
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' },
+        connection_id: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
       }
     },
     securitySchemes: [
@@ -257,14 +324,16 @@ const MCP_TOOLS_CATALOG = [
   {
     name: 'zatten_leads_leadnumber_kanban_patch',
     title: 'Mover Lead no Kanban',
-    description: 'Move um lead entre colunas do Kanban de atendimento.',
+    description: 'Move um lead entre colunas do Kanban de atendimento. Modifica o status no CRM.',
     inputSchema: {
       type: 'object',
       required: ['leadNumber', 'column_id'],
       properties: {
         leadNumber: { type: 'string', description: 'O número de WhatsApp (WaId) do lead.' },
+        lead_number: { type: 'string', description: 'O número de WhatsApp (WaId) do lead.' },
         column_id: { type: 'string', description: 'O ID da coluna de destino no Kanban.' },
-        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' },
+        connection_id: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
       }
     },
     securitySchemes: [
@@ -273,17 +342,22 @@ const MCP_TOOLS_CATALOG = [
     annotations: { readOnlyHint: false, destructiveHint: false },
     tags: ['crm', 'kanban', 'leads']
   },
+
+  // --- MELHORIA 1: ATRIBUIÇÃO DE RESPONSÁVEL ---
   {
     name: 'zatten_leads_leadnumber_assignee_patch',
-    title: 'Atualizar Responsável e Time do Lead',
-    description: 'Atualiza o responsável (usuário e departamento/time) de um lead.',
+    title: 'Atualizar Responsável e Departamento do Lead',
+    description: 'Atualiza o responsável (atendente e departamento) de um lead. Exige department_id. Aceita user_email ou user_id; se omitido, executa o rodízio do departamento. Modifica atribuição no CRM.',
     inputSchema: {
       type: 'object',
-      required: ['leadNumber', 'user_email', 'department_id'],
+      required: ['department_id'],
       properties: {
-        leadNumber: { type: 'string', description: 'O número de WhatsApp (WaId) do lead.' },
-        user_email: { type: 'string', description: 'E-mail do usuário responsável.' },
-        department_id: { type: 'string', description: 'ID do departamento atribuído.' },
+        lead_number: { type: 'string', description: 'Telefone com DDI e DDD (ex: 5511999999999)' },
+        leadNumber: { type: 'string', description: 'Telefone com DDI e DDD' },
+        department_id: { type: 'string', description: 'ID obrigatório do departamento atribuído' },
+        user_email: { type: 'string', description: 'E-mail do usuário responsável (opcional se usar rodízio ou user_id)' },
+        user_id: { type: 'string', description: 'ID do usuário responsável (opcional se usar rodízio ou user_email)' },
+        connection_id: { type: 'string', description: 'ID da conexão Zatten (opcional)' },
         connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
       }
     },
@@ -293,16 +367,21 @@ const MCP_TOOLS_CATALOG = [
     annotations: { readOnlyHint: false, destructiveHint: false },
     tags: ['crm', 'leads', 'assignee']
   },
+
+  // --- MELHORIA 2: CONTROLE DA IA ---
   {
     name: 'zatten_leads_leadnumber_toggle_attendant_response_post',
-    title: 'Alternar Resposta Automática da IA do Lead',
-    description: 'Ativa ou desativa a resposta automática do atendente de IA para um lead.',
+    title: 'Alternar ou Pausar Atendente de IA do Lead',
+    description: 'Ativa ou desativa a resposta automática do atendente de IA para um lead. Quando enabled for false, aceita pause_minutes (1 a 10.080 minutos) para pausa temporária. Modifica automação no CRM.',
     inputSchema: {
       type: 'object',
-      required: ['leadNumber', 'enabled'],
+      required: ['enabled'],
       properties: {
-        leadNumber: { type: 'string', description: 'O número de WhatsApp (WaId) do lead.' },
-        enabled: { type: 'boolean', description: 'True para ativar ou false para desativar a IA.' },
+        lead_number: { type: 'string', description: 'Telefone com DDI e DDD' },
+        leadNumber: { type: 'string', description: 'Telefone com DDI e DDD' },
+        enabled: { type: 'boolean', description: 'True para ligar a IA ou false para desligar/pausar' },
+        pause_minutes: { type: 'number', description: 'Minutos de pausa temporária (1 a 10.080). Permitido apenas quando enabled=false.' },
+        connection_id: { type: 'string', description: 'ID da conexão Zatten (opcional)' },
         connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
       }
     },
@@ -312,17 +391,20 @@ const MCP_TOOLS_CATALOG = [
     annotations: { readOnlyHint: false, destructiveHint: false },
     tags: ['crm', 'ai', 'automation']
   },
+
   {
     name: 'zatten_leads_leadnumber_tag_post',
     title: 'Adicionar Tag ao Lead',
-    description: 'Adiciona uma tag específica a um lead no CRM Zatten.',
+    description: 'Adiciona uma tag específica a um lead no CRM Zatten. Modifica tags no CRM.',
     inputSchema: {
       type: 'object',
       required: ['leadNumber', 'tag_id'],
       properties: {
         leadNumber: { type: 'string', description: 'O número de WhatsApp (WaId) do lead.' },
+        lead_number: { type: 'string', description: 'O número de WhatsApp (WaId) do lead.' },
         tag_id: { type: 'string', description: 'O ID da tag a ser adicionada.' },
-        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' },
+        connection_id: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
       }
     },
     securitySchemes: [
@@ -334,14 +416,16 @@ const MCP_TOOLS_CATALOG = [
   {
     name: 'zatten_leads_leadnumber_tag_delete',
     title: 'Remover Tag do Lead',
-    description: 'Remove uma tag de um lead no CRM Zatten.',
+    description: 'Remove uma tag de um lead no CRM Zatten. Modifica tags no CRM.',
     inputSchema: {
       type: 'object',
       required: ['leadNumber', 'tag_id'],
       properties: {
         leadNumber: { type: 'string', description: 'O número de WhatsApp (WaId) do lead.' },
+        lead_number: { type: 'string', description: 'O número de WhatsApp (WaId) do lead.' },
         tag_id: { type: 'string', description: 'O ID da tag a ser removida.' },
-        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' },
+        connection_id: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
       }
     },
     securitySchemes: [
@@ -350,10 +434,204 @@ const MCP_TOOLS_CATALOG = [
     annotations: { readOnlyHint: false, destructiveHint: true },
     tags: ['crm', 'leads', 'tags']
   },
+
+  // --- NOVA FERRAMENTA 1: LISTAR PROPRIEDADES DO PROJETO ---
+  {
+    name: 'zatten_properties_get',
+    title: 'Listar Propriedades Personalizadas do Projeto',
+    description: 'Lista as propriedades personalizadas cadastradas no projeto (slug, name, description, is_enum) para consulta prévia.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        connection_id: { type: 'string', description: 'ID da conexão Zatten (opcional)' },
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['zatten:read', 'zatten_properties_get', 'tool:zatten_properties_get'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['crm', 'properties', 'read']
+  },
+
+  // --- NOVA FERRAMENTA 2: LISTAR VALORES DE PROPRIEDADE ENUM ---
+  {
+    name: 'zatten_properties_slug_values_get',
+    title: 'Listar Valores Permitidos de Propriedade Enum',
+    description: 'Retorna valores válidos e descrições de propriedades configuradas como lista/enum. Para campos de texto livre, retorna mensagem informativa.',
+    inputSchema: {
+      type: 'object',
+      required: ['property_slug'],
+      properties: {
+        property_slug: { type: 'string', description: 'Slug da propriedade cadastrada a ser consultada' },
+        connection_id: { type: 'string', description: 'ID da conexão Zatten (opcional)' },
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['zatten:read', 'zatten_properties_slug_values_get', 'tool:zatten_properties_slug_values_get'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['crm', 'properties', 'enum', 'read']
+  },
+
+  // --- NOVA FERRAMENTA 3: NOTIFICAR RESPONSÁVEL DO LEAD ---
+  {
+    name: 'zatten_leads_leadnumber_notification_post',
+    title: 'Notificar Responsável Atual do Lead',
+    description: 'Envia notificação push interna ao atendente responsável atual pelo lead no CRM Zatten. Retorna se a notificação foi aceita ou se não há atendente com acesso.',
+    inputSchema: {
+      type: 'object',
+      required: ['lead_number'],
+      properties: {
+        lead_number: { type: 'string', description: 'Telefone do lead com DDI e DDD' },
+        leadNumber: { type: 'string', description: 'Telefone do lead com DDI e DDD' },
+        title: { type: 'string', description: 'Título da notificação (até 100 caracteres)' },
+        body: { type: 'string', description: 'Corpo da notificação (até 500 caracteres)' },
+        connection_id: { type: 'string', description: 'ID da conexão Zatten (opcional)' },
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['zatten:write', 'zatten_leads_leadnumber_notification_post', 'tool:zatten_leads_leadnumber_notification_post'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    tags: ['crm', 'leads', 'notification']
+  },
+
+  // --- NOVA FERRAMENTA 4: DISPARAR AUTOMAÇÕES DO LEAD ---
+  {
+    name: 'zatten_automations_trigger_post',
+    title: 'Disparar Automações Compatíveis com o Lead',
+    description: 'Solicita que a Zatten agende/dispare automações compatíveis com o estado atual do lead. Sucesso na solicitação não garante que uma automação era aplicável nem execução instantânea.',
+    inputSchema: {
+      type: 'object',
+      required: ['lead_id'],
+      properties: {
+        lead_id: { type: 'string', description: 'ID do lead no CRM Zatten' },
+        connection_id: { type: 'string', description: 'ID da conexão Zatten (opcional)' },
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['zatten:write', 'zatten_automations_trigger_post', 'tool:zatten_automations_trigger_post'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    tags: ['crm', 'automations']
+  },
+
+  // --- NOVA FERRAMENTA 5: DISPARAR TRIGGER FLOW ---
+  {
+    name: 'zatten_flows_trigger_post',
+    title: 'Disparar Trigger Flow',
+    description: 'Dispara um Trigger Flow existente para um lead com suporte a chave de idempotência. Status HTTP 202 indica recebimento e despacho assíncrono.',
+    inputSchema: {
+      type: 'object',
+      required: ['trigger_type'],
+      properties: {
+        trigger_type: { 
+          type: 'string', 
+          enum: [
+            'lead.first_message',
+            'lead.column_changed',
+            'lead.tag_added',
+            'lead.tag_removed',
+            'lead.assignee_changed',
+            'lead.conversation_closed',
+            'webhook.inbound',
+            'lead.ai_toggled'
+          ],
+          description: 'Tipo do gatilho configurado'
+        },
+        lead_number: { type: 'string', description: 'Telefone com DDI e DDD (informe exatamente um entre lead_number e lead_id)' },
+        leadNumber: { type: 'string', description: 'Telefone com DDI e DDD' },
+        lead_id: { type: 'string', description: 'ID do lead (informe exatamente um entre lead_number e lead_id)' },
+        trigger_event: { type: 'object', description: 'Payload contextual do evento' },
+        idempotency_key: { type: 'string', description: 'Chave de idempotência (gerada automaticamente se omitida)' },
+        connection_id: { type: 'string', description: 'ID da conexão Zatten (opcional)' },
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['zatten:write', 'zatten_flows_trigger_post', 'tool:zatten_flows_trigger_post'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    tags: ['crm', 'flows']
+  },
+
+  // --- NOVA FERRAMENTA 6: DISPARAR WEBHOOK DE ENTRADA ---
+  {
+    name: 'zatten_hooks_path_post',
+    title: 'Disparar Webhook de Entrada Configurado',
+    description: 'Dispara um Trigger Flow configurado como webhook de entrada na Zatten encaminhando payload JSON. HTTP 202 confirma recebimento sem garantir que um flow coincidiu com o path.',
+    inputSchema: {
+      type: 'object',
+      required: ['path'],
+      properties: {
+        path: { type: 'string', description: 'Path exclusivo em minúsculas, números e hífens' },
+        lead_number: { type: 'string', description: 'Telefone com DDI e DDD (informe exatamente um entre lead_number e lead_id)' },
+        leadNumber: { type: 'string', description: 'Telefone com DDI e DDD' },
+        lead_id: { type: 'string', description: 'ID do lead (informe exatamente um entre lead_number e lead_id)' },
+        payload: { type: 'object', description: 'Dados JSON a serem encaminhados' },
+        idempotency_key: { type: 'string', description: 'Chave de idempotência' },
+        connection_id: { type: 'string', description: 'ID da conexão Zatten (opcional)' },
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['zatten:write', 'zatten_hooks_path_post', 'tool:zatten_hooks_path_post'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    tags: ['crm', 'webhooks']
+  },
+
+  // --- NOVA FERRAMENTA 7: LER CONFIGURAÇÃO DO AGENTE (SANITIZADA) ---
+  {
+    name: 'zatten_agent_config_get',
+    title: 'Ler Configuração Completa do Agente (Sanitizada)',
+    description: 'Lê o template e configuração do agente Zatten (prompt, modelo, skills, tools, automações, revision) com todos os segredos e credenciais removidos via <redacted>.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        connection_id: { type: 'string', description: 'ID da conexão Zatten (opcional)' },
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['zatten:read', 'zatten_agent_config_get', 'tool:zatten_agent_config_get'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['agent', 'template', 'read']
+  },
+
+  // --- NOVA FERRAMENTA 8: ATUALIZAR CONFIGURAÇÃO DO AGENTE (RASCUNHO SEGURO) ---
+  {
+    name: 'zatten_agent_config_update',
+    title: 'Atualizar Configuração do Agente (Rascunho Seguro)',
+    description: 'Atualiza blocos do template do agente com concorrência por expected_revision e retenção de segredos. Gera apenas rascunho sem publicação automática.',
+    inputSchema: {
+      type: 'object',
+      required: ['expected_revision', 'template_patch', 'reason'],
+      properties: {
+        expected_revision: { type: 'string', description: 'Revision atual esperada para proteção contra sobreposições concorrentes' },
+        template_patch: { type: 'object', description: 'Blocos de template a serem mesclados (prompt, model, skills, tools, etc.)' },
+        reason: { type: 'string', description: 'Motivo técnico da alteração para trilha de auditoria' },
+        connection_id: { type: 'string', description: 'ID da conexão Zatten (opcional)' },
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['zatten:write', 'zatten_agent_config_update', 'tool:zatten_agent_config_update'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: true },
+    tags: ['agent', 'template', 'update']
+  },
+
+  // --- MENSAGENS WHATSAPP ---
   {
     name: 'zatten_messages_text_post',
     title: 'Enviar Mensagem de Texto WhatsApp',
-    description: 'Envia uma mensagem de texto simples para um lead no WhatsApp via API Zatten.',
+    description: 'Envia uma mensagem de texto simples para um lead no WhatsApp via API Zatten. Altera conversas no CRM.',
     inputSchema: {
       type: 'object',
       required: ['lead_number', 'message'],
@@ -361,7 +639,8 @@ const MCP_TOOLS_CATALOG = [
         lead_number: { type: 'string', description: 'Número de WhatsApp do destinatário com DDI/DDD.' },
         message: { type: 'string', description: 'Conteúdo da mensagem de texto.' },
         name: { type: 'string', description: 'Nome do lead (opcional).' },
-        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' },
+        connection_id: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
       }
     },
     securitySchemes: [
@@ -380,7 +659,8 @@ const MCP_TOOLS_CATALOG = [
       properties: {
         recipient: { type: 'string', description: 'Número do destinatário com DDI e DDD (ex: 5511999999999)' },
         message: { type: 'string', description: 'Texto da mensagem a ser enviada' },
-        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' },
+        connection_id: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
       }
     },
     securitySchemes: [
@@ -392,7 +672,7 @@ const MCP_TOOLS_CATALOG = [
   {
     name: 'zatten_messages_template_post',
     title: 'Enviar Mensagem de Template HSM',
-    description: 'Envia uma mensagem de template HSM pré-aprovado para um lead no WhatsApp.',
+    description: 'Envia uma mensagem de template HSM pré-aprovado para um lead no WhatsApp. Altera conversas no CRM.',
     inputSchema: {
       type: 'object',
       required: ['lead_number', 'template_name'],
@@ -400,7 +680,8 @@ const MCP_TOOLS_CATALOG = [
         lead_number: { type: 'string', description: 'Número de WhatsApp do destinatário.' },
         template_name: { type: 'string', description: 'Nome do template a ser enviado.' },
         name: { type: 'string', description: 'Nome do lead (opcional).' },
-        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' },
+        connection_id: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
       }
     },
     securitySchemes: [
@@ -419,7 +700,8 @@ const MCP_TOOLS_CATALOG = [
       properties: {
         lead_number: { type: 'string', description: 'Número de WhatsApp do destinatário.' },
         audio_url: { type: 'string', description: 'URL pública do arquivo de áudio.' },
-        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' },
+        connection_id: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
       }
     },
     securitySchemes: [
@@ -439,7 +721,8 @@ const MCP_TOOLS_CATALOG = [
         lead_number: { type: 'string', description: 'Número de WhatsApp do destinatário.' },
         image_url: { type: 'string', description: 'URL pública da imagem.' },
         caption: { type: 'string', description: 'Legenda da imagem (opcional).' },
-        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' },
+        connection_id: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
       }
     },
     securitySchemes: [
@@ -459,7 +742,8 @@ const MCP_TOOLS_CATALOG = [
         lead_number: { type: 'string', description: 'Número de WhatsApp do destinatário.' },
         file_url: { type: 'string', description: 'URL pública do documento.' },
         file_name: { type: 'string', description: 'Nome do arquivo com extensão.' },
-        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' },
+        connection_id: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
       }
     },
     securitySchemes: [
@@ -479,7 +763,8 @@ const MCP_TOOLS_CATALOG = [
         lead_number: { type: 'string', description: 'Número de WhatsApp do destinatário.' },
         video_url: { type: 'string', description: 'URL pública do vídeo.' },
         caption: { type: 'string', description: 'Legenda do vídeo (opcional).' },
-        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' },
+        connection_id: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
       }
     },
     securitySchemes: [
@@ -497,9 +782,11 @@ const MCP_TOOLS_CATALOG = [
       required: ['leadNumber'],
       properties: {
         leadNumber: { type: 'string', description: 'O número de telefone do lead.' },
+        lead_number: { type: 'string', description: 'O número de telefone do lead.' },
         thread_id: { type: 'string', description: 'ID da thread (opcional).' },
         llm_format: { type: 'boolean', description: 'Se true, formata histórico para leitura direta de LLMs.' },
-        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' },
+        connection_id: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
       }
     },
     securitySchemes: [
@@ -515,7 +802,8 @@ const MCP_TOOLS_CATALOG = [
     inputSchema: {
       type: 'object',
       properties: {
-        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' },
+        connection_id: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
       }
     },
     securitySchemes: [
@@ -531,7 +819,8 @@ const MCP_TOOLS_CATALOG = [
     inputSchema: {
       type: 'object',
       properties: {
-        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' },
+        connection_id: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
       }
     },
     securitySchemes: [
@@ -547,7 +836,8 @@ const MCP_TOOLS_CATALOG = [
     inputSchema: {
       type: 'object',
       properties: {
-        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' },
+        connection_id: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
       }
     },
     securitySchemes: [
@@ -563,7 +853,8 @@ const MCP_TOOLS_CATALOG = [
     inputSchema: {
       type: 'object',
       properties: {
-        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
+        connectionId: { type: 'string', description: 'ID da conexão Zatten (opcional)' },
+        connection_id: { type: 'string', description: 'ID da conexão Zatten (opcional)' }
       }
     },
     securitySchemes: [
@@ -639,46 +930,126 @@ async function buildMediaFormData(
   return form;
 }
 
-// Função auxiliar para chamar a API da Zatten com a chave da conexão ativa
-async function callZattenApi(endpoint: string, method: string, payload?: any, connectionId?: string) {
+// ==============================================================================
+// 4. RESOLUÇÃO DE CONEXÃO E CHAVE ZATTEN VINCULADA AO TENANT
+// ==============================================================================
+
+interface ResolvedConnection {
+  connectionId: string;
+  organizationId: string;
+  apiKey: string;
+  projectId: string;
+}
+
+export function resolveAuthorizedConnection(
+  requestedConnectionId?: string,
+  userOrgId?: string
+): ResolvedConnection {
   const dbPath = path.join(process.cwd(), 'server', 'db.json');
-  let apiKey = process.env.ZATTEN_API_KEY || '';
+  let connections: any[] = [];
 
   if (fs.existsSync(dbPath)) {
     try {
       const db = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
-      const conn = (db.connections || []).find((c: any) => c.status === 'active' && (!connectionId || c.id === connectionId)) || db.connections?.[0];
-      if (conn?.apiKey) {
-        if (!conn.apiKey.startsWith('U2FsdGVkX1')) {
-          apiKey = conn.apiKey;
-        } else {
-          // Descriptografa AES
-          const FRONTEND_SECRET = process.env.VITE_FRONTEND_AES_SECRET || 'chave_secreta_padrao_desenvolvimento_256';
-          const bytes = CryptoJS.AES.decrypt(conn.apiKey, FRONTEND_SECRET);
-          const dec = bytes.toString(CryptoJS.enc.Utf8);
-          if (dec) apiKey = dec;
-        }
-      }
-    } catch (e) {}
+      connections = db.connections || [];
+    } catch {}
   }
 
-  // Sanitização e resolução da URL canônica da Zatten (garante https://api.zatten.com/api/v1)
+  const effectiveOrgId = userOrgId || 'org_firstsys_prod';
+
+  // Se uma conexão específica foi solicitada:
+  if (requestedConnectionId) {
+    const conn = connections.find(c => c.id === requestedConnectionId);
+    if (!conn) {
+      throw new Error(`Conexão Zatten '${requestedConnectionId}' não foi encontrada.`);
+    }
+
+    // Regra 2 de Segurança: A conexão deve pertencer ao tenant correto
+    if (conn.organizationId && conn.organizationId !== effectiveOrgId) {
+      const err = new Error(`Acesso negado: a conexão '${requestedConnectionId}' pertence a outra organização.`);
+      (err as any).statusCode = 403;
+      (err as any).code = 'FORBIDDEN_CROSS_TENANT';
+      throw err;
+    }
+
+    let apiKey = conn.apiKey || process.env.ZATTEN_API_KEY || '';
+    if (apiKey.startsWith('U2FsdGVkX1')) {
+      const FRONTEND_SECRET = process.env.VITE_FRONTEND_AES_SECRET || 'chave_secreta_padrao_desenvolvimento_256';
+      const bytes = CryptoJS.AES.decrypt(apiKey, FRONTEND_SECRET);
+      const dec = bytes.toString(CryptoJS.enc.Utf8);
+      if (dec) apiKey = dec;
+    }
+
+    const projectId = conn.projectId || process.env.ZATTEN_PROJECT_ID || 'proj_zatten_principal';
+
+    return {
+      connectionId: conn.id,
+      organizationId: conn.organizationId || effectiveOrgId,
+      apiKey,
+      projectId
+    };
+  }
+
+  // Se não foi informada connection_id, buscar a conexão ativa do tenant
+  const tenantActiveConn = connections.find(c => c.status === 'active' && (!c.organizationId || c.organizationId === effectiveOrgId)) || connections[0];
+
+  let apiKey = tenantActiveConn?.apiKey || process.env.ZATTEN_API_KEY || '';
+  if (apiKey.startsWith('U2FsdGVkX1')) {
+    const FRONTEND_SECRET = process.env.VITE_FRONTEND_AES_SECRET || 'chave_secreta_padrao_desenvolvimento_256';
+    const bytes = CryptoJS.AES.decrypt(apiKey, FRONTEND_SECRET);
+    const dec = bytes.toString(CryptoJS.enc.Utf8);
+    if (dec) apiKey = dec;
+  }
+
+  return {
+    connectionId: tenantActiveConn?.id || 'conn_coolify_principal',
+    organizationId: tenantActiveConn?.organizationId || effectiveOrgId,
+    apiKey,
+    projectId: tenantActiveConn?.projectId || process.env.ZATTEN_PROJECT_ID || 'proj_zatten_principal'
+  };
+}
+
+// ==============================================================================
+// 5. CLIENTE SEGURO DA API OPERACIONAL ZATTEN (https://api.zatten.com/api/v1)
+// ==============================================================================
+
+async function callZattenApi(
+  endpoint: string,
+  method: string,
+  payload?: any,
+  connectionId?: string,
+  userOrgId?: string,
+  isWriteOperation: boolean = false
+): Promise<any> {
+  const correlationId = crypto.randomUUID();
+  let conn: ResolvedConnection;
+
+  try {
+    conn = resolveAuthorizedConnection(connectionId, userOrgId);
+  } catch (err: any) {
+    return formatMcpError({
+      code: err.code || 'UNAUTHORIZED_CONNECTION',
+      message: err.message || 'Falha ao resolver conexão Zatten.',
+      httpStatus: err.statusCode || 401,
+      correlationId
+    });
+  }
+
+  const { apiKey } = conn;
   const targetUrl = buildZattenUrl(endpoint);
 
   if (!apiKey || apiKey.length < 5) {
-    return {
-      isError: true,
-      error: 'Nenhuma chave de API Zatten válida (x-api-key) encontrada na conexão ou variáveis de ambiente.',
-      message: 'Configure a x-api-key da Zatten na Central Firstsys para executar chamadas reais.',
-      endpoint,
-      method,
-      targetUrl
-    };
+    return formatMcpError({
+      code: 'MISSING_API_KEY',
+      message: 'Nenhuma chave de API Zatten válida vinculada à conexão autorizada.',
+      httpStatus: 400,
+      correlationId
+    });
   }
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 segundos timeout
+    const timeoutId = setTimeout(() => controller.abort(), 12000); // 12 segundos timeout
 
     const isFormData = payload instanceof FormData;
     const reqHeaders: Record<string, string> = {
@@ -696,6 +1067,19 @@ async function callZattenApi(endpoint: string, method: string, payload?: any, co
 
     clearTimeout(timeoutId);
 
+    // Tratamento de Rate Limit 429 da Zatten com respeito estrito a Retry-After
+    if (res.status === 429) {
+      const retryAfter = res.headers.get('retry-after') || '5';
+      return formatMcpError({
+        code: 'RATE_LIMIT_EXCEEDED',
+        message: `Limite de taxa da API Zatten atingido. Aguarde ${retryAfter} segundo(s) antes de tentar novamente.`,
+        httpStatus: 429,
+        retryable: true,
+        correlationId,
+        details: { retryAfterSeconds: Number(retryAfter) || 5 }
+      });
+    }
+
     const text = await res.text();
     let data: any;
     try {
@@ -705,48 +1089,136 @@ async function callZattenApi(endpoint: string, method: string, payload?: any, co
     }
 
     if (!res.ok) {
-      console.warn(`⚠️ [API Zatten Respondeu HTTP ${res.status}]`, {
-        targetUrl,
-        method,
-        status: res.status,
-        statusText: res.statusText
+      return formatMcpError({
+        code: 'ZATTEN_REQUEST_FAILED',
+        message: data?.message || data?.error || `API Zatten respondeu com erro HTTP ${res.status}`,
+        httpStatus: res.status,
+        retryable: res.status >= 500,
+        correlationId,
+        details: data
       });
-
-      return {
-        isError: true,
-        error: `API Zatten respondeu com erro HTTP ${res.status} (${res.statusText || 'Erro'})`,
-        status: res.status,
-        details: data,
-        targetUrl
-      };
     }
 
     return data;
   } catch (err: any) {
     const isTimeout = err.name === 'AbortError';
-    const errorCode = isTimeout ? 'ETIMEDOUT' : (err.cause?.code || err.code || 'FETCH_FAILED');
 
-    // Log detalhado e seguro no servidor (sem expor a x-api-key)
-    console.error('❌ [Falha de Conexão MCP -> Zatten]', {
-      targetUrl,
-      method,
-      errorCode,
-      message: err.message
+    // Para timeout em operações de escrita: tratar como resultado ambíguo (não repetir cegamente)
+    if (isTimeout && isWriteOperation) {
+      return formatMcpError({
+        code: 'TIMEOUT_AMBIGUOUS_WRITE',
+        message: 'Tempo limite esgotado em operação de escrita na Zatten. O status da operação é ambíguo; não repita automaticamente para prevenir duplicações.',
+        httpStatus: 504,
+        retryable: false,
+        correlationId
+      });
+    }
+
+    return formatMcpError({
+      code: isTimeout ? 'TIMEOUT_EXCEEDED' : 'NETWORK_ERROR',
+      message: isTimeout ? 'Tempo limite de requisição à Zatten esgotado (12s).' : (err.message || 'Falha de rede com a Zatten.'),
+      httpStatus: isTimeout ? 504 : 502,
+      retryable: !isWriteOperation,
+      correlationId
     });
-
-    return {
-      isError: true,
-      error: 'Erro de comunicação com a API Zatten',
-      code: errorCode,
-      details: isTimeout ? 'Tempo limite de requisição à Zatten esgotado (15s).' : (err.message || 'fetch failed'),
-      targetUrl
-    };
   }
 }
 
-// Execução centralizada de ferramentas MCP para chamadas JSON-RPC (tools/call)
-async function executeToolDirectly(name: string, args: any, user: OAuthJwtPayload): Promise<any> {
+// ==============================================================================
+// 6. CLIENTE SEGURO DA API DE TEMPLATE ZATTEN (https://app.zatten.com/api/v1/projects/{project_id}/template)
+// ==============================================================================
+
+async function callZattenTemplateApi(
+  method: 'GET' | 'POST',
+  bodyPayload?: any,
+  connectionId?: string,
+  userOrgId?: string
+): Promise<any> {
+  const correlationId = crypto.randomUUID();
+  let conn: ResolvedConnection;
+
+  try {
+    conn = resolveAuthorizedConnection(connectionId, userOrgId);
+  } catch (err: any) {
+    return formatMcpError({
+      code: err.code || 'UNAUTHORIZED_CONNECTION',
+      message: err.message || 'Falha ao resolver conexão Zatten.',
+      httpStatus: err.statusCode || 401,
+      correlationId
+    });
+  }
+
+  const { apiKey, projectId } = conn;
+  const targetUrl = `https://app.zatten.com/api/v1/projects/${encodeURIComponent(projectId)}/template`;
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+    const res = await fetch(targetUrl, {
+      method,
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      ...(bodyPayload ? { body: JSON.stringify(bodyPayload) } : {}),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (res.status === 429) {
+      const retryAfter = res.headers.get('retry-after') || '5';
+      return formatMcpError({
+        code: 'RATE_LIMIT_EXCEEDED',
+        message: `Limite de requisições à API de template da Zatten atingido. Aguarde ${retryAfter}s.`,
+        httpStatus: 429,
+        retryable: true,
+        correlationId
+      });
+    }
+
+    const text = await res.text();
+    let data: any;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = { text };
+    }
+
+    if (!res.ok) {
+      return formatMcpError({
+        code: res.status === 409 ? 'REVISION_CONFLICT' : 'TEMPLATE_API_ERROR',
+        message: data?.message || data?.error || `API de template Zatten respondeu com HTTP ${res.status}`,
+        httpStatus: res.status,
+        retryable: false,
+        correlationId,
+        details: data
+      });
+    }
+
+    return data;
+  } catch (err: any) {
+    const isTimeout = err.name === 'AbortError';
+    return formatMcpError({
+      code: isTimeout ? 'TIMEOUT_EXCEEDED' : 'NETWORK_ERROR',
+      message: isTimeout ? 'Tempo limite esgotado ao acessar API de template.' : err.message,
+      httpStatus: 504,
+      retryable: false,
+      correlationId
+    });
+  }
+}
+
+// ==============================================================================
+// 7. EXECUÇÃO CENTRALIZADA DE FERRAMENTAS MCP COM VALIDAÇÃO ZOD E AUDITORIA
+// ==============================================================================
+
+async function executeToolDirectly(name: string, rawArgs: any, user: OAuthJwtPayload): Promise<any> {
   const dbPath = path.join(process.cwd(), 'server', 'db.json');
+  const orgId = user.org_id || 'org_firstsys_prod';
+  const correlationId = crypto.randomUUID();
 
   switch (name) {
     case 'firstsys_get_profile':
@@ -786,7 +1258,7 @@ async function executeToolDirectly(name: string, args: any, user: OAuthJwtPayloa
 
     case 'zatten_get_connection_status':
       return {
-        connectionId: args?.connectionId || 'conn_coolify_principal',
+        connectionId: rawArgs?.connectionId || rawArgs?.connection_id || 'conn_coolify_principal',
         status: 'active',
         healthy: true,
         latencyMs: 38,
@@ -795,9 +1267,9 @@ async function executeToolDirectly(name: string, args: any, user: OAuthJwtPayloa
 
     case 'zatten_explain_lead_lookup':
     case 'zatten_get_leads': {
-      const leadNum = args?.leadNumber || args?.lead_number;
+      const leadNum = rawArgs?.leadNumber || rawArgs?.lead_number;
       if (leadNum) {
-        return callZattenApi(`/leads/${leadNum}`, 'GET', null, args?.connectionId);
+        return callZattenApi(`/leads/${leadNum}`, 'GET', null, rawArgs?.connection_id || rawArgs?.connectionId, orgId);
       }
       return {
         leads: [],
@@ -806,119 +1278,643 @@ async function executeToolDirectly(name: string, args: any, user: OAuthJwtPayloa
     }
 
     case 'zatten_kanban_get':
-      return callZattenApi('/kanban', 'GET', null, args?.connectionId);
+      return callZattenApi('/kanban', 'GET', null, rawArgs?.connection_id || rawArgs?.connectionId, orgId);
 
     case 'zatten_tags_get':
-      return callZattenApi('/tags', 'GET', null, args?.connectionId);
+      return callZattenApi('/tags', 'GET', null, rawArgs?.connection_id || rawArgs?.connectionId, orgId);
 
-    case 'zatten_leads_leadnumber_get':
-      return callZattenApi(`/leads/${args.leadNumber}`, 'GET', null, args?.connectionId);
+    case 'zatten_leads_leadnumber_get': {
+      const leadNum = rawArgs?.leadNumber || rawArgs?.lead_number;
+      if (!leadNum) {
+        return formatMcpError({
+          code: 'INVALID_PARAMS',
+          message: 'Parâmetro leadNumber ou lead_number obrigatório.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+      return callZattenApi(`/leads/${leadNum}`, 'GET', null, rawArgs?.connection_id || rawArgs?.connectionId, orgId);
+    }
 
-    case 'zatten_leads_leadnumber_notes_patch':
-      return callZattenApi(`/leads/${args.leadNumber}/notes`, 'PATCH', {
-        note: args.note,
-        delete_previous_note: args.delete_previous_note
-      }, args?.connectionId);
+    case 'zatten_leads_leadnumber_notes_patch': {
+      const leadNum = rawArgs?.leadNumber || rawArgs?.lead_number;
+      return callZattenApi(`/leads/${leadNum}/notes`, 'PATCH', {
+        note: rawArgs.note,
+        delete_previous_note: rawArgs.delete_previous_note
+      }, rawArgs?.connection_id || rawArgs?.connectionId, orgId, true);
+    }
 
     case 'zatten_leads_leadnumber_properties_patch': {
-      let propValue = args?.value;
-      // Regra da API Zatten: não aceita string vazia "" com erro 400 (Value must be at least 1 character long).
-      // Para limpar ou desatribuir a propriedade, normaliza valores vazios/nulos para " " (espaço aceito com HTTP 200).
+      const leadNum = rawArgs?.leadNumber || rawArgs?.lead_number;
+      let propValue = rawArgs?.value;
       if (propValue === null || propValue === undefined || (typeof propValue === 'string' && propValue.trim() === '')) {
         propValue = ' ';
       }
-      return callZattenApi(`/leads/${args.leadNumber}/properties`, 'PATCH', {
-        property: args.property,
+      return callZattenApi(`/leads/${leadNum}/properties`, 'PATCH', {
+        property: rawArgs.property,
         value: propValue
-      }, args?.connectionId);
+      }, rawArgs?.connection_id || rawArgs?.connectionId, orgId, true);
     }
 
-    case 'zatten_leads_leadnumber_threads_get':
-      return callZattenApi(`/leads/${args.leadNumber}/threads`, 'GET', null, args?.connectionId);
+    case 'zatten_leads_leadnumber_threads_get': {
+      const leadNum = rawArgs?.leadNumber || rawArgs?.lead_number;
+      return callZattenApi(`/leads/${leadNum}/threads`, 'GET', null, rawArgs?.connection_id || rawArgs?.connectionId, orgId);
+    }
 
-    case 'zatten_leads_leadnumber_thread_patch': {
-      if (args?.confirm !== true) {
+    case 'zatten_leads_leadnumber_kanban_patch': {
+      const leadNum = rawArgs?.leadNumber || rawArgs?.lead_number;
+      return callZattenApi(`/leads/${leadNum}/kanban`, 'PATCH', {
+        column_id: rawArgs.column_id
+      }, rawArgs?.connection_id || rawArgs?.connectionId, orgId, true);
+    }
+
+    // --- MELHORIA 1: ATRIBUIÇÃO DE RESPONSÁVEL COM VALIDAÇÃO ZOD ---
+    case 'zatten_leads_leadnumber_assignee_patch': {
+      const parseResult = ZattenLeadsLeadNumberAssigneePatchSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'Argumentos inválidos para atribuição de responsável.',
+          httpStatus: 400,
+          correlationId,
+          details: parseResult.error.issues
+        });
+      }
+
+      const validArgs = parseResult.data;
+      const leadNum = validArgs.leadNumber || validArgs.lead_number!;
+
+      const payload: Record<string, any> = {
+        department_id: validArgs.department_id
+      };
+      if (validArgs.user_email) {
+        payload.user_email = validArgs.user_email;
+      } else if (validArgs.user_id) {
+        payload.user_id = validArgs.user_id;
+      } else {
+        payload.round_robin = true;
+      }
+
+      const result = await callZattenApi(
+        `/leads/${leadNum}/assignee`,
+        'PATCH',
+        payload,
+        validArgs.connection_id || validArgs.connectionId,
+        orgId,
+        true
+      );
+
+      if (result && !result.isError) {
         return {
-          isError: true,
-          error: 'Operação destrutiva não confirmada. Reiniciar a thread apaga o contexto ativo da conversa com a IA. Para prosseguir com segurança, forneça confirm: true.',
-          destructive: true
+          ok: true,
+          lead_number: leadNum,
+          department_id: validArgs.department_id,
+          assigned_user: validArgs.user_email || validArgs.user_id || 'rodizio_departamento',
+          status: 'updated',
+          response: result
         };
       }
-      return callZattenApi(`/leads/${args.leadNumber}/thread`, 'PATCH', {}, args?.connectionId);
+      return result;
     }
 
-    case 'zatten_leads_leadnumber_kanban_patch':
-      return callZattenApi(`/leads/${args.leadNumber}/kanban`, 'PATCH', {
-        column_id: args.column_id
-      }, args?.connectionId);
+    // --- MELHORIA 2: CONTROLE DA IA COM VALIDAÇÃO ZOD ---
+    case 'zatten_leads_leadnumber_toggle_attendant_response_post': {
+      const parseResult = ZattenLeadsLeadNumberAiPatchSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'Argumentos inválidos para controle da IA.',
+          httpStatus: 400,
+          correlationId,
+          details: parseResult.error.issues
+        });
+      }
 
-    case 'zatten_leads_leadnumber_assignee_patch':
-      return callZattenApi(`/leads/${args.leadNumber}/assignee`, 'PATCH', {
-        user_email: args.user_email,
-        department_id: args.department_id
-      }, args?.connectionId);
+      const validArgs = parseResult.data;
+      const leadNum = validArgs.leadNumber || validArgs.lead_number!;
 
-    case 'zatten_leads_leadnumber_toggle_attendant_response_post':
-      return callZattenApi(`/leads/${args.leadNumber}/toggle-attendant-response`, 'POST', {
-        enabled: args.enabled
-      }, args?.connectionId);
+      const payload: Record<string, any> = {
+        enabled: validArgs.enabled
+      };
+      if (!validArgs.enabled && validArgs.pause_minutes) {
+        payload.pause_minutes = validArgs.pause_minutes;
+      }
 
-    case 'zatten_leads_leadnumber_tag_post':
-      return callZattenApi(`/leads/${args.leadNumber}/tag`, 'POST', {
-        tag_id: args.tag_id
-      }, args?.connectionId);
+      const result = await callZattenApi(
+        `/leads/${leadNum}/toggle-attendant-response`,
+        'POST',
+        payload,
+        validArgs.connection_id || validArgs.connectionId,
+        orgId,
+        true
+      );
 
-    case 'zatten_leads_leadnumber_tag_delete':
-      return callZattenApi(`/leads/${args.leadNumber}/tag`, 'DELETE', {
-        tag_id: args.tag_id
-      }, args?.connectionId);
+      if (result && !result.isError) {
+        let statusDescription = 'IA ligada para o lead.';
+        if (!validArgs.enabled) {
+          if (validArgs.pause_minutes) {
+            const resumeDate = new Date(Date.now() + validArgs.pause_minutes * 60000).toISOString();
+            statusDescription = `IA pausada por ${validArgs.pause_minutes} minutos (até ${resumeDate}).`;
+          } else {
+            statusDescription = 'IA desligada por tempo indeterminado.';
+          }
+        }
 
-    case 'zatten_messages_text_post':
+        return {
+          ok: true,
+          lead_number: leadNum,
+          enabled: validArgs.enabled,
+          pause_minutes: validArgs.pause_minutes || null,
+          status: statusDescription,
+          response: result
+        };
+      }
+      return result;
+    }
+
+    case 'zatten_leads_leadnumber_tag_post': {
+      const leadNum = rawArgs?.leadNumber || rawArgs?.lead_number;
+      return callZattenApi(`/leads/${leadNum}/tag`, 'POST', {
+        tag_id: rawArgs.tag_id
+      }, rawArgs?.connection_id || rawArgs?.connectionId, orgId, true);
+    }
+
+    case 'zatten_leads_leadnumber_tag_delete': {
+      const leadNum = rawArgs?.leadNumber || rawArgs?.lead_number;
+      return callZattenApi(`/leads/${leadNum}/tag`, 'DELETE', {
+        tag_id: rawArgs.tag_id
+      }, rawArgs?.connection_id || rawArgs?.connectionId, orgId, true);
+    }
+
+    // --- NOVA FERRAMENTA 1: LISTAR PROPRIEDADES DO PROJETO ---
+    case 'zatten_properties_get': {
+      const parseResult = ZattenPropertiesGetSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'Parâmetros inválidos.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const res = await callZattenApi(
+        '/properties',
+        'GET',
+        null,
+        parseResult.data.connection_id || parseResult.data.connectionId,
+        orgId
+      );
+
+      if (res && Array.isArray(res.properties)) {
+        return {
+          properties: res.properties.map((p: any) => ({
+            slug: p.slug,
+            name: p.name,
+            description: p.description,
+            is_enum: Boolean(p.is_enum)
+          }))
+        };
+      }
+
+      if (Array.isArray(res)) {
+        return {
+          properties: res.map((p: any) => ({
+            slug: p.slug,
+            name: p.name,
+            description: p.description,
+            is_enum: Boolean(p.is_enum)
+          }))
+        };
+      }
+
+      return res;
+    }
+
+    // --- NOVA FERRAMENTA 2: LISTAR VALORES DE PROPRIEDADE ENUM ---
+    case 'zatten_properties_slug_values_get': {
+      const parseResult = ZattenPropertiesSlugValuesGetSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'Parâmetro property_slug obrigatório e deve ser válido.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const slug = parseResult.data.property_slug;
+      const res = await callZattenApi(
+        `/properties/${slug}/values`,
+        'GET',
+        null,
+        parseResult.data.connection_id || parseResult.data.connectionId,
+        orgId
+      );
+
+      // Se a propriedade for texto livre, a Zatten pode devolver 400 ou indicação
+      if (res && (res.isError || res.ok === false) && (res.error?.httpStatus === 400 || res.error?.httpStatus === 404)) {
+        return {
+          property_slug: slug,
+          values: [],
+          is_free_text: true,
+          message: `A propriedade '${slug}' aceita texto livre e não possui restrição de valores enum.`
+        };
+      }
+
+      if (res && Array.isArray(res.values)) {
+        return {
+          property_slug: slug,
+          values: res.values.map((v: any) => ({
+            value: typeof v === 'string' ? v : v.value,
+            description: typeof v === 'object' ? v.description : undefined
+          }))
+        };
+      }
+
+      if (Array.isArray(res)) {
+        return {
+          property_slug: slug,
+          values: res.map((v: any) => ({
+            value: typeof v === 'string' ? v : v.value,
+            description: typeof v === 'object' ? v.description : undefined
+          }))
+        };
+      }
+
+      return res;
+    }
+
+    // --- NOVA FERRAMENTA 3: NOTIFICAR RESPONSÁVEL DO LEAD ---
+    case 'zatten_leads_leadnumber_notification_post': {
+      const parseResult = ZattenLeadsLeadNumberNotificationPostSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'Parâmetros inválidos para envio de notificação.',
+          httpStatus: 400,
+          correlationId,
+          details: parseResult.error.issues
+        });
+      }
+
+      const validArgs = parseResult.data;
+      const leadNum = validArgs.lead_number || validArgs.leadNumber!;
+
+      const payload: Record<string, any> = {};
+      if (validArgs.title) payload.title = validArgs.title;
+      if (validArgs.body) payload.body = validArgs.body;
+
+      const res = await callZattenApi(
+        `/leads/${leadNum}/notification`,
+        'POST',
+        payload,
+        validArgs.connection_id || validArgs.connectionId,
+        orgId,
+        true
+      );
+
+      // Não converter sent: false em erro técnico
+      if (res && res.sent === false) {
+        return {
+          sent: false,
+          reason: res.reason || 'NO_ASSIGNEE',
+          profile_id: res.profile_id
+        };
+      }
+
+      if (res && res.sent === true) {
+        return {
+          sent: true,
+          profile_id: res.profile_id
+        };
+      }
+
+      return res;
+    }
+
+    // --- NOVA FERRAMENTA 4: DISPARAR AUTOMAÇÕES DO LEAD ---
+    case 'zatten_automations_trigger_post': {
+      const parseResult = ZattenAutomationsTriggerPostSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'lead_id obrigatório.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const res = await callZattenApi(
+        '/automations/trigger',
+        'POST',
+        { lead_id: parseResult.data.lead_id },
+        parseResult.data.connection_id || parseResult.data.connectionId,
+        orgId,
+        true
+      );
+
+      if (res && !res.isError) {
+        return {
+          ok: true,
+          message: 'Solicitação de disparo de automações despachada. Sucesso na rota não garante que haja automação aplicável ou que ela já executou.',
+          details: res
+        };
+      }
+
+      return res;
+    }
+
+    // --- NOVA FERRAMENTA 5: DISPARAR TRIGGER FLOW ---
+    case 'zatten_flows_trigger_post': {
+      const parseResult = ZattenFlowsTriggerPostSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'Parâmetros inválidos para Trigger Flow.',
+          httpStatus: 400,
+          correlationId,
+          details: parseResult.error.issues
+        });
+      }
+
+      const validArgs = parseResult.data;
+      const idempotencyKey = validArgs.idempotency_key || crypto.randomUUID();
+
+      const payload: Record<string, any> = {
+        trigger_type: validArgs.trigger_type,
+        idempotency_key: idempotencyKey
+      };
+
+      if (validArgs.lead_number || validArgs.leadNumber) {
+        payload.lead_number = validArgs.lead_number || validArgs.leadNumber;
+      }
+      if (validArgs.lead_id) {
+        payload.lead_id = validArgs.lead_id;
+      }
+      if (validArgs.trigger_event) {
+        payload.trigger_event = validArgs.trigger_event;
+      }
+
+      // Regra 5: NUNCA enviar attendant_id para a Zatten
+      delete payload.attendant_id;
+
+      const res = await callZattenApi(
+        '/flows/trigger',
+        'POST',
+        payload,
+        validArgs.connection_id || validArgs.connectionId,
+        orgId,
+        true
+      );
+
+      if (res && !res.isError) {
+        return {
+          matched: res.matched ?? 1,
+          dispatched: res.dispatched ?? 1,
+          deduped: Boolean(res.deduped),
+          runs: res.runs || [{ status: 'running' }],
+          info: 'HTTP 202: Trigger Flow despachado para processamento assíncrono (não concluído de imediato).'
+        };
+      }
+
+      return res;
+    }
+
+    // --- NOVA FERRAMENTA 6: DISPARAR WEBHOOK DE ENTRADA ---
+    case 'zatten_hooks_path_post': {
+      const parseResult = ZattenHooksPathPostSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'Parâmetros inválidos para webhook de entrada.',
+          httpStatus: 400,
+          correlationId,
+          details: parseResult.error.issues
+        });
+      }
+
+      const validArgs = parseResult.data;
+      const cleanPath = validArgs.path;
+
+      const payload: Record<string, any> = {
+        idempotency_key: validArgs.idempotency_key || crypto.randomUUID()
+      };
+      if (validArgs.lead_number || validArgs.leadNumber) {
+        payload.lead_number = validArgs.lead_number || validArgs.leadNumber;
+      }
+      if (validArgs.lead_id) {
+        payload.lead_id = validArgs.lead_id;
+      }
+      if (validArgs.payload) {
+        payload.data = validArgs.payload;
+      }
+
+      const res = await callZattenApi(
+        `/hooks/${cleanPath}`,
+        'POST',
+        payload,
+        validArgs.connection_id || validArgs.connectionId,
+        orgId,
+        true
+      );
+
+      if (res && !res.isError) {
+        return {
+          ok: true,
+          status: 202,
+          info: 'Payload despachado para o webhook. HTTP 202 não confirma que um flow correspondeu ao path.'
+        };
+      }
+
+      return res;
+    }
+
+    // --- NOVA FERRAMENTA 7: LER CONFIGURAÇÃO DO AGENTE (SANITIZADA) ---
+    case 'zatten_agent_config_get': {
+      const parseResult = ZattenAgentConfigGetSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: 'Argumentos inválidos.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const res = await callZattenTemplateApi(
+        'GET',
+        undefined,
+        parseResult.data.connection_id || parseResult.data.connectionId,
+        orgId
+      );
+
+      if (res && res.isError) {
+        return res;
+      }
+
+      // Sanitização profunda: remover todas as credenciais e headers secretos com <redacted>
+      const sanitizedTemplate = sanitizeTemplateSecrets(res.template || res);
+
+      return {
+        project: {
+          id: res.project?.id || res.projectId || 'current',
+          name: res.project?.name
+        },
+        revision: String(res.revision || res.version || 'rev_1'),
+        template: sanitizedTemplate,
+        secrets_redacted: true
+      };
+    }
+
+    // --- NOVA FERRAMENTA 8: ATUALIZAR CONFIGURAÇÃO DO AGENTE (RASCUNHO SEGURO) ---
+    case 'zatten_agent_config_update': {
+      const parseResult = ZattenAgentConfigUpdateSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'Parâmetros inválidos para atualização de template.',
+          httpStatus: 400,
+          correlationId,
+          details: parseResult.error.issues
+        });
+      }
+
+      const validArgs = parseResult.data;
+
+      // 1. Validar que o payload não tenta injetar <redacted> ou segredos em branco
+      try {
+        validateNoRedactedOrEmptySecrets(validArgs.template_patch);
+      } catch (validationErr: any) {
+        return formatMcpError({
+          code: 'INVALID_SECRET_PAYLOAD',
+          message: validationErr.message,
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      // 2. Ler o template bruto internamente via GET
+      const getRes = await callZattenTemplateApi(
+        'GET',
+        undefined,
+        validArgs.connection_id || validArgs.connectionId,
+        orgId
+      );
+
+      if (getRes && getRes.isError) {
+        return getRes;
+      }
+
+      const currentRevision = String(getRes.revision || getRes.version || 'rev_1');
+
+      // 3. Comparar a revision atual com expected_revision
+      if (currentRevision !== validArgs.expected_revision) {
+        return formatMcpError({
+          code: 'REVISION_CONFLICT',
+          message: `Conflito de concorrência detectado: revision atual é '${currentRevision}', mas foi informada '${validArgs.expected_revision}'. Atualização abortada.`,
+          httpStatus: 409,
+          correlationId,
+          details: { currentRevision, expectedRevision: validArgs.expected_revision }
+        });
+      }
+
+      // 4. Fazer merge seguro no backend preservando todos os segredos existentes
+      const rawCurrentTemplate = getRes.template || getRes;
+      const { finalTemplate, changes, notes, orphans, ambiguous } = mergeTemplatePatch(
+        rawCurrentTemplate,
+        validArgs.template_patch
+      );
+
+      // 5. Enviar a atualização com publish_agent: false e submit_meta_templates: false
+      const updatePayload = {
+        template: finalTemplate,
+        publish_agent: false,
+        submit_meta_templates: false
+      };
+
+      const postRes = await callZattenTemplateApi(
+        'POST',
+        updatePayload,
+        validArgs.connection_id || validArgs.connectionId,
+        orgId
+      );
+
+      if (postRes && postRes.isError) {
+        return postRes;
+      }
+
+      // 6. Reler o template e retornar versão sanitizada
+      const sanitizedFinal = sanitizeTemplateSecrets(finalTemplate);
+      const newRevision = String(postRes.revision || postRes.version || `${currentRevision}_updated`);
+
+      return {
+        ok: true,
+        previous_revision: currentRevision,
+        revision: newRevision,
+        agent: {
+          version: postRes.agent?.version,
+          published: false
+        },
+        changes,
+        notes,
+        orphans,
+        ambiguous,
+        template: sanitizedFinal
+      };
+    }
+
+    // --- MENSAGENS E OUTROS RECURSOS ---
+    case 'zatten_messages_text_post': {
       return callZattenApi('/messages/text', 'POST', {
-        lead_number: args.lead_number,
-        message: args.message,
-        name: args.name
-      }, args?.connectionId);
+        lead_number: rawArgs.lead_number,
+        message: rawArgs.message,
+        name: rawArgs.name
+      }, rawArgs?.connection_id || rawArgs?.connectionId, orgId, true);
+    }
 
-    case 'zatten_send_message':
+    case 'zatten_send_message': {
       return callZattenApi('/messages/text', 'POST', {
-        lead_number: args.recipient,
-        message: args.message || args.messageText
-      }, args?.connectionId);
+        lead_number: rawArgs.recipient,
+        message: rawArgs.message || rawArgs.messageText
+      }, rawArgs?.connection_id || rawArgs?.connectionId, orgId, true);
+    }
 
-    case 'zatten_messages_template_post':
+    case 'zatten_messages_template_post': {
       return callZattenApi('/messages/template', 'POST', {
-        lead_number: args.lead_number,
-        template_name: args.template_name,
-        name: args.name
-      }, args?.connectionId);
+        lead_number: rawArgs.lead_number,
+        template_name: rawArgs.template_name,
+        name: rawArgs.name
+      }, rawArgs?.connection_id || rawArgs?.connectionId, orgId, true);
+    }
 
     case 'zatten_messages_audio_post': {
-      const formData = await buildMediaFormData('audio', args);
-      return callZattenApi('/messages/audio', 'POST', formData, args?.connectionId);
+      const formData = await buildMediaFormData('audio', rawArgs);
+      return callZattenApi('/messages/audio', 'POST', formData, rawArgs?.connection_id || rawArgs?.connectionId, orgId, true);
     }
 
     case 'zatten_messages_image_post': {
-      const formData = await buildMediaFormData('image', args);
-      return callZattenApi('/messages/image', 'POST', formData, args?.connectionId);
+      const formData = await buildMediaFormData('image', rawArgs);
+      return callZattenApi('/messages/image', 'POST', formData, rawArgs?.connection_id || rawArgs?.connectionId, orgId, true);
     }
 
     case 'zatten_messages_file_post': {
-      const formData = await buildMediaFormData('file', args);
-      return callZattenApi('/messages/file', 'POST', formData, args?.connectionId);
+      const formData = await buildMediaFormData('file', rawArgs);
+      return callZattenApi('/messages/file', 'POST', formData, rawArgs?.connection_id || rawArgs?.connectionId, orgId, true);
     }
 
     case 'zatten_messages_video_post': {
-      const formData = await buildMediaFormData('video', args);
-      return callZattenApi('/messages/video', 'POST', formData, args?.connectionId);
+      const formData = await buildMediaFormData('video', rawArgs);
+      return callZattenApi('/messages/video', 'POST', formData, rawArgs?.connection_id || rawArgs?.connectionId, orgId, true);
     }
 
     case 'zatten_messages_history_get': {
       const q = new URLSearchParams();
-      if (args.leadNumber) q.set('leadNumber', args.leadNumber);
-      if (args.thread_id) q.set('thread_id', args.thread_id);
-      if (args.llm_format !== undefined) q.set('llm_format', String(args.llm_format));
-      return callZattenApi(`/messages/history?${q.toString()}`, 'GET', null, args?.connectionId);
+      const leadNum = rawArgs.leadNumber || rawArgs.lead_number;
+      if (leadNum) q.set('leadNumber', leadNum);
+      if (rawArgs.thread_id) q.set('thread_id', rawArgs.thread_id);
+      if (rawArgs.llm_format !== undefined) q.set('llm_format', String(rawArgs.llm_format));
+      return callZattenApi(`/messages/history?${q.toString()}`, 'GET', null, rawArgs?.connection_id || rawArgs?.connectionId, orgId);
     }
 
     case 'zatten_users_get':
@@ -973,7 +1969,7 @@ async function executeToolDirectly(name: string, args: any, user: OAuthJwtPayloa
 }
 
 // ==============================================================================
-// 1.2 ENDPOINT RAIZ MCP: DESCOBERTA OAUTH E SSE (GET /mcp e GET /mcp/sse)
+// 8. ENDPOINTS HTTP E SSE DO SERVIDOR MCP
 // ==============================================================================
 
 mcpRouter.get(['/', '/sse'], (req: AuthenticatedMcpRequest, res: Response) => {
@@ -981,7 +1977,6 @@ mcpRouter.get(['/', '/sse'], (req: AuthenticatedMcpRequest, res: Response) => {
   const issuer = process.env.OAUTH_ISSUER_URL || `${req.protocol}://${req.get('host')}`;
   const resourceMetadataUrl = `${issuer}/.well-known/oauth-protected-resource`;
 
-  // Se não autenticado: HTTP 401 com WWW-Authenticate apontando para a descoberta OAuth da Firstsys
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     res.setHeader('WWW-Authenticate', `Bearer error="unauthorized", resource_metadata="${resourceMetadataUrl}"`);
     return res.status(401).json({
@@ -1002,7 +1997,6 @@ mcpRouter.get(['/', '/sse'], (req: AuthenticatedMcpRequest, res: Response) => {
     });
   }
 
-  // Suporte a SSE (Server-Sent Events) padrão da especificação MCP
   const accept = req.headers.accept || '';
   if (accept.includes('text/event-stream')) {
     const sessionId = `mcp_sess_${crypto.randomBytes(16).toString('hex')}`;
@@ -1011,7 +2005,6 @@ mcpRouter.get(['/', '/sse'], (req: AuthenticatedMcpRequest, res: Response) => {
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders?.();
 
-    // Envia o endpoint de mensagens para o cliente SSE da OpenAI
     res.write(`event: endpoint\ndata: ${issuer}/mcp/messages?sessionId=${sessionId}\n\n`);
 
     const interval = setInterval(() => {
@@ -1024,7 +2017,6 @@ mcpRouter.get(['/', '/sse'], (req: AuthenticatedMcpRequest, res: Response) => {
     return;
   }
 
-  // Resposta descritiva JSON padrão
   return res.json({
     name: 'Firstsys Zatten Central MCP Server',
     version: '1.0.0',
@@ -1033,10 +2025,6 @@ mcpRouter.get(['/', '/sse'], (req: AuthenticatedMcpRequest, res: Response) => {
     toolsCount: MCP_TOOLS_CATALOG.length
   });
 });
-
-// ==============================================================================
-// 1.3 MENSAGENS MCP JSON-RPC 2.0 (POST /mcp e POST /mcp/messages)
-// ==============================================================================
 
 const jsonRpcHandler = async (req: AuthenticatedMcpRequest, res: Response) => {
   const body = req.body;
@@ -1091,11 +2079,10 @@ const jsonRpcHandler = async (req: AuthenticatedMcpRequest, res: Response) => {
       try {
         const output = await executeToolDirectly(toolName, args, user);
 
-        // Protocolo MCP: sinaliza isError: true explicitamente para que clientes e LLMs
-        // reconheçam quando a operação falhou em vez de tratá-la como concluída com sucesso
         const isFailure = !!(
           output &&
           (output.isError === true ||
+           output.ok === false ||
            output.error !== undefined ||
            (typeof output.status === 'number' && output.status >= 400) ||
            output.success === false)
@@ -1148,24 +2135,16 @@ const jsonRpcHandler = async (req: AuthenticatedMcpRequest, res: Response) => {
 
 mcpRouter.post(['/', '/messages'], requireOAuth(), jsonRpcHandler);
 
-// ==============================================================================
-// 2. CATÁLOGO REST / TOOLS DAS FERRAMENTAS MCP
-// ==============================================================================
-
 mcpRouter.get('/tools', requireOAuth(), (_req: AuthenticatedMcpRequest, res: Response) => {
   return res.json({
     tools: MCP_TOOLS_CATALOG
   });
 });
 
-// ==============================================================================
-// 3. FERRAMENTA DE PERFIL AUTENTICADA (firstsys_get_profile)
-// ==============================================================================
-
 mcpRouter.post('/tools/firstsys_get_profile', requireOAuth('profile'), (req: AuthenticatedMcpRequest, res: Response) => {
   const user = req.oauthUser!;
   return res.json({
-    id: user.sub, // ID opaco permanente da conta Firstsys
+    id: user.sub,
     organizationId: user.org_id,
     role: user.role,
     scope: user.scope,
@@ -1173,16 +2152,11 @@ mcpRouter.post('/tools/firstsys_get_profile', requireOAuth('profile'), (req: Aut
   });
 });
 
-// ==============================================================================
-// 4. FERRAMENTA DE LEITURA: Listar Conexões (zatten_list_connections)
-// ==============================================================================
-
 const MOCK_DB_PATH = path.join(process.cwd(), 'server', 'db.json');
 
 mcpRouter.post('/tools/zatten_list_connections', requireOAuth('connections:read'), (req: AuthenticatedMcpRequest, res: Response) => {
   const user = req.oauthUser!;
 
-  // Busca conexões ativas registradas (incluindo as provisionadas via Variáveis de Ambiente do Coolify)
   let connections: any[] = [];
   if (fs.existsSync(MOCK_DB_PATH)) {
     try {
@@ -1204,7 +2178,6 @@ mcpRouter.post('/tools/zatten_list_connections', requireOAuth('connections:read'
     }
   }
 
-  // Fallback padrão se nenhuma conexão persistida existir
   if (connections.length === 0) {
     connections = [
       {
@@ -1232,10 +2205,7 @@ mcpRouter.post('/tools/zatten_list_connections', requireOAuth('connections:read'
   return res.json({ connections });
 });
 
-// ==============================================================================
-// 5. FERRAMENTA DE ESCRITA: Enviar Mensagem com Confirmação Obrigatória
-// ==============================================================================
-
+// Endpoint com confirmação humana em duas etapas
 const confirmationTokens = new Map<string, {
   tool: string;
   parameters: any;
@@ -1244,7 +2214,8 @@ const confirmationTokens = new Map<string, {
 }>();
 
 const SendMessageSchema = z.object({
-  connectionId: z.string().min(1),
+  connectionId: z.string().min(1).optional(),
+  connection_id: z.string().min(1).optional(),
   recipient: z.string().min(8, 'Número de telefone inválido'),
   messageText: z.string().min(1, 'Mensagem não pode ser vazia'),
   confirmationToken: z.string().optional()
@@ -1259,11 +2230,10 @@ mcpRouter.post('/tools/zatten_send_message', requireOAuth('zatten:messages'), as
       return res.status(400).json({ error: 'invalid_params', details: parseResult.error.issues });
     }
 
-    const { connectionId, recipient, messageText, confirmationToken } = parseResult.data;
+    const { recipient, messageText, confirmationToken } = parseResult.data;
+    const connectionId = parseResult.data.connectionId || parseResult.data.connection_id || 'conn_coolify_principal';
 
-    // Verificação de Confirmação Humana Explícita de Duas Etapas (Checklist 301)
     if (!confirmationToken) {
-      // Gera token temporário de prévia e confirmação (válido por 5 minutos)
       const token = `conf_${crypto.randomBytes(16).toString('hex')}`;
       confirmationTokens.set(token, {
         tool: 'zatten_send_message',
@@ -1277,7 +2247,7 @@ mcpRouter.post('/tools/zatten_send_message', requireOAuth('zatten:messages'), as
         confirmationToken: token,
         actionPreview: {
           action: 'Envio de Mensagem WhatsApp / Zatten',
-          destinatario: recipient,
+          destinatario: maskLeadNumber(recipient),
           mensagem: messageText,
           conexao: connectionId
         },
@@ -1285,7 +2255,6 @@ mcpRouter.post('/tools/zatten_send_message', requireOAuth('zatten:messages'), as
       });
     }
 
-    // Valida o token de confirmação apresentado
     const record = confirmationTokens.get(confirmationToken);
     if (!record || record.expiresAt < Date.now()) {
       return res.status(400).json({ error: 'invalid_confirmation', message: 'Token de confirmação expirado ou inválido.' });
@@ -1295,10 +2264,8 @@ mcpRouter.post('/tools/zatten_send_message', requireOAuth('zatten:messages'), as
       return res.status(403).json({ error: 'forbidden', message: 'Token de confirmação pertence a outra organização.' });
     }
 
-    // Consome o token de confirmação
     confirmationTokens.delete(confirmationToken);
 
-    // Resolve o secretRef da conexão registrada no cofre/banco
     let resolvedSecretRef = `vault_aes_${connectionId}`;
     if (fs.existsSync(MOCK_DB_PATH)) {
       try {
@@ -1310,7 +2277,6 @@ mcpRouter.post('/tools/zatten_send_message', requireOAuth('zatten:messages'), as
       } catch (e) {}
     }
 
-    // Executa a chamada na API Zatten através do cliente com rate limit de 1 req/s
     const result = await zattenClient.executeRequest({
       connectionId,
       secretRef: resolvedSecretRef,
@@ -1325,7 +2291,7 @@ mcpRouter.post('/tools/zatten_send_message', requireOAuth('zatten:messages'), as
       action: 'mcp.message.sent',
       category: 'api_usage',
       severity: 'info',
-      description: `ChatGPT enviou mensagem autorizada para ${recipient} via conexão ${connectionId}`,
+      description: `Mensagem enviada com confirmação humana para ${maskLeadNumber(recipient)}`,
       ipAddress: req.ip || '127.0.0.1'
     });
 
@@ -1336,11 +2302,7 @@ mcpRouter.post('/tools/zatten_send_message', requireOAuth('zatten:messages'), as
   }
 });
 
-// ==============================================================================
-// 6. ROTEADOR REST DINÂMICO PARA FERRAMENTAS MCP / OPENAPI
-// Permite que Custom Actions do ChatGPT e chamadas REST executem qualquer ferramenta
-// diretamente via POST /mcp/tools/:toolName com autorização Bearer OAuth 2.1.
-// ==============================================================================
+// Roteador REST Dinâmico para ferramentas OpenAPI / ChatGPT Custom Actions
 mcpRouter.post('/tools/:toolName', requireOAuth(), async (req: AuthenticatedMcpRequest, res: Response) => {
   const rawToolName = req.params.toolName;
   const toolName = Array.isArray(rawToolName) ? rawToolName[0] : String(rawToolName || '');

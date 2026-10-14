@@ -184,6 +184,59 @@
       "name": "Buscar Tags (zatten_tags_get)",
       "description": "Busca informações de todas as tags disponíveis.",
       "enabled": true
+    },
+    {
+      "id": "zatten_properties_get",
+      "name": "Listar Propriedades (zatten_properties_get)",
+      "description": "Lista as propriedades personalizadas cadastradas no projeto (slug, name, is_enum).",
+      "enabled": true
+    },
+    {
+      "id": "zatten_properties_slug_values_get",
+      "name": "Listar Valores Enum (zatten_properties_slug_values_get)",
+      "description": "Retorna os valores permitidos de uma propriedade do tipo enum/lista.",
+      "enabled": true
+    },
+    {
+      "id": "zatten_leads_leadnumber_notification_post",
+      "name": "Notificar Responsável (zatten_leads_leadnumber_notification_post)",
+      "description": "Envia notificação push interna ao atendente responsável pelo lead.",
+      "enabled": true,
+      "danger": true
+    },
+    {
+      "id": "zatten_automations_trigger_post",
+      "name": "Disparar Automações (zatten_automations_trigger_post)",
+      "description": "Solicita disparo de automações compatíveis com o estado atual do lead.",
+      "enabled": true,
+      "danger": true
+    },
+    {
+      "id": "zatten_flows_trigger_post",
+      "name": "Disparar Trigger Flow (zatten_flows_trigger_post)",
+      "description": "Dispara um Trigger Flow com chave de idempotência para um lead.",
+      "enabled": true,
+      "danger": true
+    },
+    {
+      "id": "zatten_hooks_path_post",
+      "name": "Disparar Webhook (zatten_hooks_path_post)",
+      "description": "Dispara webhook de entrada configurado na Zatten com payload JSON.",
+      "enabled": true,
+      "danger": true
+    },
+    {
+      "id": "zatten_agent_config_get",
+      "name": "Ler Config do Agente (zatten_agent_config_get)",
+      "description": "Lê o template e configuração do agente Zatten com dados sensíveis protegidos.",
+      "enabled": true
+    },
+    {
+      "id": "zatten_agent_config_update",
+      "name": "Atualizar Config do Agente (zatten_agent_config_update)",
+      "description": "Atualiza blocos do agente Zatten preservando segredos e sem publicação automática.",
+      "enabled": true,
+      "danger": true
     }
   ],
   "attendants": [
