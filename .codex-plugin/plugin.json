@@ -1,0 +1,33 @@
+{
+  "schema_version": "v1",
+  "name": "firstsys-mcp",
+  "display_name": "Firstsys MCP",
+  "version": "1.2.0",
+  "description": "MCP da Firstsys — CRM Zatten WhatsApp & Skills de IA",
+  "interface": {
+    "displayName": "Firstsys MCP",
+    "shortDescription": "Conecte o ChatGPT ao CRM Zatten WhatsApp e execute Skills operacionais da Firstsys.",
+    "longDescription": "Integração oficial da Central Firstsys com o CRM Zatten. Permite que o ChatGPT consulte dados cadastrais de leads, histórico de mensagens no WhatsApp, colunas do Kanban, atribuição de equipe com rodízio, envio de mensagens e templates HSM, disparo de automações e gerenciamento de Skills especializadas de IA.",
+    "developerName": "Firstsys",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write"
+    ]
+  },
+  "author": {
+    "name": "Firstsys",
+    "email": "contato@firstsys.com.br",
+    "url": "https://firstend.firstsys.com.br"
+  },
+  "mcp": {
+    "server": "https://firstend.firstsys.com.br/mcp",
+    "type": "remote",
+    "sse_endpoint": "https://firstend.firstsys.com.br/mcp/sse",
+    "messages_endpoint": "https://firstend.firstsys.com.br/mcp/messages"
+  },
+  "api": {
+    "type": "openapi",
+    "url": "https://firstend.firstsys.com.br/openapi.json"
+  }
+}

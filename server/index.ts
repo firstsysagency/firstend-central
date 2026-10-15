@@ -1149,6 +1149,29 @@ app.post('/api/connections/:id/revoke', verifyAuthToken, async (req, res) => {
   }
 });
 
+// 1.5. Rota explícita de download do Pacote MCP ChatGPT (Sem Cache)
+app.get(['/firstsys-zatten-mcp-bundle.zip', '/api/mcp/bundle.zip'], (_req, res) => {
+  res.setHeader('Content-Type', 'application/zip');
+  res.setHeader('Content-Disposition', 'attachment; filename="firstsys-zatten-mcp-bundle.zip"');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
+  const candidates = [
+    path.resolve(process.cwd(), 'public', 'firstsys-zatten-mcp-bundle.zip'),
+    path.resolve(process.cwd(), 'dist', 'firstsys-zatten-mcp-bundle.zip'),
+    path.resolve(process.cwd(), 'firstsys-zatten-mcp-bundle.zip')
+  ];
+
+  for (const p of candidates) {
+    if (fs.existsSync(p)) {
+      return res.sendFile(p);
+    }
+  }
+
+  res.status(404).send('Arquivo firstsys-zatten-mcp-bundle.zip não encontrado');
+});
+
 // 2. Servir estáticos compilados do Vite
 const distPath = path.join(process.cwd(), 'dist');
 app.use(express.static(distPath));

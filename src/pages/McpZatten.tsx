@@ -317,7 +317,7 @@ Token Exchange: Default (POST Request)`;
 
           <div className="flex items-center gap-3 flex-wrap">
             <a
-              href="/firstsys-zatten-mcp-bundle.zip"
+              href={`/api/mcp/bundle.zip?v=${Date.now()}`}
               download="firstsys-zatten-mcp-bundle.zip"
               className="px-4 py-2.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-950/30 transition-all flex items-center gap-2 cursor-pointer active:scale-95"
               title="Baixar pacote .ZIP completo com todas as 40 ferramentas e schemas para o ChatGPT"
