@@ -33,6 +33,14 @@ const codexPlugin = {
   display_name: 'Firstsys MCP',
   version: '1.2.0',
   description: 'MCP da Firstsys — CRM Zatten WhatsApp & Skills de IA',
+  interface: {
+    displayName: 'Firstsys MCP',
+    shortDescription: 'Conecte o ChatGPT ao CRM Zatten WhatsApp e execute Skills operacionais da Firstsys.',
+    longDescription: 'Integração oficial da Central Firstsys com o CRM Zatten. Permite que o ChatGPT consulte dados cadastrais de leads, histórico de mensagens no WhatsApp, colunas do Kanban, atribuição de equipe com rodízio, envio de mensagens e templates HSM, disparo de automações e gerenciamento de Skills especializadas de IA.',
+    developerName: 'Firstsys',
+    category: 'Productivity',
+    capabilities: ['Read', 'Write']
+  },
   author: {
     name: 'Firstsys',
     email: 'contato@firstsys.com.br',
@@ -54,7 +62,7 @@ fs.writeFileSync(
   JSON.stringify(codexPlugin, null, 2),
   'utf8'
 );
-console.log('✅ .codex-plugin/plugin.json gerado.');
+console.log('✅ .codex-plugin/plugin.json gerado com interface.');
 
 // 3. .AGENT-PLUGIN/PLUGIN.JSON (Exigido pelo validador da OpenAI)
 const agentPluginDir = path.join(OUTPUT_DIR, '.agent-plugin');
@@ -64,6 +72,14 @@ const agentPlugin = {
   name: 'firstsys-mcp',
   version: '1.2.0',
   description: 'MCP da Firstsys — CRM Zatten WhatsApp & Skills de IA',
+  interface: {
+    displayName: 'Firstsys MCP',
+    shortDescription: 'Conecte o ChatGPT ao CRM Zatten WhatsApp e execute Skills operacionais da Firstsys.',
+    longDescription: 'Integração oficial da Central Firstsys com o CRM Zatten. Permite que o ChatGPT consulte dados cadastrais de leads, histórico de mensagens no WhatsApp, colunas do Kanban, atribuição de equipe com rodízio, envio de mensagens e templates HSM, disparo de automações e gerenciamento de Skills especializadas de IA.',
+    developerName: 'Firstsys',
+    category: 'Productivity',
+    capabilities: ['Read', 'Write']
+  },
   mcpServers: {
     'firstsys-zatten': {
       url: `${PROD_URL}/mcp`,
@@ -120,6 +136,14 @@ const appJson = {
   name: 'Firstsys MCP',
   version: '1.2.0',
   description: 'MCP da Firstsys — Gestão do CRM Zatten e Skills de Atendimento',
+  interface: {
+    displayName: 'Firstsys MCP',
+    shortDescription: 'Conecte o ChatGPT ao CRM Zatten WhatsApp e execute Skills operacionais da Firstsys.',
+    longDescription: 'Integração oficial da Central Firstsys com o CRM Zatten. Permite que o ChatGPT consulte dados cadastrais de leads, histórico de mensagens no WhatsApp, colunas do Kanban, atribuição de equipe com rodízio, envio de mensagens e templates HSM, disparo de automações e gerenciamento de Skills especializadas de IA.',
+    developerName: 'Firstsys',
+    category: 'Productivity',
+    capabilities: ['Read', 'Write']
+  },
   mcp: {
     url: `${PROD_URL}/mcp`
   },
