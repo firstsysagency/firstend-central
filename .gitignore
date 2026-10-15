@@ -16,6 +16,8 @@ dist/
 dist-ssr/
 build/
 *.local
+chatgpt-mcp-bundle/
+/firstsys-zatten-mcp-bundle.zip
 
 # Segredos, Chaves Privadas e Variáveis de Ambiente (CRÍTICO - Regra 294)
 .env

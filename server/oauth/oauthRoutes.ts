@@ -25,6 +25,7 @@ import {
 } from './cryptoEngine.js';
 import { oauthStore } from './oauthStore.js';
 import { logAuditEvent } from '../../src/lib/audit.js';
+import { MCP_TOOLS_CATALOG } from '../mcp/mcpRouter.js';
 
 export const oauthRouter = Router();
 
@@ -547,18 +548,63 @@ oauthRouter.get('/oauth/userinfo', (req: Request, res: Response) => {
 // 8. MANIFESTO OPENAPI 3.1.0 PARA CHATGPT ACTIONS / MCP
 // ==============================================================================
 
-const openApiHandler = (req: Request, res: Response) => {
-  const issuer = getBaseIssuer(req);
-  res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  res.json({
+export function generateOpenApiSpec(issuer: string) {
+  const paths: Record<string, any> = {};
+
+  for (const tool of MCP_TOOLS_CATALOG) {
+    const props = tool.inputSchema?.properties || {};
+    const hasProps = Object.keys(props).length > 0;
+    
+    paths[`/mcp/tools/${tool.name}`] = {
+      post: {
+        operationId: tool.name,
+        summary: tool.title || tool.name,
+        description: tool.description || '',
+        tags: tool.tags || ['tools'],
+        ...(hasProps ? {
+          requestBody: {
+            required: Array.isArray(tool.inputSchema?.required) && tool.inputSchema.required.length > 0,
+            content: {
+              'application/json': {
+                schema: tool.inputSchema
+              }
+            }
+          }
+        } : {}),
+        responses: {
+          '200': {
+            description: 'Operação executada com sucesso',
+            content: {
+              'application/json': {
+                schema: { type: 'object' }
+              }
+            }
+          },
+          '400': {
+            description: 'Parâmetros inválidos ou schema rejeitado'
+          },
+          '401': {
+            description: 'Não autorizado - Token OAuth inválido ou expirado'
+          },
+          '500': {
+            description: 'Erro interno ao processar ferramenta'
+          }
+        },
+        security: [
+          {
+            OAuth2: (tool.securitySchemes?.[0] as any)?.scopes || ['zatten:read']
+          }
+        ]
+      }
+    };
+  }
+
+  return {
     openapi: '3.1.0',
     info: {
       title: 'Firstsys Zatten Central MCP API',
-      description: 'API e Servidor MCP remoto para integração segura do ChatGPT com a Zatten via Firstsys OAuth 2.1.',
-      version: '1.1.0'
+      description: 'API e Servidor MCP remoto para integração segura do ChatGPT com a Zatten e Skills via Firstsys OAuth 2.1.',
+      version: '1.2.0'
     },
     servers: [
       {
@@ -566,380 +612,7 @@ const openApiHandler = (req: Request, res: Response) => {
         description: 'Servidor Principal de Produção'
       }
     ],
-    paths: {
-      '/mcp/tools/firstsys_get_profile': {
-        post: {
-          operationId: 'firstsys_get_profile',
-          summary: 'Obter perfil da conta Firstsys autenticada',
-          description: 'Retorna o identificador opaco permanente, organização e papéis da conta Firstsys autorizada.',
-          responses: {
-            '200': {
-              description: 'Perfil autenticado retornado com sucesso',
-              content: {
-                'application/json': {
-                  schema: {
-                    type: 'object',
-                    properties: {
-                      id: { type: 'string' },
-                      organizationId: { type: 'string' },
-                      role: { type: 'string' },
-                      scope: { type: 'string' },
-                      client: { type: 'string' }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      '/mcp/tools/zatten_list_connections': {
-        post: {
-          operationId: 'zatten_list_connections',
-          summary: 'Listar conexões Zatten ativas',
-          description: 'Lista todas as conexões Zatten ativas e operacionais autorizadas para a organização.',
-          responses: {
-            '200': {
-              description: 'Lista de conexões ativas',
-              content: {
-                'application/json': {
-                  schema: {
-                    type: 'object',
-                    properties: {
-                      connections: {
-                        type: 'array',
-                        items: {
-                          type: 'object',
-                          properties: {
-                            id: { type: 'string' },
-                            name: { type: 'string' },
-                            status: { type: 'string' },
-                            environment: { type: 'string' }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      '/mcp/tools/zatten_get_connection_status': {
-        post: {
-          operationId: 'zatten_get_connection_status',
-          summary: 'Consultar status da conexão Zatten',
-          description: 'Consulta o status de integridade e prontidão operacional de uma conexão Zatten específica.',
-          requestBody: {
-            required: false,
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    connectionId: { type: 'string', description: 'ID da conexão a ser consultada' }
-                  }
-                }
-              }
-            }
-          },
-          responses: {
-            '200': {
-              description: 'Status da conexão retornado com sucesso',
-              content: {
-                'application/json': {
-                  schema: { type: 'object' }
-                }
-              }
-            }
-          }
-        }
-      },
-      '/mcp/tools/zatten_kanban_get': {
-        post: {
-          operationId: 'zatten_kanban_get',
-          summary: 'Consultar colunas do Kanban no CRM Zatten',
-          description: 'Busca informações de todas as colunas do Kanban de atendimento no CRM Zatten.',
-          requestBody: {
-            required: false,
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    connectionId: { type: 'string', description: 'ID opcional da conexão Zatten' }
-                  }
-                }
-              }
-            }
-          },
-          responses: {
-            '200': {
-              description: 'Colunas do Kanban retornadas com sucesso',
-              content: {
-                'application/json': {
-                  schema: { type: 'object' }
-                }
-              }
-            }
-          }
-        }
-      },
-      '/mcp/tools/zatten_leads_leadnumber_get': {
-        post: {
-          operationId: 'zatten_leads_leadnumber_get',
-          summary: 'Obter dados cadastrais do lead por telefone',
-          description: 'Obtém informações cadastrais completas, tags, responsável e metadados de um lead específico pelo número de telefone (WaId).',
-          requestBody: {
-            required: true,
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  required: ['leadNumber'],
-                  properties: {
-                    leadNumber: { type: 'string', description: 'Número de WhatsApp (WaId) do lead com DDI+DDD (ex: 5511999999999)' },
-                    connectionId: { type: 'string', description: 'ID opcional da conexão Zatten' }
-                  }
-                }
-              }
-            }
-          },
-          responses: {
-            '200': {
-              description: 'Dados do lead retornados com sucesso',
-              content: {
-                'application/json': {
-                  schema: { type: 'object' }
-                }
-              }
-            }
-          }
-        }
-      },
-      '/mcp/tools/zatten_leads_leadnumber_properties_patch': {
-        post: {
-          operationId: 'zatten_leads_leadnumber_properties_patch',
-          summary: 'Atualizar ou limpar propriedade customizada do lead',
-          description: 'Atualiza o valor de uma propriedade customizada do lead a partir do slug. Para limpar ou remover o valor, envie uma string vazia ou espaço.',
-          requestBody: {
-            required: true,
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  required: ['leadNumber', 'property', 'value'],
-                  properties: {
-                    leadNumber: { type: 'string', description: 'Número de WhatsApp (WaId) do lead' },
-                    property: { type: 'string', description: 'Slug da propriedade a ser atualizada' },
-                    value: { type: 'string', description: 'Novo valor da propriedade. Para limpar, envie " "' },
-                    connectionId: { type: 'string', description: 'ID opcional da conexão Zatten' }
-                  }
-                }
-              }
-            }
-          },
-          responses: {
-            '200': {
-              description: 'Propriedade atualizada com sucesso',
-              content: {
-                'application/json': {
-                  schema: { type: 'object' }
-                }
-              }
-            }
-          }
-        }
-      },
-      '/mcp/tools/zatten_send_message': {
-        post: {
-          operationId: 'zatten_send_message',
-          summary: 'Disparar mensagem para contato via Zatten',
-          description: 'Dispara uma mensagem para um contato via API Zatten. AÇÃO DE ESCRITA: EXIGE CONFIRMAÇÃO DO USUÁRIO.',
-          requestBody: {
-            required: true,
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  required: ['recipient', 'message'],
-                  properties: {
-                    recipient: { type: 'string', description: 'Número do destinatário com DDI e DDD' },
-                    message: { type: 'string', description: 'Texto da mensagem a ser enviada' },
-                    connectionId: { type: 'string', description: 'ID da conexão Zatten específica (opcional)' }
-                  }
-                }
-              }
-            }
-          },
-          responses: {
-            '200': {
-              description: 'Mensagem enviada com sucesso',
-              content: {
-                'application/json': {
-                  schema: { type: 'object' }
-                }
-              }
-            }
-          }
-        }
-      },
-      '/mcp/tools/zatten_update_lead': {
-        post: {
-          operationId: 'zatten_update_lead',
-          summary: 'Atualizar lead no funil Zatten',
-          description: 'Atualiza propriedades, anotações ou etapa do lead no funil Zatten.',
-          requestBody: {
-            required: true,
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  required: ['leadId'],
-                  properties: {
-                    leadId: { type: 'string', description: 'Identificador do lead' },
-                    stage: { type: 'string', description: 'Nova etapa do funil' },
-                    notes: { type: 'string', description: 'Anotações complementares' },
-                    connectionId: { type: 'string', description: 'ID da conexão Zatten' }
-                  }
-                }
-              }
-            }
-          },
-          responses: {
-            '200': {
-              description: 'Lead atualizado com sucesso',
-              content: {
-                'application/json': {
-                  schema: { type: 'object' }
-                }
-              }
-            }
-          }
-        }
-      },
-      '/mcp/tools/zatten_attendants_list': {
-        post: {
-          operationId: 'zatten_attendants_list',
-          summary: 'Listar atendentes e departamentos ativos',
-          description: 'Obtém a lista de atendentes ativos cadastrados na Zatten (com e-mail, ID e departamento) para uso na atribuição de responsáveis via zatten_leads_leadnumber_assignee_patch.',
-          requestBody: {
-            required: false,
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    connectionId: { type: 'string', description: 'ID opcional da conexão Zatten' }
-                  }
-                }
-              }
-            }
-          },
-          responses: {
-            '200': {
-              description: 'Lista de atendentes e departamentos retornada com sucesso',
-              content: {
-                'application/json': {
-                  schema: { type: 'object' }
-                }
-              }
-            }
-          }
-        }
-      },
-      '/mcp/tools/zatten_templates_list': {
-        post: {
-          operationId: 'zatten_templates_list',
-          summary: 'Listar templates HSM aprovados',
-          description: 'Consulta a lista de templates HSM aprovados pela Meta WhatsApp Business API disponíveis para envio através de zatten_messages_template_post.',
-          requestBody: {
-            required: false,
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    connectionId: { type: 'string', description: 'ID opcional da conexão Zatten' }
-                  }
-                }
-              }
-            }
-          },
-          responses: {
-            '200': {
-              description: 'Templates HSM retornados com sucesso',
-              content: {
-                'application/json': {
-                  schema: { type: 'object' }
-                }
-              }
-            }
-          }
-        }
-      },
-      '/mcp/tools/zatten_users_get': {
-        post: {
-          operationId: 'zatten_users_get',
-          summary: 'Listar usuários, atendentes e responsáveis ativos',
-          description: 'Consulta a lista de todos os usuários, atendentes e responsáveis ativos cadastrados no CRM Zatten com seus respectivos IDs, nomes, e-mails e departamentos para descoberta de dados antes da atribuição de responsável via zatten_leads_leadnumber_assignee_patch.',
-          requestBody: {
-            required: false,
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    connectionId: { type: 'string', description: 'ID opcional da conexão Zatten' }
-                  }
-                }
-              }
-            }
-          },
-          responses: {
-            '200': {
-              description: 'Lista de usuários, atendentes e responsáveis retornada com sucesso',
-              content: {
-                'application/json': {
-                  schema: { type: 'object' }
-                }
-              }
-            }
-          }
-        }
-      },
-      '/mcp/tools/zatten_templates_get': {
-        post: {
-          operationId: 'zatten_templates_get',
-          summary: 'Consultar templates HSM aprovados pela Meta',
-          description: 'Consulta os templates HSM oficiais cadastrados e aprovados pela Meta WhatsApp Business API disponíveis para envio através de zatten_messages_template_post.',
-          requestBody: {
-            required: false,
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    connectionId: { type: 'string', description: 'ID opcional da conexão Zatten' }
-                  }
-                }
-              }
-            }
-          },
-          responses: {
-            '200': {
-              description: 'Templates HSM retornados com sucesso',
-              content: {
-                'application/json': {
-                  schema: { type: 'object' }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
+    paths,
     components: {
       securitySchemes: {
         OAuth2: {
@@ -952,8 +625,8 @@ const openApiHandler = (req: Request, res: Response) => {
               scopes: {
                 'profile': 'Acessar dados do perfil e organização',
                 'connections:read': 'Listar conexões ativas',
-                'zatten:read': 'Consultar leads e dados Zatten',
-                'zatten:write': 'Atualizar propriedades no CRM Zatten',
+                'zatten:read': 'Consultar leads, dados Zatten e Skills',
+                'zatten:write': 'Atualizar propriedades no CRM Zatten e Skills',
                 'zatten:messages': 'Disparar mensagens via Zatten'
               }
             }
@@ -961,8 +634,20 @@ const openApiHandler = (req: Request, res: Response) => {
         }
       }
     }
-  });
+  };
+}
+
+const openApiHandler = (req: Request, res: Response) => {
+  const issuer = getBaseIssuer(req);
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  
+  const spec = generateOpenApiSpec(issuer);
+  res.json(spec);
 };
 
 oauthRouter.get('/openapi.json', openApiHandler);
 oauthRouter.get('/mcp/openapi.json', openApiHandler);
+

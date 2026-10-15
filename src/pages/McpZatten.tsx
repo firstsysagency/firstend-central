@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, Shield, Check, X, ShieldAlert, Search, Save, CheckCircle2, RotateCcw, Loader2, Copy, ExternalLink, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
+import { Bot, Shield, Check, X, ShieldAlert, Search, Save, CheckCircle2, RotateCcw, Loader2, Copy, ExternalLink, Sparkles, ChevronDown, ChevronUp, Download } from 'lucide-react';
 import { logAuditEvent } from '../lib/audit';
 
 interface McpPermission {
@@ -316,6 +316,16 @@ Token Exchange: Default (POST Request)`;
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
+            <a
+              href="/firstsys-zatten-mcp-bundle.zip"
+              download="firstsys-zatten-mcp-bundle.zip"
+              className="px-4 py-2.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-950/30 transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+              title="Baixar pacote .ZIP completo com todas as 40 ferramentas e schemas para o ChatGPT"
+            >
+              <Download size={14} />
+              <span>Baixar Pacote .ZIP</span>
+            </a>
+
             <button
               type="button"
               onClick={handleCopyOpenApi}
@@ -380,10 +390,10 @@ Token Exchange: Default (POST Request)`;
                 <div className="p-4 rounded-xl bg-secondary/30 border border-border flex flex-col gap-2">
                   <div className="flex items-center gap-2 font-semibold text-foreground">
                     <span className="w-5 h-5 rounded-full bg-primary/20 text-primary text-[11px] flex items-center justify-center font-bold">2</span>
-                    Importar OpenAPI Schema
+                    Importar Schema ou Pacote .ZIP
                   </div>
                   <p className="text-zinc-400 leading-relaxed">
-                    Clique em <strong>Copiar Schema OpenAPI</strong> acima e cole no campo <strong>Schema</strong> do Custom GPT, ou importe a URL <code>{window.location.origin}/openapi.json</code>.
+                    Faça upload do arquivo <strong>.ZIP</strong> baixado, ou clique em <strong>Copiar Schema OpenAPI</strong> e cole no campo <strong>Schema</strong>, ou importe a URL <code>{window.location.origin}/openapi.json</code>.
                   </p>
                 </div>
 

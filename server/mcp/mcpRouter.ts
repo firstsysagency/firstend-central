@@ -167,7 +167,7 @@ export function requireOAuth(requiredScope?: OAuthScope) {
 // 3. CATÁLOGO COMPLETO DE FERRAMENTAS MCP CONFORME PROTOCOLO 2024-11-05
 // ==============================================================================
 
-const MCP_TOOLS_CATALOG = [
+export const MCP_TOOLS_CATALOG = [
   // --- IDENTIDADE E CONEXÕES FIRSTSYS ---
   {
     name: 'firstsys_get_profile',
