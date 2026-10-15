@@ -305,7 +305,7 @@
           "path": "/SKILL.md",
           "language": "markdown",
           "updatedAt": "2026-10-14T10:00:00.000Z",
-          "content": "# Skill: Qualificação e SDR Automatizado\n\n## Objetivo\nQualificar leads recebidos pelo WhatsApp identificando com precisão necessidade, autoridade, orçamento e timing (BANT).\n\n## Diretrizes de Comportamento\n1. Faça perguntas curtas e empáticas (máximo 2 frases por mensagem).\n2. Identifique o segmento do cliente e volume atual de atendimento.\n3. Quando o lead atender aos critérios de qualificação, mova-o no Kanban para a coluna 'Qualificado' e atribua ao time comercial.\n4. Caso o lead informe dados de contato ou empresa, salve nas propriedades customizadas correspondentes.\n\n## Gatilhos de Notificação\n- Quando o lead solicitar proposta ou reunião imediatamente, execute `zatten_leads_leadnumber_notification_post` com título 'Lead Quente Solicitou Contato'."
+          "content": "---\nname: sdr-qualificacao\ndescription: Skill para conduzir conversas de qualificação de leads via WhatsApp, aplicando metodologia BANT e coletando dores e orçamento.\nversion: 1.0.0\ncategory: vendas\n---\n\n# Skill: Qualificação e SDR Automatizado\n\n## Objetivo\nQualificar leads recebidos pelo WhatsApp identificando com precisão necessidade, autoridade, orçamento e timing (BANT).\n\n## Diretrizes de Comportamento\n1. Faça perguntas curtas e empáticas (máximo 2 frases por mensagem).\n2. Identifique o segmento do cliente e volume atual de atendimento.\n3. Quando o lead atender aos critérios de qualificação, mova-o no Kanban para a coluna 'Qualificado' e atribua ao time comercial.\n4. Caso o lead informe dados de contato ou empresa, salve nas propriedades customizadas correspondentes.\n\n## Gatilhos de Notificação\n- Quando o lead solicitar proposta ou reunião imediatamente, execute `zatten_leads_leadnumber_notification_post` com título 'Lead Quente Solicitou Contato'."
         },
         {
           "name": "rules.json",
@@ -340,7 +340,7 @@
           "path": "/SKILL.md",
           "language": "markdown",
           "updatedAt": "2026-10-14T11:00:00.000Z",
-          "content": "# Skill: Follow-up e Reengajamento Inteligente\n\n## Objetivo\nReconectar com leads que pararam de responder após o envio de apresentação ou proposta.\n\n## Estratégia de Cadência\n- **D+1 (24 horas após envio):** Mensagem de cortesia perguntando se conseguiu visualizar o material.\n- **D+3 (72 horas):** Envio de case de sucesso do mesmo nicho do lead.\n- **D+7 (Última tentativa amigável):** Pergunta direta de fechamento ou encerramento temporário de contato.\n\n## Instruções para a IA\n- Sempre verifique o histórico via `zatten_messages_history_get` antes de enviar nova mensagem.\n- Respeite o tom humanizado e jamais envie mensagens robotizadas ou insistentes demais."
+          "content": "---\nname: followup-inteligente\ndescription: Cadência automatizada de reengajamento para contatos sem resposta recente, quebrando objeções comuns e resgatando oportunidades.\nversion: 1.1.0\ncategory: atendimento\n---\n\n# Skill: Follow-up e Reengajamento Inteligente\n\n## Objetivo\nReconectar com leads que pararam de responder após o envio de apresentação ou proposta.\n\n## Estratégia de Cadência\n- **D+1 (24 horas após envio):** Mensagem de cortesia perguntando se conseguiu visualizar o material.\n- **D+3 (72 horas):** Envio de case de sucesso do mesmo nicho do lead.\n- **D+7 (Última tentativa amigável):** Pergunta direta de fechamento ou encerramento temporário de contato.\n\n## Instruções para a IA\n- Sempre verifique o histórico via `zatten_messages_history_get` antes de enviar nova mensagem.\n- Respeite o tom humanizado e jamais envie mensagens robotizadas ou insistentes demais."
         }
       ]
     },
@@ -368,7 +368,7 @@
           "path": "/SKILL.md",
           "language": "markdown",
           "updatedAt": "2026-10-14T12:00:00.000Z",
-          "content": "# Skill: Triagem e Roteamento de Suporte\n\n## Objetivo\nDetectar a natureza do chamado do cliente no WhatsApp e transferir para o time responsável utilizando `zatten_leads_leadnumber_assignee_patch`.\n\n## Mapeamento de Departamentos\n- **Dúvidas de Cobrança / Boletos / NFs:** Atribuir ao Departamento Financeiro.\n- **Problemas Técnicos e Bugs:** Coletar print ou descrição detalhada e atribuir ao Suporte Técnico Nível 2.\n- **Renovação de Contrato / Upgrade:** Atribuir ao Comercial."
+          "content": "---\nname: triagem-suporte\ndescription: Identificação de solicitações técnicas, financeiras e contratuais, roteando para os departamentos corretos no CRM.\nversion: 1.0.0\ncategory: suporte\n---\n\n# Skill: Triagem e Roteamento de Suporte\n\n## Objetivo\nDetectar a natureza do chamado do cliente no WhatsApp e transferir para o time responsável utilizando `zatten_leads_leadnumber_assignee_patch`.\n\n## Mapeamento de Departamentos\n- **Dúvidas de Cobrança / Boletos / NFs:** Atribuir ao Departamento Financeiro.\n- **Problemas Técnicos e Bugs:** Coletar print ou descrição detalhada e atribuir ao Suporte Técnico Nível 2.\n- **Renovação de Contrato / Upgrade:** Atribuir ao Comercial."
         }
       ]
     }

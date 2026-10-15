@@ -1,6 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const { ZipArchive } = require('archiver');
 import { generateOpenApiSpec } from '../server/oauth/oauthRoutes.js';
 import { MCP_TOOLS_CATALOG } from '../server/mcp/mcpRouter.js';
 
@@ -174,31 +177,63 @@ if (fs.existsSync(dbPath)) {
 const skillsBaseDir = path.join(OUTPUT_DIR, 'skills');
 fs.mkdirSync(skillsBaseDir, { recursive: true });
 
+function formatSkillMd(content: string, slug: string, desc: string): string {
+  // Limpa caracteres invisíveis, BOM e quebras
+  const cleaned = (content || '').replace(/^\uFEFF/, '').trim();
+  const cleanDesc = (desc || '').replace(/[\r\n]+/g, ' ').replace(/"/g, '\\"').trim();
+
+  // Detecta se já tem YAML frontmatter delimitado por ---
+  const match = cleaned.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+  if (match) {
+    const body = match[2].trim();
+    return `---\nname: ${slug}\ndescription: "${cleanDesc}"\n---\n\n${body}\n`;
+  }
+
+  return `---\nname: ${slug}\ndescription: "${cleanDesc}"\n---\n\n${cleaned}\n`;
+}
+
+// 7.1. SKILL.MD MESTRE NA RAIZ DO BUNDLE (Compatibilidade total com analisadores de raiz)
+const rootSkillMd = `---\nname: firstsys-mcp\ndescription: "MCP da Firstsys — CRM Zatten WhatsApp e Coleção de Skills Operacionais de IA"\n---\n\n# Firstsys Zatten Central & Skills\n\nPacote oficial de ferramentas MCP e Skills operacionais para agentes de IA e ChatGPT.\n`;
+fs.writeFileSync(path.join(OUTPUT_DIR, 'SKILL.md'), rootSkillMd, 'utf8');
+console.log('✅ SKILL.md mestre na raiz gerado com YAML frontmatter.');
+
+// 7.2. SKILLS INDIVIDUAIS (skills/<slug>/SKILL.md)
 for (const skill of skillsList) {
-  // Cria tanto por slug quanto por ID para máxima tolerância
-  const slugsToCreate = [skill.slug, skill.id].filter(Boolean);
-  
-  for (const slug of slugsToCreate) {
-    const skillFolder = path.join(skillsBaseDir, slug);
-    fs.mkdirSync(skillFolder, { recursive: true });
+  // Slug limpo e canônico em kebab-case estrito (ex: sdr-qualificacao)
+  const canonicalSlug = (skill.slug || skill.id || '')
+    .toLowerCase()
+    .replace(/^skill_/, '')
+    .replace(/_/g, '-')
+    .trim();
 
-    // Grava os arquivos da skill (SKILL.md, rules.json, etc.)
-    for (const file of skill.files || []) {
-      const fileName = file.name.startsWith('/') ? file.name.substring(1) : file.name;
-      fs.writeFileSync(path.join(skillFolder, fileName), file.content || '', 'utf8');
-    }
+  if (!canonicalSlug) continue;
 
-    // Se não tiver SKILL.md explícito, cria um padrão
-    if (!fs.existsSync(path.join(skillFolder, 'SKILL.md'))) {
-      fs.writeFileSync(
-        path.join(skillFolder, 'SKILL.md'),
-        `# Skill: ${skill.name}\n\n${skill.description}\n`,
-        'utf8'
-      );
+  const skillFolder = path.join(skillsBaseDir, canonicalSlug);
+  fs.mkdirSync(skillFolder, { recursive: true });
+
+  let hasSkillMd = false;
+
+  // Grava os arquivos da skill (SKILL.md, rules.json, etc.)
+  for (const file of skill.files || []) {
+    const fileName = file.name.startsWith('/') ? file.name.substring(1) : file.name;
+    let fileContent = file.content || '';
+    
+    if (fileName.toLowerCase() === 'skill.md') {
+      hasSkillMd = true;
+      fileContent = formatSkillMd(fileContent, canonicalSlug, skill.description);
     }
+    
+    fs.writeFileSync(path.join(skillFolder, fileName), fileContent, 'utf8');
+  }
+
+  // Se não tiver SKILL.md explícito, cria um padrão com frontmatter obrigatório
+  if (!hasSkillMd) {
+    const defaultBody = `# Skill: ${skill.name}\n\n${skill.description || ''}\n`;
+    const defaultContent = formatSkillMd(defaultBody, canonicalSlug, skill.description);
+    fs.writeFileSync(path.join(skillFolder, 'SKILL.md'), defaultContent, 'utf8');
   }
 }
-console.log(`✅ Pasta skills/*/SKILL.md gerada com ${skillsList.length} skills da Central.`);
+console.log(`✅ Pasta skills/*/SKILL.md gerada com YAML frontmatter estrito para ${skillsList.length} skills.`);
 
 // 8. MCP-MANIFEST.JSON
 const mcpManifest = {
@@ -435,7 +470,7 @@ Este pacote reúne todas as especificações e instruções necessárias para co
 fs.writeFileSync(path.join(OUTPUT_DIR, 'README.md'), readmeContent, 'utf8');
 console.log('✅ README.md gerado.');
 
-// 13. COMPACTAÇÃO EM ARQUIVO .ZIP UNIVERSAL
+// 13. COMPACTAÇÃO EM ARQUIVO .ZIP UNIVERSAL (via archiver com padrão PKWARE / RFC 1951)
 const zipName = 'firstsys-zatten-mcp-bundle.zip';
 const targetPaths = [
   path.resolve(process.cwd(), zipName),
@@ -444,17 +479,36 @@ const targetPaths = [
   path.resolve(process.cwd(), '..', 'non-deploy', zipName)
 ];
 
-console.log('🤐 Compactando arquivos e pastas ocultas em .zip...');
+console.log('🤐 Compactando arquivos e pastas ocultas em .zip padrão RFC com archiver...');
 
-// Criação de ZIP via tar.exe nativo (garante inclusão perfeita de pastas e arquivos ocultos como .codex-plugin, .mcp.json e skills/*/SKILL.md)
-const tarCommand = `tar.exe -a -cf "${targetPaths[0]}" -C "${OUTPUT_DIR}" .`;
+async function createBundleZip(sourceDir: string, outZipPath: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (fs.existsSync(outZipPath)) {
+      fs.unlinkSync(outZipPath);
+    }
+    const output = fs.createWriteStream(outZipPath);
+    const archive = new ZipArchive({
+      zlib: { level: 9 },
+      forceLocalTime: true
+    });
+
+    output.on('close', () => {
+      console.log(`✅ Arquivo ZIP criado com sucesso (${fs.statSync(outZipPath).size} bytes) em: ${outZipPath}`);
+      resolve();
+    });
+
+    archive.on('error', (err: any) => reject(err));
+    archive.pipe(output);
+
+    // Inclui tudo de sourceDir na raiz do ZIP sem prefixo './', incluindo arquivos e pastas ocultos (.codex-plugin, etc.)
+    archive.directory(sourceDir, false);
+
+    archive.finalize();
+  });
+}
 
 try {
-  if (fs.existsSync(targetPaths[0])) {
-    fs.unlinkSync(targetPaths[0]);
-  }
-  execSync(tarCommand, { stdio: 'inherit' });
-  console.log(`✅ Arquivo ZIP criado com sucesso em: ${targetPaths[0]}`);
+  await createBundleZip(OUTPUT_DIR, targetPaths[0]);
 
   // Copia para as pastas de distribuição
   for (let i = 1; i < targetPaths.length; i++) {
@@ -465,7 +519,8 @@ try {
     console.log(`📋 Copiado para: ${dest}`);
   }
 } catch (err) {
-  console.error('Erro ao compactar via tar.exe:', err);
+  console.error('Erro ao compactar via archiver:', err);
+  process.exit(1);
 }
 
 console.log('🎉 PACOTE MCP DO CHATGPT COMPILADO COM SUCESSO TOTAL!');

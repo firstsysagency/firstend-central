@@ -443,7 +443,14 @@ app.post('/api/skills', (req, res) => {
     const id = `skill_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const now = new Date().toISOString();
 
-    const defaultSkillMd = `# Skill: ${name.trim()}
+    const defaultSkillMd = `---
+name: ${slug || id}
+description: "${(description || '').trim().replace(/"/g, '\\"')}"
+version: "${version?.trim() || '1.0.0'}"
+category: "${(category || 'geral').toLowerCase().trim()}"
+---
+
+# Skill: ${name.trim()}
 
 ## Objetivo
 ${description?.trim() || 'Descreva aqui o propósito e resultado esperado desta skill de IA.'}
@@ -620,11 +627,21 @@ app.post('/api/skills/:id/files', (req, res) => {
     const fileIndex = skill.files.findIndex((f: any) => f.name.toLowerCase() === fileName.toLowerCase());
     const now = new Date().toISOString();
 
+    let finalContent = content !== undefined ? String(content) : '';
+    if (fileName.toLowerCase() === 'skill.md') {
+      const trimmed = finalContent.replace(/^\uFEFF/, '').trim();
+      if (!trimmed.startsWith('---')) {
+        const slug = (skill.slug || skill.name || id).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        const desc = (skill.description || '').replace(/[\r\n]+/g, ' ').replace(/"/g, '\\"').trim();
+        finalContent = `---\nname: ${slug}\ndescription: "${desc}"\n---\n\n${trimmed}\n`;
+      }
+    }
+
     const fileRecord = {
       name: fileName,
       path: fileName.startsWith('/') ? fileName : `/${fileName}`,
       language: language || (fileName.endsWith('.md') ? 'markdown' : fileName.endsWith('.json') ? 'json' : 'text'),
-      content: content !== undefined ? String(content) : '',
+      content: finalContent,
       updatedAt: now
     };
 
