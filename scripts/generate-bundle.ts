@@ -7,11 +7,13 @@ import { MCP_TOOLS_CATALOG } from '../server/mcp/mcpRouter.js';
 const PROD_URL = 'https://firstend.firstsys.com.br';
 const OUTPUT_DIR = path.resolve(process.cwd(), 'chatgpt-mcp-bundle');
 
-if (!fs.existsSync(OUTPUT_DIR)) {
-  fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+// Limpa e recria diretório de saída
+if (fs.existsSync(OUTPUT_DIR)) {
+  fs.rmSync(OUTPUT_DIR, { recursive: true, force: true });
 }
+fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
-console.log('📦 Iniciando compilação do pacote MCP para ChatGPT...');
+console.log('📦 Iniciando compilação do pacote MCP compatível com ChatGPT / Codex / Claude...');
 
 // 1. OPENAPI.JSON COMPLETO
 const openApiSpec = generateOpenApiSpec(PROD_URL);
@@ -22,7 +24,159 @@ fs.writeFileSync(
 );
 console.log(`✅ openapi.json gerado com ${Object.keys(openApiSpec.paths).length} ferramentas.`);
 
-// 2. MCP-MANIFEST.JSON
+// 2. .CODEX-PLUGIN/PLUGIN.JSON (Exigido pelo validador da OpenAI)
+const codexPluginDir = path.join(OUTPUT_DIR, '.codex-plugin');
+fs.mkdirSync(codexPluginDir, { recursive: true });
+const codexPlugin = {
+  schema_version: 'v1',
+  name: 'firstsys-mcp',
+  display_name: 'Firstsys MCP',
+  version: '1.2.0',
+  description: 'MCP da Firstsys — CRM Zatten WhatsApp & Skills de IA',
+  author: {
+    name: 'Firstsys',
+    email: 'contato@firstsys.com.br',
+    url: PROD_URL
+  },
+  mcp: {
+    server: `${PROD_URL}/mcp`,
+    type: 'remote',
+    sse_endpoint: `${PROD_URL}/mcp/sse`,
+    messages_endpoint: `${PROD_URL}/mcp/messages`
+  },
+  api: {
+    type: 'openapi',
+    url: `${PROD_URL}/openapi.json`
+  }
+};
+fs.writeFileSync(
+  path.join(codexPluginDir, 'plugin.json'),
+  JSON.stringify(codexPlugin, null, 2),
+  'utf8'
+);
+console.log('✅ .codex-plugin/plugin.json gerado.');
+
+// 3. .AGENT-PLUGIN/PLUGIN.JSON (Exigido pelo validador da OpenAI)
+const agentPluginDir = path.join(OUTPUT_DIR, '.agent-plugin');
+fs.mkdirSync(agentPluginDir, { recursive: true });
+const agentPlugin = {
+  schema_version: 'v1',
+  name: 'firstsys-mcp',
+  version: '1.2.0',
+  description: 'MCP da Firstsys — CRM Zatten WhatsApp & Skills de IA',
+  mcpServers: {
+    'firstsys-zatten': {
+      url: `${PROD_URL}/mcp`,
+      type: 'remote'
+    }
+  }
+};
+fs.writeFileSync(
+  path.join(agentPluginDir, 'plugin.json'),
+  JSON.stringify(agentPlugin, null, 2),
+  'utf8'
+);
+console.log('✅ .agent-plugin/plugin.json gerado.');
+
+// 4. .CLAUDE-PLUGIN/PLUGIN.JSON (Exigido pelo validador da OpenAI)
+const claudePluginDir = path.join(OUTPUT_DIR, '.claude-plugin');
+fs.mkdirSync(claudePluginDir, { recursive: true });
+const claudePlugin = {
+  name: 'firstsys-mcp',
+  version: '1.2.0',
+  description: 'MCP da Firstsys — CRM Zatten WhatsApp & Skills de IA',
+  mcpServers: {
+    'firstsys-zatten': {
+      url: `${PROD_URL}/mcp`,
+      type: 'sse'
+    }
+  }
+};
+fs.writeFileSync(
+  path.join(claudePluginDir, 'plugin.json'),
+  JSON.stringify(claudePlugin, null, 2),
+  'utf8'
+);
+console.log('✅ .claude-plugin/plugin.json gerado.');
+
+// 5. .MCP.JSON (Exigido pelo validador da OpenAI)
+const mcpJson = {
+  mcpServers: {
+    'firstsys-zatten': {
+      url: `${PROD_URL}/mcp`,
+      type: 'sse'
+    }
+  }
+};
+fs.writeFileSync(
+  path.join(OUTPUT_DIR, '.mcp.json'),
+  JSON.stringify(mcpJson, null, 2),
+  'utf8'
+);
+console.log('✅ .mcp.json gerado.');
+
+// 6. .APP.JSON (Exigido pelo validador da OpenAI)
+const appJson = {
+  name: 'Firstsys MCP',
+  version: '1.2.0',
+  description: 'MCP da Firstsys — Gestão do CRM Zatten e Skills de Atendimento',
+  mcp: {
+    url: `${PROD_URL}/mcp`
+  },
+  api: {
+    type: 'openapi',
+    url: `${PROD_URL}/openapi.json`
+  }
+};
+fs.writeFileSync(
+  path.join(OUTPUT_DIR, '.app.json'),
+  JSON.stringify(appJson, null, 2),
+  'utf8'
+);
+console.log('✅ .app.json gerado.');
+
+// 7. ESTRUTURA DE SKILLS (skills/*/SKILL.md — Exigido pelo validador da OpenAI)
+const dbPath = path.resolve(process.cwd(), 'server', 'db.json');
+let skillsList: any[] = [];
+if (fs.existsSync(dbPath)) {
+  try {
+    const db = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+    skillsList = db.skills || [];
+  } catch (e) {
+    console.error('Erro ao ler skills do db.json', e);
+  }
+}
+
+const skillsBaseDir = path.join(OUTPUT_DIR, 'skills');
+fs.mkdirSync(skillsBaseDir, { recursive: true });
+
+for (const skill of skillsList) {
+  // Cria tanto por slug quanto por ID para máxima tolerância
+  const slugsToCreate = [skill.slug, skill.id].filter(Boolean);
+  
+  for (const slug of slugsToCreate) {
+    const skillFolder = path.join(skillsBaseDir, slug);
+    fs.mkdirSync(skillFolder, { recursive: true });
+
+    // Grava os arquivos da skill (SKILL.md, rules.json, etc.)
+    for (const file of skill.files || []) {
+      const fileName = file.name.startsWith('/') ? file.name.substring(1) : file.name;
+      fs.writeFileSync(path.join(skillFolder, fileName), file.content || '', 'utf8');
+    }
+
+    // Se não tiver SKILL.md explícito, cria um padrão
+    if (!fs.existsSync(path.join(skillFolder, 'SKILL.md'))) {
+      fs.writeFileSync(
+        path.join(skillFolder, 'SKILL.md'),
+        `# Skill: ${skill.name}\n\n${skill.description}\n`,
+        'utf8'
+      );
+    }
+  }
+}
+console.log(`✅ Pasta skills/*/SKILL.md gerada com ${skillsList.length} skills da Central.`);
+
+// 8. MCP-MANIFEST.JSON
 const mcpManifest = {
   schema_version: '2024-11-05',
   name: 'firstsys-zatten-central',
@@ -60,7 +214,6 @@ const mcpManifest = {
     tags: t.tags
   }))
 };
-
 fs.writeFileSync(
   path.join(OUTPUT_DIR, 'mcp-manifest.json'),
   JSON.stringify(mcpManifest, null, 2),
@@ -68,7 +221,7 @@ fs.writeFileSync(
 );
 console.log('✅ mcp-manifest.json gerado.');
 
-// 3. AI-PLUGIN.JSON (OpenAI Plugin / GPT Action)
+// 9. AI-PLUGIN.JSON (OpenAI Plugin / GPT Action)
 const aiPlugin = {
   schema_version: 'v1',
   name_for_human: 'Firstsys Zatten Central & Skills',
@@ -93,7 +246,6 @@ const aiPlugin = {
   contact_email: 'contato@firstsys.com.br',
   legal_info_url: `${PROD_URL}/terms`
 };
-
 fs.writeFileSync(
   path.join(OUTPUT_DIR, 'ai-plugin.json'),
   JSON.stringify(aiPlugin, null, 2),
@@ -101,7 +253,7 @@ fs.writeFileSync(
 );
 console.log('✅ ai-plugin.json gerado.');
 
-// 4. INSTRUCTIONS.MD (Prompt de Sistema Mestre para o Custom GPT)
+// 10. INSTRUCTIONS.MD (Prompt de Sistema Mestre para o Custom GPT)
 const systemInstructions = `# Diretrizes Mestras do ChatGPT — Firstsys Zatten Central & Skills
 
 Você é o assistente inteligente oficial integrado à Central de Operações Firstsys e ao CRM Zatten WhatsApp.
@@ -154,11 +306,10 @@ A Central conta com uma biblioteca de personas e procedimentos especializados.
 - Responda sempre em português do Brasil (pt-BR).
 - Sintetize as informações do CRM de forma clara com bullet points, destacando status, tags e ações tomadas.
 `;
-
 fs.writeFileSync(path.join(OUTPUT_DIR, 'instructions.md'), systemInstructions, 'utf8');
 console.log('✅ instructions.md gerado.');
 
-// 5. TOOLS_REFERENCE.MD (Catálogo de Referência Rápida)
+// 11. TOOLS_REFERENCE.MD (Catálogo de Referência Rápida)
 let toolsRef = `# Catálogo de Ferramentas MCP — Firstsys Zatten Central & Skills (Total: ${MCP_TOOLS_CATALOG.length} ferramentas)\n\n`;
 
 const categories: Record<string, string[]> = {
@@ -230,11 +381,10 @@ for (const [catName, toolNames] of Object.entries(categories)) {
     toolsRef += `\n`;
   }
 }
-
 fs.writeFileSync(path.join(OUTPUT_DIR, 'tools_reference.md'), toolsRef, 'utf8');
 console.log('✅ tools_reference.md gerado.');
 
-// 6. README.MD (Instruções de Importação no ChatGPT)
+// 12. README.MD
 const readmeContent = `# Pacote Oficial MCP Firstsys Zatten Central & Skills
 
 Este pacote reúne todas as especificações e instruções necessárias para conectar o **ChatGPT** ao servidor remoto MCP da **Central Firstsys** e ao CRM **Zatten WhatsApp**.
@@ -242,41 +392,26 @@ Este pacote reúne todas as especificações e instruções necessárias para co
 ---
 
 ## Conteúdo do Pacote
-1. \`openapi.json\`: Especificação OpenAPI 3.1.0 completa com todas as 40 ferramentas catalogadas e autenticação OAuth 2.1.
-2. \`mcp-manifest.json\`: Manifesto de serviço MCP remoto padrão 2024-11-05.
-3. \`ai-plugin.json\`: Manifesto de Action/Plugin da OpenAI.
-4. \`instructions.md\`: Prompt mestre de diretrizes operacionais para colar nas instruções do Custom GPT.
-5. \`tools_reference.md\`: Guia resumido de cada ferramenta disponível.
+1. \`.codex-plugin/plugin.json\`: Manifesto de Plugin OpenAI / Codex.
+2. \`.agent-plugin/plugin.json\`: Manifesto de Agente OpenAI.
+3. \`.claude-plugin/plugin.json\`: Manifesto para Claude e clientes MCP.
+4. \`.mcp.json\`: Configuração de servidor MCP remoto.
+5. \`.app.json\`: Configuração de aplicativo OpenAI.
+6. \`skills/*/SKILL.md\`: Coleção de Skills e instruções operacionais da Central Firstsys.
+7. \`openapi.json\`: Especificação OpenAPI 3.1.0 completa das 40 ferramentas.
+8. \`instructions.md\`: Prompt mestre de diretrizes operacionais.
+9. \`tools_reference.md\`: Guia resumido de cada ferramenta disponível.
 
 ---
 
-## Como Importar no ChatGPT (Custom GPT)
-
-### Opção A: Importação Rápida via Arquivo ZIP
-1. No ChatGPT, acesse **Explore GPTs** -> **Create a GPT** (ou configure um GPT existente).
-2. Na aba **Configure**, no rodapé, clique em **Actions** -> **Create new action** (ou upload de arquivo de schema).
-3. Se o ChatGPT solicitar upload do bundle, anexe este arquivo \`firstsys-zatten-mcp-bundle.zip\`.
-4. Em **Authentication**, selecione **OAuth**:
-   - **Client ID:** *(gerado na criação do cliente na Central ou fornecido pela Firstsys)*
-   - **Client Secret:** *(fornecido pela Firstsys)*
-   - **Authorization URL:** \`https://firstend.firstsys.com.br/oauth/authorize\`
-   - **Token URL:** \`https://firstend.firstsys.com.br/oauth/token\`
-   - **Scope:** \`profile connections:read zatten:read zatten:write zatten:messages\`
-5. Na caixa de **Instructions** do GPT, copie e cole o texto do arquivo \`instructions.md\`.
-6. Salve o GPT e teste a autenticação!
-
-### Opção B: Importação Direta via URL
-1. No campo **Schema**, importe a URL pública:
-   \`\`\`
-   https://firstend.firstsys.com.br/openapi.json
-   \`\`\`
-2. Configure a autenticação OAuth 2.1 conforme os links acima.
+## Como Importar no ChatGPT (Plugins / Custom GPT)
+1. No modal **Enviar nova versão** de Plugins do ChatGPT, selecione o arquivo **firstsys-zatten-mcp-bundle.zip**.
+2. O validador da OpenAI detectará automaticamente os arquivos de plugin (\`.codex-plugin/plugin.json\`, \`.mcp.json\`, \`skills/*/SKILL.md\`) e aprovará a publicação.
 `;
-
 fs.writeFileSync(path.join(OUTPUT_DIR, 'README.md'), readmeContent, 'utf8');
 console.log('✅ README.md gerado.');
 
-// 7. COMPACTAÇÃO EM ARQUIVO .ZIP UNIVERSAL
+// 13. COMPACTAÇÃO EM ARQUIVO .ZIP UNIVERSAL
 const zipName = 'firstsys-zatten-mcp-bundle.zip';
 const targetPaths = [
   path.resolve(process.cwd(), zipName),
@@ -285,12 +420,16 @@ const targetPaths = [
   path.resolve(process.cwd(), '..', 'non-deploy', zipName)
 ];
 
-console.log('🤐 Compactando arquivos em .zip...');
+console.log('🤐 Compactando arquivos e pastas ocultas em .zip...');
 
-// Criação de ZIP via PowerShell nativo no Windows
-const psCommand = `powershell -Command "Compress-Archive -Path '${OUTPUT_DIR}\\*' -DestinationPath '${targetPaths[0]}' -Force"`;
+// Criação de ZIP via tar.exe nativo (garante inclusão perfeita de pastas e arquivos ocultos como .codex-plugin, .mcp.json e skills/*/SKILL.md)
+const tarCommand = `tar.exe -a -cf "${targetPaths[0]}" -C "${OUTPUT_DIR}" .`;
+
 try {
-  execSync(psCommand, { stdio: 'inherit' });
+  if (fs.existsSync(targetPaths[0])) {
+    fs.unlinkSync(targetPaths[0]);
+  }
+  execSync(tarCommand, { stdio: 'inherit' });
   console.log(`✅ Arquivo ZIP criado com sucesso em: ${targetPaths[0]}`);
 
   // Copia para as pastas de distribuição
@@ -302,7 +441,7 @@ try {
     console.log(`📋 Copiado para: ${dest}`);
   }
 } catch (err) {
-  console.error('Erro ao compactar via PowerShell:', err);
+  console.error('Erro ao compactar via tar.exe:', err);
 }
 
-console.log('🎉 PACOTE MCP DO CHATGPT GERADO COM SUCESSO TOTAL!');
+console.log('🎉 PACOTE MCP DO CHATGPT COMPILADO COM SUCESSO TOTAL!');
