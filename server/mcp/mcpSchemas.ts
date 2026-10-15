@@ -172,3 +172,50 @@ export const ZattenLeadsLeadNumberAiPatchSchema = z.object({
   },
   { message: 'pause_minutes só é permitido quando enabled for false (pausar atendimento por 1 até 10.080 minutos).' }
 );
+
+// ==============================================================================
+// 11. SCHEMAS DE FERRAMENTAS MCP DE SKILLS DE IA (firstsys_skills_*)
+// ==============================================================================
+
+// 11.1 firstsys_skills_list
+export const SkillListSchema = z.object({
+  category: z.string().max(50).optional(),
+  query: z.string().max(100).optional(),
+  installed_only: z.boolean().optional()
+}).strict();
+
+// 11.2 firstsys_skills_get
+export const SkillGetSchema = z.object({
+  skill_id: z.string().min(1, 'skill_id ou slug é obrigatório').max(100)
+}).strict();
+
+// 11.3 firstsys_skills_install
+export const SkillInstallSchema = z.object({
+  skill_id: z.string().min(1, 'skill_id é obrigatório').max(100),
+  install: z.boolean().default(true)
+}).strict();
+
+// 11.4 firstsys_skills_create
+export const SkillCreateSchema = z.object({
+  name: z.string().min(2, 'Nome da skill deve ter no mínimo 2 caracteres').max(100),
+  description: z.string().min(5, 'Descrição deve ter no mínimo 5 caracteres').max(500),
+  category: z.string().max(50).default('geral'),
+  tags: z.array(z.string().max(30)).max(10).optional(),
+  skill_md_content: z.string().min(10, 'Conteúdo de SKILL.md obrigatório').max(20000).optional()
+}).strict();
+
+// 11.5 firstsys_skills_update
+export const SkillUpdateSchema = z.object({
+  skill_id: z.string().min(1, 'skill_id é obrigatório').max(100),
+  name: z.string().min(2).max(100).optional(),
+  description: z.string().max(500).optional(),
+  skill_md_content: z.string().max(20000).optional()
+}).strict();
+
+// 11.6 firstsys_skills_delete
+export const SkillDeleteSchema = z.object({
+  skill_id: z.string().min(1, 'skill_id é obrigatório').max(100),
+  confirm: z.boolean().refine(val => val === true, {
+    message: 'A exclusão de uma skill requer confirm: true para evitar perdas acidentais.'
+  })
+}).strict();

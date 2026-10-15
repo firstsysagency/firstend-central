@@ -24,7 +24,13 @@ import {
   ZattenAgentConfigGetSchema,
   ZattenAgentConfigUpdateSchema,
   ZattenLeadsLeadNumberAssigneePatchSchema,
-  ZattenLeadsLeadNumberAiPatchSchema
+  ZattenLeadsLeadNumberAiPatchSchema,
+  SkillListSchema,
+  SkillGetSchema,
+  SkillInstallSchema,
+  SkillCreateSchema,
+  SkillUpdateSchema,
+  SkillDeleteSchema
 } from './mcpSchemas.js';
 import {
   sanitizeTemplateSecrets,
@@ -862,6 +868,120 @@ const MCP_TOOLS_CATALOG = [
     ],
     annotations: { readOnlyHint: true, destructiveHint: false },
     tags: ['messages', 'templates', 'hsm']
+  },
+
+  // --- GERENCIAMENTO DE SKILLS DE IA ---
+  {
+    name: 'firstsys_skills_list',
+    title: 'Listar Skills de IA da Central',
+    description: 'Lista todas as skills, diretrizes operacionais e especialidades de IA cadastradas na Central Firstsys.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        category: { type: 'string', description: 'Filtrar por categoria (ex: vendas, atendimento, suporte)' },
+        query: { type: 'string', description: 'Termo de busca por nome, descrição ou tag' },
+        installed_only: { type: 'boolean', description: 'Se true, lista apenas skills instaladas/ativas' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['skills:read', 'firstsys_skills_list', 'tool:firstsys_skills_list'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['skills', 'ai', 'read']
+  },
+  {
+    name: 'firstsys_skills_get',
+    title: 'Obter Detalhes e Arquivos da Skill (SKILL.md)',
+    description: 'Retorna a especificação completa, metadados e arquivos (SKILL.md, regras) de uma skill para que a IA possa assimilar suas instruções e operar em alto nível.',
+    inputSchema: {
+      type: 'object',
+      required: ['skill_id'],
+      properties: {
+        skill_id: { type: 'string', description: 'ID ou slug da skill a ser consultada' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['skills:read', 'firstsys_skills_get', 'tool:firstsys_skills_get'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['skills', 'ai', 'read', 'files']
+  },
+  {
+    name: 'firstsys_skills_install',
+    title: 'Instalar ou Ativar Skill de IA',
+    description: 'Instala ou ativa uma skill de IA para a conexão atual, habilitando o uso de suas regras e instruções.',
+    inputSchema: {
+      type: 'object',
+      required: ['skill_id'],
+      properties: {
+        skill_id: { type: 'string', description: 'ID ou slug da skill a ser instalada ou ativada' },
+        install: { type: 'boolean', description: 'True para instalar/ativar, false para desinstalar/desativar' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['skills:write', 'firstsys_skills_install', 'tool:firstsys_skills_install'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    tags: ['skills', 'ai', 'install']
+  },
+  {
+    name: 'firstsys_skills_create',
+    title: 'Criar Nova Skill de IA',
+    description: 'Cria uma nova skill de IA na Central Firstsys com instruções em SKILL.md e metadados operacionais.',
+    inputSchema: {
+      type: 'object',
+      required: ['name', 'description'],
+      properties: {
+        name: { type: 'string', description: 'Nome da skill' },
+        description: { type: 'string', description: 'Objetivo e descrição clara da skill' },
+        category: { type: 'string', description: 'Categoria (ex: vendas, atendimento, suporte, automacao)' },
+        tags: { type: 'array', items: { type: 'string' }, description: 'Tags identificadoras' },
+        skill_md_content: { type: 'string', description: 'Conteúdo detalhado das instruções em Markdown para o arquivo SKILL.md' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['skills:write', 'firstsys_skills_create', 'tool:firstsys_skills_create'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    tags: ['skills', 'ai', 'create']
+  },
+  {
+    name: 'firstsys_skills_update',
+    title: 'Atualizar Skill ou Arquivo SKILL.md',
+    description: 'Atualiza o conteúdo do SKILL.md, nome ou descrição de uma skill existente na Central.',
+    inputSchema: {
+      type: 'object',
+      required: ['skill_id'],
+      properties: {
+        skill_id: { type: 'string', description: 'ID ou slug da skill a ser atualizada' },
+        name: { type: 'string', description: 'Novo nome da skill' },
+        description: { type: 'string', description: 'Nova descrição da skill' },
+        skill_md_content: { type: 'string', description: 'Novo conteúdo em Markdown para o arquivo SKILL.md' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['skills:write', 'firstsys_skills_update', 'tool:firstsys_skills_update'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    tags: ['skills', 'ai', 'update']
+  },
+  {
+    name: 'firstsys_skills_delete',
+    title: 'Excluir Skill de IA da Central',
+    description: 'Remove permanentemente uma skill da Central. Exige confirmação explícita com confirm: true.',
+    inputSchema: {
+      type: 'object',
+      required: ['skill_id', 'confirm'],
+      properties: {
+        skill_id: { type: 'string', description: 'ID da skill a ser excluída' },
+        confirm: { type: 'boolean', description: 'Confirmação obrigatória (true) para autorizar exclusão' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['skills:write', 'firstsys_skills_delete', 'tool:firstsys_skills_delete'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: true },
+    tags: ['skills', 'ai', 'delete']
   }
 ];
 
@@ -1960,6 +2080,316 @@ async function executeToolDirectly(name: string, rawArgs: any, user: OAuthJwtPay
         hsm_templates: dbTemplates,
         total: dbTemplates.length,
         info: 'Templates HSM cadastrados e aprovados pela Meta WhatsApp Business API disponíveis para envio via zatten_messages_template_post.'
+      };
+    }
+
+    // --- EXECUÇÃO DE FERRAMENTAS DE SKILLS DE IA ---
+    case 'firstsys_skills_list': {
+      const parseResult = SkillListSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'Parâmetros inválidos.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      let skills: any[] = [];
+      if (fs.existsSync(dbPath)) {
+        try {
+          const dbData = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+          skills = dbData.skills || [];
+        } catch {}
+      }
+
+      const { category, query, installed_only } = parseResult.data;
+
+      if (category && category !== 'todas') {
+        skills = skills.filter(s => s.category?.toLowerCase() === category.toLowerCase());
+      }
+
+      if (installed_only) {
+        skills = skills.filter(s => s.installed === true);
+      }
+
+      if (query) {
+        const q = query.toLowerCase();
+        skills = skills.filter(s =>
+          s.name?.toLowerCase().includes(q) ||
+          s.description?.toLowerCase().includes(q) ||
+          (Array.isArray(s.tags) && s.tags.some((t: string) => t.toLowerCase().includes(q)))
+        );
+      }
+
+      return {
+        skills: skills.map(s => ({
+          id: s.id,
+          name: s.name,
+          slug: s.slug,
+          description: s.description,
+          category: s.category,
+          tags: s.tags,
+          status: s.status,
+          installed: s.installed,
+          version: s.version,
+          files_count: Array.isArray(s.files) ? s.files.length : 0,
+          files_available: Array.isArray(s.files) ? s.files.map((f: any) => f.name) : []
+        })),
+        total: skills.length,
+        info: "Utilize 'firstsys_skills_get' com o 'skill_id' para consultar o conteúdo integral do arquivo SKILL.md de uma skill."
+      };
+    }
+
+    case 'firstsys_skills_get': {
+      const parseResult = SkillGetSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'skill_id é obrigatório.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { skill_id } = parseResult.data;
+      let skills: any[] = [];
+      if (fs.existsSync(dbPath)) {
+        try {
+          const dbData = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+          skills = dbData.skills || [];
+        } catch {}
+      }
+
+      const skill = skills.find(s => s.id === skill_id || s.slug === skill_id);
+      if (!skill) {
+        return formatMcpError({
+          code: 'SKILL_NOT_FOUND',
+          message: `Nenhuma skill encontrada com o identificador '${skill_id}'.`,
+          httpStatus: 404,
+          correlationId
+        });
+      }
+
+      return {
+        ok: true,
+        skill: {
+          id: skill.id,
+          name: skill.name,
+          slug: skill.slug,
+          description: skill.description,
+          category: skill.category,
+          tags: skill.tags,
+          status: skill.status,
+          installed: skill.installed,
+          version: skill.version,
+          files: skill.files || []
+        }
+      };
+    }
+
+    case 'firstsys_skills_install': {
+      const parseResult = SkillInstallSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'skill_id é obrigatório.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { skill_id, install } = parseResult.data;
+      if (!fs.existsSync(dbPath)) {
+        return formatMcpError({ code: 'DB_ERROR', message: 'Banco indisponível.', httpStatus: 500, correlationId });
+      }
+
+      const dbData = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+      const skills = dbData.skills || [];
+      const skill = skills.find((s: any) => s.id === skill_id || s.slug === skill_id);
+
+      if (!skill) {
+        return formatMcpError({
+          code: 'SKILL_NOT_FOUND',
+          message: `Skill '${skill_id}' não encontrada para instalação.`,
+          httpStatus: 404,
+          correlationId
+        });
+      }
+
+      skill.installed = install;
+      skill.status = install ? 'active' : 'inactive';
+      skill.updatedAt = new Date().toISOString();
+
+      fs.writeFileSync(dbPath, JSON.stringify(dbData, null, 2));
+
+      return {
+        ok: true,
+        message: install ? `Skill '${skill.name}' instalada e ativada com sucesso.` : `Skill '${skill.name}' desinstalada.`,
+        skill_id: skill.id,
+        installed: skill.installed,
+        status: skill.status
+      };
+    }
+
+    case 'firstsys_skills_create': {
+      const parseResult = SkillCreateSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'Parâmetros inválidos para criação de skill.',
+          httpStatus: 400,
+          correlationId,
+          details: parseResult.error.issues
+        });
+      }
+
+      const { name: skillName, description, category, tags, skill_md_content } = parseResult.data;
+      if (!fs.existsSync(dbPath)) {
+        return formatMcpError({ code: 'DB_ERROR', message: 'Banco indisponível.', httpStatus: 500, correlationId });
+      }
+
+      const dbData = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+      if (!dbData.skills) dbData.skills = [];
+
+      const slug = skillName
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
+
+      const id = `skill_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      const now = new Date().toISOString();
+
+      const newSkill = {
+        id,
+        name: skillName.trim(),
+        slug: slug || id,
+        description: description.trim(),
+        category: (category || 'geral').toLowerCase().trim(),
+        tags: tags || [],
+        status: 'active',
+        installed: true,
+        version: '1.0.0',
+        author: 'ChatGPT / MCP Agent',
+        createdAt: now,
+        updatedAt: now,
+        files: [
+          {
+            name: 'SKILL.md',
+            path: '/SKILL.md',
+            language: 'markdown',
+            updatedAt: now,
+            content: skill_md_content?.trim() || `# Skill: ${skillName}\n\n## Objetivo\n${description}`
+          }
+        ]
+      };
+
+      dbData.skills.push(newSkill);
+      fs.writeFileSync(dbPath, JSON.stringify(dbData, null, 2));
+
+      return {
+        ok: true,
+        message: `Skill '${newSkill.name}' criada com sucesso pela IA.`,
+        skill: newSkill
+      };
+    }
+
+    case 'firstsys_skills_update': {
+      const parseResult = SkillUpdateSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'Parâmetros inválidos.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { skill_id, name: newName, description: newDesc, skill_md_content } = parseResult.data;
+      if (!fs.existsSync(dbPath)) {
+        return formatMcpError({ code: 'DB_ERROR', message: 'Banco indisponível.', httpStatus: 500, correlationId });
+      }
+
+      const dbData = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+      const skills = dbData.skills || [];
+      const skill = skills.find((s: any) => s.id === skill_id || s.slug === skill_id);
+
+      if (!skill) {
+        return formatMcpError({
+          code: 'SKILL_NOT_FOUND',
+          message: `Skill '${skill_id}' não encontrada.`,
+          httpStatus: 404,
+          correlationId
+        });
+      }
+
+      if (newName) skill.name = newName.trim();
+      if (newDesc) skill.description = newDesc.trim();
+
+      if (skill_md_content) {
+        if (!Array.isArray(skill.files)) skill.files = [];
+        const skillMdFile = skill.files.find((f: any) => f.name.toLowerCase() === 'skill.md');
+        if (skillMdFile) {
+          skillMdFile.content = skill_md_content.trim();
+          skillMdFile.updatedAt = new Date().toISOString();
+        } else {
+          skill.files.push({
+            name: 'SKILL.md',
+            path: '/SKILL.md',
+            language: 'markdown',
+            updatedAt: new Date().toISOString(),
+            content: skill_md_content.trim()
+          });
+        }
+      }
+
+      skill.updatedAt = new Date().toISOString();
+      fs.writeFileSync(dbPath, JSON.stringify(dbData, null, 2));
+
+      return {
+        ok: true,
+        message: `Skill '${skill.name}' atualizada com sucesso.`,
+        skill
+      };
+    }
+
+    case 'firstsys_skills_delete': {
+      const parseResult = SkillDeleteSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'Exclusão requer confirm: true.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { skill_id } = parseResult.data;
+      if (!fs.existsSync(dbPath)) {
+        return formatMcpError({ code: 'DB_ERROR', message: 'Banco indisponível.', httpStatus: 500, correlationId });
+      }
+
+      const dbData = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+      const skills = dbData.skills || [];
+      const exists = skills.some((s: any) => s.id === skill_id || s.slug === skill_id);
+
+      if (!exists) {
+        return formatMcpError({
+          code: 'SKILL_NOT_FOUND',
+          message: `Skill '${skill_id}' não encontrada.`,
+          httpStatus: 404,
+          correlationId
+        });
+      }
+
+      dbData.skills = skills.filter((s: any) => s.id !== skill_id && s.slug !== skill_id);
+      fs.writeFileSync(dbPath, JSON.stringify(dbData, null, 2));
+
+      return {
+        ok: true,
+        message: `Skill '${skill_id}' removida com sucesso pela IA.`
       };
     }
 

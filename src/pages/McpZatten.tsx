@@ -45,7 +45,13 @@ const ALL_PERMISSIONS: McpPermission[] = [
   { id: 'zatten_flows_trigger_post', name: 'Disparar Trigger Flow (zatten_flows_trigger_post)', description: 'Dispara um Trigger Flow com chave de idempotência para um lead.', enabled: true, danger: true },
   { id: 'zatten_hooks_path_post', name: 'Disparar Webhook (zatten_hooks_path_post)', description: 'Dispara webhook de entrada configurado na Zatten com payload JSON.', enabled: true, danger: true },
   { id: 'zatten_agent_config_get', name: 'Ler Config do Agente (zatten_agent_config_get)', description: 'Lê o template e configuração do agente Zatten com dados sensíveis protegidos.', enabled: true },
-  { id: 'zatten_agent_config_update', name: 'Atualizar Config do Agente (zatten_agent_config_update)', description: 'Atualiza blocos do agente Zatten preservando segredos e sem publicação automática.', enabled: true, danger: true }
+  { id: 'zatten_agent_config_update', name: 'Atualizar Config do Agente (zatten_agent_config_update)', description: 'Atualiza blocos do agente Zatten preservando segredos e sem publicação automática.', enabled: true, danger: true },
+  { id: 'firstsys_skills_list', name: 'Listar Skills Cadastradas (firstsys_skills_list)', description: 'Lista as skills e personas especializadas cadastradas na Central Firstsys.', enabled: true },
+  { id: 'firstsys_skills_get', name: 'Obter Detalhes da Skill (firstsys_skills_get)', description: 'Obtém o conteúdo completo dos arquivos de uma skill (incluindo SKILL.md) para uso pelo agente.', enabled: true },
+  { id: 'firstsys_skills_install', name: 'Ativar/Desativar Skill (firstsys_skills_install)', description: 'Ativa ou desativa a instalação de uma skill para uso imediato pelo assistente de IA.', enabled: true, danger: true },
+  { id: 'firstsys_skills_create', name: 'Criar Nova Skill (firstsys_skills_create)', description: 'Cria uma nova skill especializada com seu prompt SKILL.md na Central Firstsys.', enabled: true, danger: true },
+  { id: 'firstsys_skills_update', name: 'Atualizar Skill (firstsys_skills_update)', description: 'Atualiza metadados, arquivos ou conteúdo do SKILL.md de uma skill existente.', enabled: true, danger: true },
+  { id: 'firstsys_skills_delete', name: 'Remover Skill (firstsys_skills_delete)', description: 'Remove permanentemente uma skill do catálogo da Central Firstsys.', enabled: true, danger: true }
 ].sort((a, b) => a.name.localeCompare(b.name));
 
 function getInitialPermissions(): McpPermission[] {

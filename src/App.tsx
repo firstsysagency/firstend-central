@@ -8,12 +8,14 @@ import {
   Settings as SettingsIcon, 
   PanelLeftClose, 
   PanelLeftOpen,
-  Bot
+  Bot,
+  Sparkles
 } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import NewConnection from './pages/NewConnection';
 import Settings from './pages/Settings';
 import McpZatten from './pages/McpZatten';
+import Skills from './pages/Skills';
 import Login from './pages/Login';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Navigate } from 'react-router-dom';
@@ -72,6 +74,13 @@ function Layout() {
               icon={<Bot size={18} />} 
               label="MCP Zatten" 
               active={location.pathname === '/mcp'} 
+              isCollapsed={isCollapsed}
+            />
+            <NavLink 
+              to="/skills" 
+              icon={<Sparkles size={18} />} 
+              label="Skills" 
+              active={location.pathname === '/skills'} 
               isCollapsed={isCollapsed}
             />
             <NavLink 
@@ -164,6 +173,7 @@ function App() {
             <Route index element={<Dashboard />} />
             <Route path="new" element={<NewConnection />} />
             <Route path="mcp" element={<McpZatten />} />
+            <Route path="skills" element={<Skills />} />
             <Route path="settings" element={<Settings />} />
           </Route>
         </Routes>

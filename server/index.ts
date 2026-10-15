@@ -371,6 +371,306 @@ app.post('/api/mcp/permissions', (req, res) => {
   }
 });
 
+// ==============================================================================
+// === ROTAS REST DE GERENCIAMENTO DE SKILLS DE IA (CENTRAL DE SKILLS) ===
+// ==============================================================================
+
+// 1. Listar todas as skills
+app.get('/api/skills', (req, res) => {
+  try {
+    const db = getDatabase();
+    let skills = db.skills || [];
+    const query = typeof req.query.q === 'string' ? req.query.q.toLowerCase().trim() : '';
+    const category = typeof req.query.category === 'string' ? req.query.category.toLowerCase().trim() : '';
+
+    if (category && category !== 'todas') {
+      skills = skills.filter((s: any) => s.category?.toLowerCase() === category);
+    }
+
+    if (query) {
+      skills = skills.filter((s: any) => 
+        s.name?.toLowerCase().includes(query) ||
+        s.description?.toLowerCase().includes(query) ||
+        (Array.isArray(s.tags) && s.tags.some((t: string) => t.toLowerCase().includes(query)))
+      );
+    }
+
+    res.json({ success: true, skills, total: skills.length });
+  } catch (err) {
+    console.error('Erro ao listar skills:', err);
+    res.status(500).json({ error: 'Erro ao carregar catálogo de skills.' });
+  }
+});
+
+// 2. Obter skill por ID
+app.get('/api/skills/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const db = getDatabase();
+    const skills = db.skills || [];
+    const skill = skills.find((s: any) => s.id === id || s.slug === id);
+
+    if (!skill) {
+      return res.status(404).json({ error: 'Skill não encontrada.' });
+    }
+
+    res.json({ success: true, skill });
+  } catch (err) {
+    console.error('Erro ao obter skill:', err);
+    res.status(500).json({ error: 'Erro ao obter detalhes da skill.' });
+  }
+});
+
+// 3. Criar nova skill
+app.post('/api/skills', (req, res) => {
+  try {
+    const { name, description, category, tags, initialContent, version } = req.body;
+
+    if (!name || typeof name !== 'string' || name.trim().length < 2) {
+      return res.status(400).json({ error: 'Nome da skill é obrigatório (mínimo 2 caracteres).' });
+    }
+
+    const db = getDatabase();
+    if (!db.skills) db.skills = [];
+
+    const slug = name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+
+    const id = `skill_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const now = new Date().toISOString();
+
+    const defaultSkillMd = `# Skill: ${name.trim()}
+
+## Objetivo
+${description?.trim() || 'Descreva aqui o propósito e resultado esperado desta skill de IA.'}
+
+## Instruções de Comportamento
+1. Atue com clareza, empatia e precisão operacional.
+2. Identifique os dados relevantes do lead no CRM Zatten.
+3. Utilize as ferramentas do MCP Zatten para atualizar status e tags quando apropriado.
+
+## Regras e Diretrizes
+- Respeite o tom de voz profissional e acolhedor.
+- Não tome decisões financeiras ou contratuais sem validação humana.
+`;
+
+    const newSkill = {
+      id,
+      name: name.trim(),
+      slug: slug || id,
+      description: (description || '').trim(),
+      category: (category || 'geral').toLowerCase().trim(),
+      tags: Array.isArray(tags) ? tags.map((t: string) => String(t).trim().toLowerCase()).filter(Boolean) : [],
+      status: 'active',
+      installed: true,
+      version: version?.trim() || '1.0.0',
+      author: 'Central Firstsys',
+      createdAt: now,
+      updatedAt: now,
+      files: [
+        {
+          name: 'SKILL.md',
+          path: '/SKILL.md',
+          language: 'markdown',
+          updatedAt: now,
+          content: (initialContent && typeof initialContent === 'string' && initialContent.trim().length > 0)
+            ? initialContent.trim()
+            : defaultSkillMd
+        }
+      ]
+    };
+
+    db.skills.push(newSkill);
+    fs.writeFileSync(MOCK_DB_PATH, JSON.stringify(db, null, 2));
+
+    logAuditEvent({
+      actor: 'usuario',
+      action: 'skill.created',
+      category: 'api_usage',
+      severity: 'info',
+      description: `Nova skill '${newSkill.name}' (${newSkill.id}) criada com sucesso.`,
+      ipAddress: req.ip || '127.0.0.1'
+    });
+
+    res.status(201).json({ success: true, skill: newSkill });
+  } catch (err) {
+    console.error('Erro ao criar skill:', err);
+    res.status(500).json({ error: 'Erro ao cadastrar nova skill.' });
+  }
+});
+
+// 4. Atualizar skill
+app.put('/api/skills/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description, category, tags, status, installed, version } = req.body;
+
+    const db = getDatabase();
+    const skills = db.skills || [];
+    const index = skills.findIndex((s: any) => s.id === id);
+
+    if (index === -1) {
+      return res.status(404).json({ error: 'Skill não encontrada para atualização.' });
+    }
+
+    const current = skills[index];
+    const updated = {
+      ...current,
+      name: name !== undefined ? String(name).trim() : current.name,
+      description: description !== undefined ? String(description).trim() : current.description,
+      category: category !== undefined ? String(category).toLowerCase().trim() : current.category,
+      tags: Array.isArray(tags) ? tags.map((t: string) => String(t).trim().toLowerCase()).filter(Boolean) : current.tags,
+      status: status !== undefined ? status : current.status,
+      installed: installed !== undefined ? Boolean(installed) : current.installed,
+      version: version !== undefined ? String(version).trim() : current.version,
+      updatedAt: new Date().toISOString()
+    };
+
+    skills[index] = updated;
+    db.skills = skills;
+    fs.writeFileSync(MOCK_DB_PATH, JSON.stringify(db, null, 2));
+
+    res.json({ success: true, skill: updated });
+  } catch (err) {
+    console.error('Erro ao atualizar skill:', err);
+    res.status(500).json({ error: 'Erro ao atualizar dados da skill.' });
+  }
+});
+
+// 5. Excluir skill
+app.delete('/api/skills/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const db = getDatabase();
+    let skills = db.skills || [];
+    const exists = skills.some((s: any) => s.id === id);
+
+    if (!exists) {
+      return res.status(404).json({ error: 'Skill não encontrada para exclusão.' });
+    }
+
+    db.skills = skills.filter((s: any) => s.id !== id);
+    fs.writeFileSync(MOCK_DB_PATH, JSON.stringify(db, null, 2));
+
+    logAuditEvent({
+      actor: 'usuario',
+      action: 'skill.deleted',
+      category: 'api_usage',
+      severity: 'warning',
+      description: `Skill '${id}' removida do catálogo.`,
+      ipAddress: req.ip || '127.0.0.1'
+    });
+
+    res.json({ success: true, message: 'Skill removida com sucesso.' });
+  } catch (err) {
+    console.error('Erro ao excluir skill:', err);
+    res.status(500).json({ error: 'Erro ao remover skill.' });
+  }
+});
+
+// 6. Alternar status de instalação da skill
+app.post('/api/skills/:id/toggle-install', (req, res) => {
+  try {
+    const { id } = req.params;
+    const db = getDatabase();
+    const skills = db.skills || [];
+    const skill = skills.find((s: any) => s.id === id);
+
+    if (!skill) {
+      return res.status(404).json({ error: 'Skill não encontrada.' });
+    }
+
+    skill.installed = !skill.installed;
+    skill.status = skill.installed ? 'active' : 'inactive';
+    skill.updatedAt = new Date().toISOString();
+
+    fs.writeFileSync(MOCK_DB_PATH, JSON.stringify(db, null, 2));
+    res.json({ success: true, installed: skill.installed, skill });
+  } catch (err) {
+    console.error('Erro ao alternar instalação da skill:', err);
+    res.status(500).json({ error: 'Erro ao alterar status de instalação da skill.' });
+  }
+});
+
+// 7. Adicionar ou atualizar arquivo dentro da skill
+app.post('/api/skills/:id/files', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, content, language } = req.body;
+
+    if (!name || typeof name !== 'string' || name.trim().length === 0) {
+      return res.status(400).json({ error: 'Nome do arquivo é obrigatório.' });
+    }
+
+    const db = getDatabase();
+    const skills = db.skills || [];
+    const skill = skills.find((s: any) => s.id === id);
+
+    if (!skill) {
+      return res.status(404).json({ error: 'Skill não encontrada.' });
+    }
+
+    if (!Array.isArray(skill.files)) skill.files = [];
+
+    const fileName = name.trim();
+    const fileIndex = skill.files.findIndex((f: any) => f.name.toLowerCase() === fileName.toLowerCase());
+    const now = new Date().toISOString();
+
+    const fileRecord = {
+      name: fileName,
+      path: fileName.startsWith('/') ? fileName : `/${fileName}`,
+      language: language || (fileName.endsWith('.md') ? 'markdown' : fileName.endsWith('.json') ? 'json' : 'text'),
+      content: content !== undefined ? String(content) : '',
+      updatedAt: now
+    };
+
+    if (fileIndex >= 0) {
+      skill.files[fileIndex] = fileRecord;
+    } else {
+      skill.files.push(fileRecord);
+    }
+
+    skill.updatedAt = now;
+    fs.writeFileSync(MOCK_DB_PATH, JSON.stringify(db, null, 2));
+
+    res.json({ success: true, file: fileRecord, skill });
+  } catch (err) {
+    console.error('Erro ao salvar arquivo da skill:', err);
+    res.status(500).json({ error: 'Erro ao salvar arquivo da skill.' });
+  }
+});
+
+// 8. Remover arquivo da skill
+app.delete('/api/skills/:id/files/:filename', (req, res) => {
+  try {
+    const { id, filename } = req.params;
+    const db = getDatabase();
+    const skills = db.skills || [];
+    const skill = skills.find((s: any) => s.id === id);
+
+    if (!skill) {
+      return res.status(404).json({ error: 'Skill não encontrada.' });
+    }
+
+    if (!Array.isArray(skill.files) || skill.files.length <= 1) {
+      return res.status(400).json({ error: 'A skill deve conter ao menos um arquivo de instrução (ex: SKILL.md).' });
+    }
+
+    skill.files = skill.files.filter((f: any) => f.name.toLowerCase() !== filename.toLowerCase());
+    skill.updatedAt = new Date().toISOString();
+
+    fs.writeFileSync(MOCK_DB_PATH, JSON.stringify(db, null, 2));
+    res.json({ success: true, message: `Arquivo '${filename}' removido com sucesso.`, skill });
+  } catch (err) {
+    console.error('Erro ao excluir arquivo da skill:', err);
+    res.status(500).json({ error: 'Erro ao remover arquivo da skill.' });
+  }
+});
+
 // === ROTAS DE AUTENTICAÇÃO COM SEGURANÇA MILITAR ===
 
 // Segurança: Rate Limiting específico para o Login (Prevenção de Brute Force agressiva por IP)
