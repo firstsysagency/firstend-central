@@ -27,17 +27,23 @@ fs.writeFileSync(
 );
 console.log(`✅ openapi.json gerado com ${Object.keys(openApiSpec.paths).length} ferramentas.`);
 
-// 2. .CODEX-PLUGIN/PLUGIN.JSON (Exigido pelo validador da OpenAI)
+const PLUGIN_ID = 'plugin_asdk_app_6acb2a1e159c8191a53f5f2b3da33e8c';
+const APP_ID = 'app_6acb2a1e159c8191a53f5f2b3da33e8c';
+const DISPLAY_NAME = 'Firstsys MCP';
+
+// 2. .CODEX-PLUGIN/PLUGIN.JSON (Exigido pelo validador da OpenAI com ID exato do plugin existente)
 const codexPluginDir = path.join(OUTPUT_DIR, '.codex-plugin');
 fs.mkdirSync(codexPluginDir, { recursive: true });
 const codexPlugin = {
   schema_version: 'v1',
-  name: 'firstsys-mcp',
-  display_name: 'Firstsys MCP',
+  name: PLUGIN_ID,
+  id: PLUGIN_ID,
+  app_id: APP_ID,
+  display_name: DISPLAY_NAME,
   version: '1.2.0',
   description: 'MCP da Firstsys — CRM Zatten WhatsApp & Skills de IA',
   interface: {
-    displayName: 'Firstsys MCP',
+    displayName: DISPLAY_NAME,
     shortDescription: 'Conecte o ChatGPT ao CRM Zatten WhatsApp e execute Skills operacionais da Firstsys.',
     longDescription: 'Integração oficial da Central Firstsys com o CRM Zatten. Permite que o ChatGPT consulte dados cadastrais de leads, histórico de mensagens no WhatsApp, colunas do Kanban, atribuição de equipe com rodízio, envio de mensagens e templates HSM, disparo de automações e gerenciamento de Skills especializadas de IA.',
     developerName: 'Firstsys',
@@ -65,18 +71,21 @@ fs.writeFileSync(
   JSON.stringify(codexPlugin, null, 2),
   'utf8'
 );
-console.log('✅ .codex-plugin/plugin.json gerado com interface.');
+console.log('✅ .codex-plugin/plugin.json gerado com ID exato do plugin existente.');
 
 // 3. .AGENT-PLUGIN/PLUGIN.JSON (Exigido pelo validador da OpenAI)
 const agentPluginDir = path.join(OUTPUT_DIR, '.agent-plugin');
 fs.mkdirSync(agentPluginDir, { recursive: true });
 const agentPlugin = {
   schema_version: 'v1',
-  name: 'firstsys-mcp',
+  name: PLUGIN_ID,
+  id: PLUGIN_ID,
+  app_id: APP_ID,
+  display_name: DISPLAY_NAME,
   version: '1.2.0',
   description: 'MCP da Firstsys — CRM Zatten WhatsApp & Skills de IA',
   interface: {
-    displayName: 'Firstsys MCP',
+    displayName: DISPLAY_NAME,
     shortDescription: 'Conecte o ChatGPT ao CRM Zatten WhatsApp e execute Skills operacionais da Firstsys.',
     longDescription: 'Integração oficial da Central Firstsys com o CRM Zatten. Permite que o ChatGPT consulte dados cadastrais de leads, histórico de mensagens no WhatsApp, colunas do Kanban, atribuição de equipe com rodízio, envio de mensagens e templates HSM, disparo de automações e gerenciamento de Skills especializadas de IA.',
     developerName: 'Firstsys',
@@ -101,7 +110,8 @@ console.log('✅ .agent-plugin/plugin.json gerado.');
 const claudePluginDir = path.join(OUTPUT_DIR, '.claude-plugin');
 fs.mkdirSync(claudePluginDir, { recursive: true });
 const claudePlugin = {
-  name: 'firstsys-mcp',
+  name: PLUGIN_ID,
+  display_name: DISPLAY_NAME,
   version: '1.2.0',
   description: 'MCP da Firstsys — CRM Zatten WhatsApp & Skills de IA',
   mcpServers: {
@@ -136,11 +146,13 @@ console.log('✅ .mcp.json gerado.');
 
 // 6. .APP.JSON (Exigido pelo validador da OpenAI)
 const appJson = {
-  name: 'Firstsys MCP',
+  id: APP_ID,
+  name: PLUGIN_ID,
+  display_name: DISPLAY_NAME,
   version: '1.2.0',
   description: 'MCP da Firstsys — Gestão do CRM Zatten e Skills de Atendimento',
   interface: {
-    displayName: 'Firstsys MCP',
+    displayName: DISPLAY_NAME,
     shortDescription: 'Conecte o ChatGPT ao CRM Zatten WhatsApp e execute Skills operacionais da Firstsys.',
     longDescription: 'Integração oficial da Central Firstsys com o CRM Zatten. Permite que o ChatGPT consulte dados cadastrais de leads, histórico de mensagens no WhatsApp, colunas do Kanban, atribuição de equipe com rodízio, envio de mensagens e templates HSM, disparo de automações e gerenciamento de Skills especializadas de IA.',
     developerName: 'Firstsys',
@@ -193,7 +205,7 @@ function formatSkillMd(content: string, slug: string, desc: string): string {
 }
 
 // 7.1. SKILL.MD MESTRE NA RAIZ DO BUNDLE (Compatibilidade total com analisadores de raiz)
-const rootSkillMd = `---\nname: firstsys-mcp\ndescription: "MCP da Firstsys — CRM Zatten WhatsApp e Coleção de Skills Operacionais de IA"\n---\n\n# Firstsys Zatten Central & Skills\n\nPacote oficial de ferramentas MCP e Skills operacionais para agentes de IA e ChatGPT.\n`;
+const rootSkillMd = `---\nname: ${PLUGIN_ID}\ndescription: "MCP da Firstsys — CRM Zatten WhatsApp e Coleção de Skills Operacionais de IA"\n---\n\n# ${DISPLAY_NAME}\n\nPacote oficial de ferramentas MCP e Skills operacionais para agentes de IA e ChatGPT.\n`;
 fs.writeFileSync(path.join(OUTPUT_DIR, 'SKILL.md'), rootSkillMd, 'utf8');
 console.log('✅ SKILL.md mestre na raiz gerado com YAML frontmatter.');
 
@@ -238,8 +250,8 @@ console.log(`✅ Pasta skills/*/SKILL.md gerada com YAML frontmatter estrito par
 // 8. MCP-MANIFEST.JSON
 const mcpManifest = {
   schema_version: '2024-11-05',
-  name: 'firstsys-zatten-central',
-  title: 'Firstsys Zatten Central & Skills MCP Server',
+  name: PLUGIN_ID,
+  title: DISPLAY_NAME,
   description: 'Servidor MCP remoto da Central Firstsys para integração do ChatGPT com o CRM Zatten WhatsApp e gestão de Skills de IA.',
   version: '1.2.0',
   homepage: PROD_URL,
@@ -283,8 +295,8 @@ console.log('✅ mcp-manifest.json gerado.');
 // 9. AI-PLUGIN.JSON (OpenAI Plugin / GPT Action)
 const aiPlugin = {
   schema_version: 'v1',
-  name_for_human: 'Firstsys Zatten Central & Skills',
-  name_for_model: 'firstsys_zatten_central',
+  name_for_human: DISPLAY_NAME,
+  name_for_model: PLUGIN_ID,
   description_for_human: 'Conecte seu ChatGPT ao CRM WhatsApp da Zatten para atender contatos, mover leads no kanban e acionar skills operacionais de IA.',
   description_for_model: 'Assistente oficial conectado à Central Firstsys e ao CRM Zatten. Permite consultar dados cadastrais de leads, histórico de mensagens, tags, propriedades personalizadas, colunas do kanban, atribuição de equipe, envio de mensagens e templates WhatsApp, disparo de automações, webhooks e gerenciamento dinâmico de Skills operacionais especializadas (firstsys_skills_*).',
   auth: {
@@ -471,13 +483,11 @@ fs.writeFileSync(path.join(OUTPUT_DIR, 'README.md'), readmeContent, 'utf8');
 console.log('✅ README.md gerado.');
 
 // 13. COMPACTAÇÃO EM ARQUIVO .ZIP UNIVERSAL (via archiver com padrão PKWARE / RFC 1951)
-const zipName = 'firstsys-zatten-mcp-bundle.zip';
-const targetPaths = [
-  path.resolve(process.cwd(), zipName),
-  path.resolve(process.cwd(), 'public', zipName),
-  path.resolve(process.cwd(), '..', zipName),
-  path.resolve(process.cwd(), '..', 'non-deploy', zipName)
-];
+const mainZipName = 'firstsys-zatten-mcp-bundle.zip';
+const idZipName = `${PLUGIN_ID}.zip`;
+const appIdZipName = `${APP_ID}.zip`;
+
+const mainZipPath = path.resolve(process.cwd(), mainZipName);
 
 console.log('🤐 Compactando arquivos e pastas ocultas em .zip padrão RFC com archiver...');
 
@@ -508,14 +518,32 @@ async function createBundleZip(sourceDir: string, outZipPath: string): Promise<v
 }
 
 try {
-  await createBundleZip(OUTPUT_DIR, targetPaths[0]);
+  await createBundleZip(OUTPUT_DIR, mainZipPath);
 
-  // Copia para as pastas de distribuição
-  for (let i = 1; i < targetPaths.length; i++) {
-    const dest = targetPaths[i];
+  // Copia com os nomes correspondentes para distribuição flexível
+  const copyTargets = [
+    // 1. firstsys-zatten-mcp-bundle.zip
+    path.resolve(process.cwd(), 'public', mainZipName),
+    path.resolve(process.cwd(), '..', mainZipName),
+    path.resolve(process.cwd(), '..', 'non-deploy', mainZipName),
+
+    // 2. plugin_asdk_app_6acb2a1e159c8191a53f5f2b3da33e8c.zip (nome idêntico à URL do ChatGPT)
+    path.resolve(process.cwd(), idZipName),
+    path.resolve(process.cwd(), 'public', idZipName),
+    path.resolve(process.cwd(), '..', idZipName),
+    path.resolve(process.cwd(), '..', 'non-deploy', idZipName),
+
+    // 3. app_6acb2a1e159c8191a53f5f2b3da33e8c.zip (nome idêntico ao APP_ID)
+    path.resolve(process.cwd(), appIdZipName),
+    path.resolve(process.cwd(), 'public', appIdZipName),
+    path.resolve(process.cwd(), '..', appIdZipName),
+    path.resolve(process.cwd(), '..', 'non-deploy', appIdZipName)
+  ];
+
+  for (const dest of copyTargets) {
     const parent = path.dirname(dest);
     if (!fs.existsSync(parent)) fs.mkdirSync(parent, { recursive: true });
-    fs.copyFileSync(targetPaths[0], dest);
+    fs.copyFileSync(mainZipPath, dest);
     console.log(`📋 Copiado para: ${dest}`);
   }
 } catch (err) {

@@ -1167,17 +1167,38 @@ app.post('/api/connections/:id/revoke', verifyAuthToken, async (req, res) => {
 });
 
 // 1.5. Rota explícita de download do Pacote MCP ChatGPT (Sem Cache)
-app.get(['/firstsys-zatten-mcp-bundle.zip', '/api/mcp/bundle.zip'], (_req, res) => {
+const PLUGIN_ZIP_NAME = 'plugin_asdk_app_6acb2a1e159c8191a53f5f2b3da33e8c.zip';
+const APP_ZIP_NAME = 'app_6acb2a1e159c8191a53f5f2b3da33e8c.zip';
+const BUNDLE_ZIP_NAME = 'firstsys-zatten-mcp-bundle.zip';
+
+app.get([
+  '/firstsys-zatten-mcp-bundle.zip',
+  '/api/mcp/bundle.zip',
+  `/${PLUGIN_ZIP_NAME}`,
+  `/api/mcp/${PLUGIN_ZIP_NAME}`,
+  `/${APP_ZIP_NAME}`,
+  `/api/mcp/${APP_ZIP_NAME}`
+], (req, res) => {
+  const reqUrl = req.path || '';
+  const chosenName = reqUrl.includes(PLUGIN_ZIP_NAME) 
+    ? PLUGIN_ZIP_NAME 
+    : reqUrl.includes(APP_ZIP_NAME) 
+      ? APP_ZIP_NAME 
+      : BUNDLE_ZIP_NAME;
+
   res.setHeader('Content-Type', 'application/zip');
-  res.setHeader('Content-Disposition', 'attachment; filename="firstsys-zatten-mcp-bundle.zip"');
+  res.setHeader('Content-Disposition', `attachment; filename="${chosenName}"`);
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
 
   const candidates = [
-    path.resolve(process.cwd(), 'public', 'firstsys-zatten-mcp-bundle.zip'),
-    path.resolve(process.cwd(), 'dist', 'firstsys-zatten-mcp-bundle.zip'),
-    path.resolve(process.cwd(), 'firstsys-zatten-mcp-bundle.zip')
+    path.resolve(process.cwd(), 'public', chosenName),
+    path.resolve(process.cwd(), 'dist', chosenName),
+    path.resolve(process.cwd(), chosenName),
+    path.resolve(process.cwd(), 'public', BUNDLE_ZIP_NAME),
+    path.resolve(process.cwd(), 'dist', BUNDLE_ZIP_NAME),
+    path.resolve(process.cwd(), BUNDLE_ZIP_NAME)
   ];
 
   for (const p of candidates) {
@@ -1186,7 +1207,7 @@ app.get(['/firstsys-zatten-mcp-bundle.zip', '/api/mcp/bundle.zip'], (_req, res) 
     }
   }
 
-  res.status(404).send('Arquivo firstsys-zatten-mcp-bundle.zip não encontrado');
+  res.status(404).send('Arquivo ZIP não encontrado');
 });
 
 // 2. Servir estáticos compilados do Vite
