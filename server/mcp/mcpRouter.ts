@@ -32,21 +32,30 @@ import {
   SkillDeleteSchema,
   SkillInstallSchema,
   SkillUninstallSchema,
+  SkillInstallationsListSchema,
+  SkillInstallationsCreateSchema,
+  SkillInstallationsDeleteSchema,
   SkillFilesListSchema,
   SkillFilesGetSchema,
+  SkillFilesSaveSchema,
   SkillFilesCreateSchema,
   SkillFilesUpdateSchema,
   SkillFilesDeleteSchema,
   SkillFilesRestoreSchema,
   SkillImportPreviewSchema,
+  SkillImportInspectSchema,
   SkillImportFromGitSchema,
+  SkillImportCommitSchema,
   SkillImportStatusSchema,
   SkillSyncPreviewSchema,
   SkillSyncFromGitSchema,
   SkillVersionsListSchema,
   SkillVersionsGetSchema,
+  SkillVersionsCreateSchema,
   SkillVersionsCompareSchema,
+  SkillVersionsDiffSchema,
   SkillVersionsRestoreSchema,
+  SkillVersionsRollbackSchema,
   SkillAuditListSchema,
   SkillDependenciesListSchema,
   SkillPermissionsGetSchema,
@@ -66,6 +75,7 @@ import {
   restoreSkillFile,
   listSkillVersions,
   getSkillVersion,
+  createVersionSnapshot,
   compareSkillVersions,
   listSkillInstallations,
   createSkillInstallation,
@@ -191,10 +201,27 @@ export function requireOAuth(requiredScope?: OAuthScope) {
       });
     }
 
-    // Validação de Escopo Mínimo Necessário
+    // Validação de Escopo Mínimo Necessário com retrocompatibilidade total
     if (requiredScope) {
       const grantedScopes = (payload.scope || '').split(' ');
-      if (!grantedScopes.includes(requiredScope)) {
+      const hasDirectScope = grantedScopes.includes(requiredScope);
+      const isReadOnly =
+        requiredScope.includes(':read') ||
+        requiredScope.includes('_list') ||
+        requiredScope.includes('_get') ||
+        requiredScope.includes('_preview') ||
+        requiredScope.includes('_inspect') ||
+        requiredScope.includes('_diff') ||
+        requiredScope.includes('_compare') ||
+        requiredScope.includes('_status');
+
+      const hasEquivalentScope =
+        (isReadOnly && (grantedScopes.includes('zatten:read') || grantedScopes.includes('skills:read'))) ||
+        (!isReadOnly && (grantedScopes.includes('zatten:write') || grantedScopes.includes('skills:write') || grantedScopes.includes('skills:manage')));
+
+      const hasWildcard = grantedScopes.includes('*') || grantedScopes.includes('all');
+
+      if (!hasDirectScope && !hasEquivalentScope && !hasWildcard) {
         res.setHeader('WWW-Authenticate', `Bearer error="insufficient_scope", scope="${requiredScope}", resource_metadata="${resourceMetadataUrl}"`);
         return res.status(403).json({
           error: 'insufficient_scope',
@@ -929,7 +956,7 @@ export const MCP_TOOLS_CATALOG = [
       }
     },
     securitySchemes: [
-      { type: 'oauth2', scopes: ['skills:read', 'firstsys_skills_list', 'tool:firstsys_skills_list'] }
+      { type: 'oauth2', scopes: ['zatten:read', 'skills:read', 'firstsys_skills_list', 'tool:firstsys_skills_list'] }
     ],
     annotations: { readOnlyHint: true, destructiveHint: false },
     tags: ['skills', 'ai', 'read']
@@ -946,7 +973,7 @@ export const MCP_TOOLS_CATALOG = [
       }
     },
     securitySchemes: [
-      { type: 'oauth2', scopes: ['skills:read', 'firstsys_skills_get', 'tool:firstsys_skills_get'] }
+      { type: 'oauth2', scopes: ['zatten:read', 'skills:read', 'firstsys_skills_get', 'tool:firstsys_skills_get'] }
     ],
     annotations: { readOnlyHint: true, destructiveHint: false },
     tags: ['skills', 'ai', 'read', 'files']
@@ -969,7 +996,7 @@ export const MCP_TOOLS_CATALOG = [
       }
     },
     securitySchemes: [
-      { type: 'oauth2', scopes: ['skills:write', 'firstsys_skills_create', 'tool:firstsys_skills_create'] }
+      { type: 'oauth2', scopes: ['zatten:write', 'skills:write', 'firstsys_skills_create', 'tool:firstsys_skills_create'] }
     ],
     annotations: { readOnlyHint: false, destructiveHint: false },
     tags: ['skills', 'ai', 'create']
@@ -991,7 +1018,7 @@ export const MCP_TOOLS_CATALOG = [
       }
     },
     securitySchemes: [
-      { type: 'oauth2', scopes: ['skills:write', 'firstsys_skills_update', 'tool:firstsys_skills_update'] }
+      { type: 'oauth2', scopes: ['zatten:write', 'skills:write', 'firstsys_skills_update', 'tool:firstsys_skills_update'] }
     ],
     annotations: { readOnlyHint: false, destructiveHint: false },
     tags: ['skills', 'ai', 'update']
@@ -1010,7 +1037,7 @@ export const MCP_TOOLS_CATALOG = [
       }
     },
     securitySchemes: [
-      { type: 'oauth2', scopes: ['skills:write', 'firstsys_skills_delete', 'tool:firstsys_skills_delete'] }
+      { type: 'oauth2', scopes: ['zatten:write', 'skills:write', 'firstsys_skills_delete', 'tool:firstsys_skills_delete'] }
     ],
     annotations: { readOnlyHint: false, destructiveHint: true },
     tags: ['skills', 'ai', 'delete']
@@ -1031,7 +1058,7 @@ export const MCP_TOOLS_CATALOG = [
       }
     },
     securitySchemes: [
-      { type: 'oauth2', scopes: ['skills:write', 'firstsys_skills_install', 'tool:firstsys_skills_install'] }
+      { type: 'oauth2', scopes: ['zatten:write', 'skills:write', 'firstsys_skills_install', 'tool:firstsys_skills_install'] }
     ],
     annotations: { readOnlyHint: false, destructiveHint: false },
     tags: ['skills', 'ai', 'install']
@@ -1039,7 +1066,7 @@ export const MCP_TOOLS_CATALOG = [
   {
     name: 'firstsys_skills_uninstall',
     title: 'Desinstalar Skill de Contexto',
-    description: 'Desvincula e desinstala uma skill de um contexto operacional.',
+    description: 'Desvincula e desinstala uma skill de um contexto operacional (agente, conexão ou projeto).',
     inputSchema: {
       type: 'object',
       required: ['skill_id'],
@@ -1050,10 +1077,66 @@ export const MCP_TOOLS_CATALOG = [
       }
     },
     securitySchemes: [
-      { type: 'oauth2', scopes: ['skills:write', 'firstsys_skills_uninstall', 'tool:firstsys_skills_uninstall'] }
+      { type: 'oauth2', scopes: ['zatten:write', 'skills:write', 'firstsys_skills_uninstall', 'tool:firstsys_skills_uninstall'] }
     ],
     annotations: { readOnlyHint: false, destructiveHint: true },
     tags: ['skills', 'ai', 'uninstall']
+  },
+  {
+    name: 'firstsys_skills_installations_list',
+    title: 'Listar Instalações da Skill por Contexto',
+    description: 'Lista todas as vinculações ativas da skill por agente, projeto, conexão ou ambiente.',
+    inputSchema: {
+      type: 'object',
+      required: ['skill_id'],
+      properties: {
+        skill_id: { type: 'string', description: 'ID da skill' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['zatten:read', 'skills:read', 'firstsys_skills_installations_list', 'tool:firstsys_skills_installations_list'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['skills', 'installations', 'list']
+  },
+  {
+    name: 'firstsys_skills_installations_create',
+    title: 'Criar Instalação de Skill em Contexto',
+    description: 'Vincula granularmente uma skill a um agente, projeto, MCP ou conexão com versão fixada opcional.',
+    inputSchema: {
+      type: 'object',
+      required: ['skill_id', 'context_id', 'context_name'],
+      properties: {
+        skill_id: { type: 'string', description: 'ID da skill' },
+        context_type: { type: 'string', enum: ['agent', 'connection', 'project', 'mcp', 'environment'], description: 'Tipo do contexto' },
+        context_id: { type: 'string', description: 'Identificador único do contexto de execução' },
+        context_name: { type: 'string', description: 'Nome amigável do contexto' },
+        pinned_version: { type: 'string', description: 'Versão semântica fixada (ex: 1.0.0)' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['zatten:write', 'skills:write', 'firstsys_skills_installations_create', 'tool:firstsys_skills_installations_create'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    tags: ['skills', 'installations', 'create']
+  },
+  {
+    name: 'firstsys_skills_installations_delete',
+    title: 'Remover Instalação de Skill de Contexto',
+    description: 'Remove o registro de instalação de uma skill em um contexto específico.',
+    inputSchema: {
+      type: 'object',
+      required: ['skill_id', 'installation_id'],
+      properties: {
+        skill_id: { type: 'string', description: 'ID da skill' },
+        installation_id: { type: 'string', description: 'ID do registro de instalação a remover' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['zatten:write', 'skills:write', 'firstsys_skills_installations_delete', 'tool:firstsys_skills_installations_delete'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: true },
+    tags: ['skills', 'installations', 'delete']
   },
   {
     name: 'firstsys_skill_files_list',
@@ -1068,7 +1151,7 @@ export const MCP_TOOLS_CATALOG = [
       }
     },
     securitySchemes: [
-      { type: 'oauth2', scopes: ['skills:read', 'firstsys_skill_files_list', 'tool:firstsys_skill_files_list'] }
+      { type: 'oauth2', scopes: ['zatten:read', 'skills:read', 'firstsys_skill_files_list', 'tool:firstsys_skill_files_list'] }
     ],
     annotations: { readOnlyHint: true, destructiveHint: false },
     tags: ['skills', 'files', 'list']
@@ -1086,10 +1169,29 @@ export const MCP_TOOLS_CATALOG = [
       }
     },
     securitySchemes: [
-      { type: 'oauth2', scopes: ['skills:read', 'firstsys_skill_files_get', 'tool:firstsys_skill_files_get'] }
+      { type: 'oauth2', scopes: ['zatten:read', 'skills:read', 'firstsys_skill_files_get', 'tool:firstsys_skill_files_get'] }
     ],
     annotations: { readOnlyHint: true, destructiveHint: false },
     tags: ['skills', 'files', 'get']
+  },
+  {
+    name: 'firstsys_skill_files_save',
+    title: 'Salvar Arquivo na Skill (Criar ou Atualizar)',
+    description: 'Cria ou atualiza um arquivo textual dentro da pasta lógica da skill com validação de segurança e hash SHA-256.',
+    inputSchema: {
+      type: 'object',
+      required: ['skill_id', 'path', 'content'],
+      properties: {
+        skill_id: { type: 'string', description: 'ID da skill' },
+        path: { type: 'string', description: 'Caminho relativo do arquivo (ex: rules.json, prompts/atendimento.md)' },
+        content: { type: 'string', description: 'Conteúdo textual completo do arquivo' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['zatten:write', 'skills:write', 'firstsys_skill_files_save', 'tool:firstsys_skill_files_save'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    tags: ['skills', 'files', 'save']
   },
   {
     name: 'firstsys_skill_files_create',
@@ -1105,7 +1207,7 @@ export const MCP_TOOLS_CATALOG = [
       }
     },
     securitySchemes: [
-      { type: 'oauth2', scopes: ['skills:write', 'firstsys_skill_files_create', 'tool:firstsys_skill_files_create'] }
+      { type: 'oauth2', scopes: ['zatten:write', 'skills:write', 'firstsys_skill_files_create', 'tool:firstsys_skill_files_create'] }
     ],
     annotations: { readOnlyHint: false, destructiveHint: false },
     tags: ['skills', 'files', 'create']
@@ -1124,7 +1226,7 @@ export const MCP_TOOLS_CATALOG = [
       }
     },
     securitySchemes: [
-      { type: 'oauth2', scopes: ['skills:write', 'firstsys_skill_files_update', 'tool:firstsys_skill_files_update'] }
+      { type: 'oauth2', scopes: ['zatten:write', 'skills:write', 'firstsys_skill_files_update', 'tool:firstsys_skill_files_update'] }
     ],
     annotations: { readOnlyHint: false, destructiveHint: false },
     tags: ['skills', 'files', 'update']
@@ -1143,7 +1245,7 @@ export const MCP_TOOLS_CATALOG = [
       }
     },
     securitySchemes: [
-      { type: 'oauth2', scopes: ['skills:write', 'firstsys_skill_files_delete', 'tool:firstsys_skill_files_delete'] }
+      { type: 'oauth2', scopes: ['zatten:write', 'skills:write', 'firstsys_skill_files_delete', 'tool:firstsys_skill_files_delete'] }
     ],
     annotations: { readOnlyHint: false, destructiveHint: true },
     tags: ['skills', 'files', 'delete']
@@ -1161,10 +1263,27 @@ export const MCP_TOOLS_CATALOG = [
       }
     },
     securitySchemes: [
-      { type: 'oauth2', scopes: ['skills:write', 'firstsys_skill_files_restore', 'tool:firstsys_skill_files_restore'] }
+      { type: 'oauth2', scopes: ['zatten:write', 'skills:write', 'firstsys_skill_files_restore', 'tool:firstsys_skill_files_restore'] }
     ],
     annotations: { readOnlyHint: false, destructiveHint: false },
     tags: ['skills', 'files', 'restore']
+  },
+  {
+    name: 'firstsys_skills_import_inspect',
+    title: 'Inspecionar Repositório Git (Anti-SSRF & Secret Scanning)',
+    description: 'Analisa e audita um repositório Git público antes de importar, verificando licenças, estrutura e possíveis segredos.',
+    inputSchema: {
+      type: 'object',
+      required: ['repo_url'],
+      properties: {
+        repo_url: { type: 'string', description: 'URL pública do repositório (ex: https://github.com/owner/repo)' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['zatten:read', 'skills:read', 'firstsys_skills_import_inspect', 'tool:firstsys_skills_import_inspect'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['skills', 'git', 'inspect', 'security']
   },
   {
     name: 'firstsys_skills_import_preview',
@@ -1178,10 +1297,31 @@ export const MCP_TOOLS_CATALOG = [
       }
     },
     securitySchemes: [
-      { type: 'oauth2', scopes: ['skills:read', 'firstsys_skills_import_preview', 'tool:firstsys_skills_import_preview'] }
+      { type: 'oauth2', scopes: ['zatten:read', 'skills:read', 'firstsys_skills_import_preview', 'tool:firstsys_skills_import_preview'] }
     ],
     annotations: { readOnlyHint: true, destructiveHint: false },
     tags: ['skills', 'git', 'preview', 'security']
+  },
+  {
+    name: 'firstsys_skills_import_commit',
+    title: 'Efetivar Importação de Repositório Git',
+    description: 'Efetiva a importação dos arquivos selecionados do repositório Git auditado, criando a nova skill versionada.',
+    inputSchema: {
+      type: 'object',
+      required: ['repo_url', 'selected_paths'],
+      properties: {
+        repo_url: { type: 'string', description: 'URL do repositório' },
+        selected_paths: { type: 'array', items: { type: 'string' }, description: 'Lista de caminhos de arquivos a importar' },
+        skill_name: { type: 'string', description: 'Nome customizado para a skill' },
+        category: { type: 'string', description: 'Categoria' },
+        tags: { type: 'array', items: { type: 'string' }, description: 'Tags' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['zatten:write', 'skills:write', 'firstsys_skills_import_commit', 'tool:firstsys_skills_import_commit'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    tags: ['skills', 'git', 'import']
   },
   {
     name: 'firstsys_skills_import_from_git',
@@ -1199,7 +1339,7 @@ export const MCP_TOOLS_CATALOG = [
       }
     },
     securitySchemes: [
-      { type: 'oauth2', scopes: ['skills:write', 'firstsys_skills_import_from_git', 'tool:firstsys_skills_import_from_git'] }
+      { type: 'oauth2', scopes: ['zatten:write', 'skills:write', 'firstsys_skills_import_from_git', 'tool:firstsys_skills_import_from_git'] }
     ],
     annotations: { readOnlyHint: false, destructiveHint: false },
     tags: ['skills', 'git', 'import']
@@ -1216,7 +1356,7 @@ export const MCP_TOOLS_CATALOG = [
       }
     },
     securitySchemes: [
-      { type: 'oauth2', scopes: ['skills:read', 'firstsys_skills_import_status', 'tool:firstsys_skills_import_status'] }
+      { type: 'oauth2', scopes: ['zatten:read', 'skills:read', 'firstsys_skills_import_status', 'tool:firstsys_skills_import_status'] }
     ],
     annotations: { readOnlyHint: true, destructiveHint: false },
     tags: ['skills', 'git', 'status']
@@ -1233,7 +1373,24 @@ export const MCP_TOOLS_CATALOG = [
       }
     },
     securitySchemes: [
-      { type: 'oauth2', scopes: ['skills:read', 'firstsys_skills_sync_preview', 'tool:firstsys_skills_sync_preview'] }
+      { type: 'oauth2', scopes: ['zatten:read', 'skills:read', 'firstsys_skills_sync_preview', 'tool:firstsys_skills_sync_preview'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['skills', 'git', 'sync']
+  },
+  {
+    name: 'firstsys_skills_sync_inspect',
+    title: 'Inspecionar Atualizações do Repositório Git (Alias)',
+    description: 'Inspeciona e compara o commit SHA e arquivos entre a versão local e a remota no Git.',
+    inputSchema: {
+      type: 'object',
+      required: ['skill_id'],
+      properties: {
+        skill_id: { type: 'string', description: 'ID da skill' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['zatten:read', 'skills:read', 'firstsys_skills_sync_inspect', 'tool:firstsys_skills_sync_inspect'] }
     ],
     annotations: { readOnlyHint: true, destructiveHint: false },
     tags: ['skills', 'git', 'sync']
@@ -1251,7 +1408,25 @@ export const MCP_TOOLS_CATALOG = [
       }
     },
     securitySchemes: [
-      { type: 'oauth2', scopes: ['skills:write', 'firstsys_skills_sync_from_git', 'tool:firstsys_skills_sync_from_git'] }
+      { type: 'oauth2', scopes: ['zatten:write', 'skills:write', 'firstsys_skills_sync_from_git', 'tool:firstsys_skills_sync_from_git'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    tags: ['skills', 'git', 'sync']
+  },
+  {
+    name: 'firstsys_skills_sync_commit',
+    title: 'Confirmar Sincronização do Git (Alias)',
+    description: 'Aplica e commita as atualizações do branch Git para a skill sob confirmação.',
+    inputSchema: {
+      type: 'object',
+      required: ['skill_id', 'confirm'],
+      properties: {
+        skill_id: { type: 'string', description: 'ID da skill' },
+        confirm: { type: 'boolean', description: 'Confirmação obrigatória (true)' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['zatten:write', 'skills:write', 'firstsys_skills_sync_commit', 'tool:firstsys_skills_sync_commit'] }
     ],
     annotations: { readOnlyHint: false, destructiveHint: false },
     tags: ['skills', 'git', 'sync']
@@ -1268,7 +1443,7 @@ export const MCP_TOOLS_CATALOG = [
       }
     },
     securitySchemes: [
-      { type: 'oauth2', scopes: ['skills:read', 'firstsys_skills_versions_list', 'tool:firstsys_skills_versions_list'] }
+      { type: 'oauth2', scopes: ['zatten:read', 'skills:read', 'firstsys_skills_versions_list', 'tool:firstsys_skills_versions_list'] }
     ],
     annotations: { readOnlyHint: true, destructiveHint: false },
     tags: ['skills', 'versions', 'list']
@@ -1286,10 +1461,29 @@ export const MCP_TOOLS_CATALOG = [
       }
     },
     securitySchemes: [
-      { type: 'oauth2', scopes: ['skills:read', 'firstsys_skills_versions_get', 'tool:firstsys_skills_versions_get'] }
+      { type: 'oauth2', scopes: ['zatten:read', 'skills:read', 'firstsys_skills_versions_get', 'tool:firstsys_skills_versions_get'] }
     ],
     annotations: { readOnlyHint: true, destructiveHint: false },
     tags: ['skills', 'versions', 'get']
+  },
+  {
+    name: 'firstsys_skills_versions_create',
+    title: 'Criar Snapshot de Versão da Skill',
+    description: 'Cria uma nova versão semântica imutável com changelog e snapshot criptográfico SHA-256 dos arquivos.',
+    inputSchema: {
+      type: 'object',
+      required: ['skill_id', 'version', 'changelog'],
+      properties: {
+        skill_id: { type: 'string', description: 'ID da skill' },
+        version: { type: 'string', description: 'Nova versão semântica (ex: 1.1.0)' },
+        changelog: { type: 'string', description: 'Descrição das mudanças introduzidas nesta versão' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['zatten:write', 'skills:write', 'firstsys_skills_versions_create', 'tool:firstsys_skills_versions_create'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    tags: ['skills', 'versions', 'create']
   },
   {
     name: 'firstsys_skills_versions_compare',
@@ -1305,7 +1499,26 @@ export const MCP_TOOLS_CATALOG = [
       }
     },
     securitySchemes: [
-      { type: 'oauth2', scopes: ['skills:read', 'firstsys_skills_versions_compare', 'tool:firstsys_skills_versions_compare'] }
+      { type: 'oauth2', scopes: ['zatten:read', 'skills:read', 'firstsys_skills_versions_compare', 'tool:firstsys_skills_versions_compare'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['skills', 'versions', 'diff']
+  },
+  {
+    name: 'firstsys_skills_versions_diff',
+    title: 'Diff entre Versões da Skill (Alias)',
+    description: 'Gera relatório de diff estrutural entre duas versões da skill.',
+    inputSchema: {
+      type: 'object',
+      required: ['skill_id', 'version_a', 'version_b'],
+      properties: {
+        skill_id: { type: 'string', description: 'ID da skill' },
+        version_a: { type: 'string', description: 'Primeira versão' },
+        version_b: { type: 'string', description: 'Segunda versão' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['zatten:read', 'skills:read', 'firstsys_skills_versions_diff', 'tool:firstsys_skills_versions_diff'] }
     ],
     annotations: { readOnlyHint: true, destructiveHint: false },
     tags: ['skills', 'versions', 'diff']
@@ -1324,7 +1537,26 @@ export const MCP_TOOLS_CATALOG = [
       }
     },
     securitySchemes: [
-      { type: 'oauth2', scopes: ['skills:write', 'firstsys_skills_versions_restore', 'tool:firstsys_skills_versions_restore'] }
+      { type: 'oauth2', scopes: ['zatten:write', 'skills:write', 'firstsys_skills_versions_restore', 'tool:firstsys_skills_versions_restore'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: true },
+    tags: ['skills', 'versions', 'rollback']
+  },
+  {
+    name: 'firstsys_skills_versions_rollback',
+    title: 'Rollback de Versão da Skill (Alias)',
+    description: 'Reverte o estado de arquivos e instruções da skill para uma versão semântica anterior.',
+    inputSchema: {
+      type: 'object',
+      required: ['skill_id', 'version', 'confirm'],
+      properties: {
+        skill_id: { type: 'string', description: 'ID da skill' },
+        version: { type: 'string', description: 'Versão alvo' },
+        confirm: { type: 'boolean', description: 'Confirmação obrigatória (true)' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['zatten:write', 'skills:write', 'firstsys_skills_versions_rollback', 'tool:firstsys_skills_versions_rollback'] }
     ],
     annotations: { readOnlyHint: false, destructiveHint: true },
     tags: ['skills', 'versions', 'rollback']
@@ -1342,7 +1574,7 @@ export const MCP_TOOLS_CATALOG = [
       }
     },
     securitySchemes: [
-      { type: 'oauth2', scopes: ['skills:read', 'firstsys_skills_audit_list', 'tool:firstsys_skills_audit_list'] }
+      { type: 'oauth2', scopes: ['zatten:read', 'skills:read', 'firstsys_skills_audit_list', 'tool:firstsys_skills_audit_list'] }
     ],
     annotations: { readOnlyHint: true, destructiveHint: false },
     tags: ['skills', 'audit']
@@ -1359,7 +1591,7 @@ export const MCP_TOOLS_CATALOG = [
       }
     },
     securitySchemes: [
-      { type: 'oauth2', scopes: ['skills:read', 'firstsys_skills_dependencies_list', 'tool:firstsys_skills_dependencies_list'] }
+      { type: 'oauth2', scopes: ['zatten:read', 'skills:read', 'firstsys_skills_dependencies_list', 'tool:firstsys_skills_dependencies_list'] }
     ],
     annotations: { readOnlyHint: true, destructiveHint: false },
     tags: ['skills', 'dependencies']
@@ -1376,7 +1608,7 @@ export const MCP_TOOLS_CATALOG = [
       }
     },
     securitySchemes: [
-      { type: 'oauth2', scopes: ['skills:read', 'firstsys_skills_permissions_get', 'tool:firstsys_skills_permissions_get'] }
+      { type: 'oauth2', scopes: ['zatten:read', 'skills:read', 'firstsys_skills_permissions_get', 'tool:firstsys_skills_permissions_get'] }
     ],
     annotations: { readOnlyHint: true, destructiveHint: false },
     tags: ['skills', 'permissions']
@@ -1394,7 +1626,7 @@ export const MCP_TOOLS_CATALOG = [
       }
     },
     securitySchemes: [
-      { type: 'oauth2', scopes: ['skills:write', 'firstsys_skills_permissions_update', 'tool:firstsys_skills_permissions_update'] }
+      { type: 'oauth2', scopes: ['zatten:write', 'skills:write', 'firstsys_skills_permissions_update', 'tool:firstsys_skills_permissions_update'] }
     ],
     annotations: { readOnlyHint: false, destructiveHint: false },
     tags: ['skills', 'permissions']
@@ -2767,6 +2999,85 @@ async function executeToolDirectly(name: string, rawArgs: any, user: OAuthJwtPay
       };
     }
 
+    case 'firstsys_skills_installations_list': {
+      const parseResult = SkillInstallationsListSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'skill_id é obrigatório.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { skill_id } = parseResult.data;
+      const installs = listSkillInstallations(skill_id);
+
+      return {
+        ok: true,
+        skill_id,
+        installations: installs.map(i => ({
+          id: i.id,
+          context_type: i.contextType,
+          context_id: i.contextId,
+          context_name: i.contextName,
+          pinned_version: i.pinnedVersion,
+          status: i.status,
+          created_at: i.createdAt
+        })),
+        total: installs.length
+      };
+    }
+
+    case 'firstsys_skills_installations_create': {
+      const parseResult = SkillInstallationsCreateSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'Parâmetros inválidos.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { skill_id, context_type, context_id, context_name, pinned_version, config } = parseResult.data;
+      const installation = createSkillInstallation(skill_id, {
+        contextType: context_type as any,
+        contextId: context_id,
+        contextName: context_name,
+        pinnedVersion: pinned_version,
+        config
+      }, user.sub || 'mcp-agent');
+
+      toggleInstallSkill(skill_id, true, user.sub || 'mcp-agent');
+
+      return {
+        ok: true,
+        message: `Instalação criada com sucesso para [${installation.contextType}: ${installation.contextName}].`,
+        installation
+      };
+    }
+
+    case 'firstsys_skills_installations_delete': {
+      const parseResult = SkillInstallationsDeleteSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'skill_id e installation_id são obrigatórios.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { skill_id, installation_id } = parseResult.data;
+      deleteSkillInstallation(skill_id, installation_id, user.sub || 'mcp-agent');
+
+      return {
+        ok: true,
+        message: `Instalação '${installation_id}' removida com sucesso da skill '${skill_id}'.`
+      };
+    }
+
     case 'firstsys_skill_files_list': {
       const parseResult = SkillFilesListSchema.safeParse(rawArgs);
       if (!parseResult.success) {
@@ -2835,10 +3146,10 @@ async function executeToolDirectly(name: string, rawArgs: any, user: OAuthJwtPay
       };
     }
 
+    case 'firstsys_skill_files_save':
     case 'firstsys_skill_files_create':
     case 'firstsys_skill_files_update': {
-      const schema = name === 'firstsys_skill_files_create' ? SkillFilesCreateSchema : SkillFilesUpdateSchema;
-      const parseResult = schema.safeParse(rawArgs);
+      const parseResult = SkillFilesSaveSchema.safeParse(rawArgs);
       if (!parseResult.success) {
         return formatMcpError({
           code: 'INVALID_ARGUMENTS',
@@ -2903,6 +3214,7 @@ async function executeToolDirectly(name: string, rawArgs: any, user: OAuthJwtPay
       };
     }
 
+    case 'firstsys_skills_import_inspect':
     case 'firstsys_skills_import_preview': {
       const parseResult = SkillImportPreviewSchema.safeParse(rawArgs);
       if (!parseResult.success) {
@@ -2939,6 +3251,7 @@ async function executeToolDirectly(name: string, rawArgs: any, user: OAuthJwtPay
       };
     }
 
+    case 'firstsys_skills_import_commit':
     case 'firstsys_skills_import_from_git': {
       const parseResult = SkillImportFromGitSchema.safeParse(rawArgs);
       if (!parseResult.success) {
@@ -3031,6 +3344,7 @@ async function executeToolDirectly(name: string, rawArgs: any, user: OAuthJwtPay
       };
     }
 
+    case 'firstsys_skills_sync_inspect':
     case 'firstsys_skills_sync_preview': {
       const parseResult = SkillSyncPreviewSchema.safeParse(rawArgs);
       if (!parseResult.success) {
@@ -3068,6 +3382,7 @@ async function executeToolDirectly(name: string, rawArgs: any, user: OAuthJwtPay
       };
     }
 
+    case 'firstsys_skills_sync_commit':
     case 'firstsys_skills_sync_from_git': {
       const parseResult = SkillSyncFromGitSchema.safeParse(rawArgs);
       if (!parseResult.success) {
@@ -3157,6 +3472,42 @@ async function executeToolDirectly(name: string, rawArgs: any, user: OAuthJwtPay
       };
     }
 
+    case 'firstsys_skills_versions_create': {
+      const parseResult = SkillVersionsCreateSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'skill_id, version e changelog são obrigatórios.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { skill_id, version, changelog } = parseResult.data;
+      const skill = getSkill(skill_id);
+      if (!skill) {
+        return formatMcpError({
+          code: 'SKILL_NOT_FOUND',
+          message: `Skill '${skill_id}' não encontrada.`,
+          httpStatus: 404,
+          correlationId
+        });
+      }
+
+      const createdVersion = createVersionSnapshot(
+        skill.id,
+        version,
+        changelog,
+        user.sub || 'mcp-agent'
+      );
+
+      return {
+        ok: true,
+        version: createdVersion
+      };
+    }
+
+    case 'firstsys_skills_versions_diff':
     case 'firstsys_skills_versions_compare': {
       const parseResult = SkillVersionsCompareSchema.safeParse(rawArgs);
       if (!parseResult.success) {
@@ -3177,6 +3528,7 @@ async function executeToolDirectly(name: string, rawArgs: any, user: OAuthJwtPay
       };
     }
 
+    case 'firstsys_skills_versions_rollback':
     case 'firstsys_skills_versions_restore': {
       const parseResult = SkillVersionsRestoreSchema.safeParse(rawArgs);
       if (!parseResult.success) {

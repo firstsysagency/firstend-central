@@ -128,7 +128,29 @@ function readDb(): DbSchema {
       return { skills: [], skill_versions: [], skill_installations: [], skill_audit_logs: [] };
     }
     const data = fs.readFileSync(DB_PATH, 'utf8');
-    return JSON.parse(data);
+    const parsed: DbSchema = JSON.parse(data);
+    
+    // Auto-migração em tempo de leitura de registros legados da VPS
+    let mutated = false;
+    if (parsed.skills && Array.isArray(parsed.skills)) {
+      for (const s of parsed.skills) {
+        if (s.slug === 'descoberta-e-curadoria-de-skills' || s.id === 'skill_curada_find_skills_vercel') {
+          s.slug = 'find-skills-vercel';
+          s.id = 'skill_find_skills_vercel';
+          s.name = 'Find Skills — Vercel';
+          mutated = true;
+        }
+      }
+    }
+    if (mutated) {
+      try {
+        fs.writeFileSync(DB_PATH, JSON.stringify(parsed, null, 2), 'utf8');
+      } catch (err) {
+        console.warn('Aviso: Não foi possível salvar migração de slug no db.json:', err);
+      }
+    }
+
+    return parsed;
   } catch (err: any) {
     console.error('Erro ao ler db.json:', err);
     return { skills: [], skill_versions: [], skill_installations: [], skill_audit_logs: [] };
@@ -225,9 +247,29 @@ export function listSkills(filters: ListSkillsFilter = {}): Skill[] {
 }
 
 export function getSkill(idOrSlug: string): Skill | null {
+  if (!idOrSlug) return null;
   const db = readDb();
   const list = db.skills || [];
-  return list.find(s => s.id === idOrSlug || s.slug === idOrSlug) || null;
+  const normalized = idOrSlug.trim().toLowerCase();
+
+  return list.find(s => {
+    if (s.id === idOrSlug || s.slug === idOrSlug) return true;
+    if (s.slug?.toLowerCase() === normalized || s.id?.toLowerCase() === normalized) return true;
+    // Alias bidirecional para find-skills-vercel e descoberta-e-curadoria-de-skills
+    if (
+      (normalized === 'find-skills-vercel' || normalized === 'skill_find_skills_vercel') &&
+      (s.slug === 'descoberta-e-curadoria-de-skills' || s.id === 'skill_curada_find_skills_vercel')
+    ) {
+      return true;
+    }
+    if (
+      (normalized === 'descoberta-e-curadoria-de-skills' || normalized === 'skill_curada_find_skills_vercel') &&
+      (s.slug === 'find-skills-vercel' || s.id === 'skill_find_skills_vercel')
+    ) {
+      return true;
+    }
+    return false;
+  }) || null;
 }
 
 export function createSkill(payload: Partial<Skill>, actor: string = 'admin'): Skill {

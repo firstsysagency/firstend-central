@@ -314,6 +314,9 @@ export const SkillSyncFromGitSchema = z.object({
   })
 }).strict();
 
+export const SkillSyncInspectSchema = SkillSyncPreviewSchema;
+export const SkillSyncCommitSchema = SkillSyncFromGitSchema;
+
 // 11.19 firstsys_skills_versions_list
 export const SkillVersionsListSchema = z.object({
   skill_id: z.string().min(1).max(100)
@@ -362,4 +365,45 @@ export const SkillPermissionsUpdateSchema = z.object({
   skill_id: z.string().min(1).max(100),
   permissions: z.array(z.string().max(50)).max(30)
 }).strict();
+
+// 11.27 firstsys_skill_files_save (criação ou atualização transparente de arquivos)
+export const SkillFilesSaveSchema = z.object({
+  skill_id: z.string().min(1, 'skill_id é obrigatório').max(100),
+  path: z.string().min(1, 'path relativo é obrigatório').max(255),
+  content: z.string().max(1000000, 'Arquivo excede 1MB')
+}).strict();
+
+// 11.28 firstsys_skills_installations_list
+export const SkillInstallationsListSchema = z.object({
+  skill_id: z.string().min(1, 'skill_id é obrigatório').max(100)
+}).strict();
+
+// 11.29 firstsys_skills_installations_create
+export const SkillInstallationsCreateSchema = z.object({
+  skill_id: z.string().min(1, 'skill_id é obrigatório').max(100),
+  context_type: z.enum(['agent', 'connection', 'project', 'mcp', 'environment']).default('connection'),
+  context_id: z.string().min(1, 'context_id é obrigatório').max(100),
+  context_name: z.string().min(1, 'context_name é obrigatório').max(150),
+  pinned_version: z.string().regex(/^\d+\.\d+\.\d+/, 'Versão semântica inválida').optional(),
+  config: z.record(z.string(), z.any()).optional()
+}).strict();
+
+// 11.30 firstsys_skills_installations_delete
+export const SkillInstallationsDeleteSchema = z.object({
+  skill_id: z.string().min(1, 'skill_id é obrigatório').max(100),
+  installation_id: z.string().min(1, 'installation_id é obrigatório').max(100)
+}).strict();
+
+// 11.31 firstsys_skills_versions_create
+export const SkillVersionsCreateSchema = z.object({
+  skill_id: z.string().min(1, 'skill_id é obrigatório').max(100),
+  version: z.string().regex(/^\d+\.\d+\.\d+/, 'Versão semântica inválida (ex: 1.1.0)').min(1).max(20),
+  changelog: z.string().min(2, 'changelog é obrigatório').max(1000)
+}).strict();
+
+// Aliases de conveniência
+export const SkillVersionsDiffSchema = SkillVersionsCompareSchema;
+export const SkillVersionsRollbackSchema = SkillVersionsRestoreSchema;
+export const SkillImportInspectSchema = SkillImportPreviewSchema;
+export const SkillImportCommitSchema = SkillImportFromGitSchema;
 

@@ -184,6 +184,13 @@ oauthRouter.get('/oauth/authorize', (req: Request, res: Response) => {
     }
 
     // 4. Criação do Código de Autorização Temporário (5 minutos, uso único)
+    const requestedScopeSet = new Set(scope);
+    if (requestedScopeSet.has('zatten:read') || requestedScopeSet.has('zatten:write') || requestedScopeSet.size === 0) {
+      requestedScopeSet.add('skills:read');
+      requestedScopeSet.add('skills:write');
+      requestedScopeSet.add('skills:manage');
+    }
+
     const code = oauthStore.createAuthorizationCode({
       clientId: client_id,
       redirectUri: redirect_uri,
@@ -193,7 +200,7 @@ oauthRouter.get('/oauth/authorize', (req: Request, res: Response) => {
       userEmail: sessionUser.email || 'contato@firstsys.com.br',
       orgId: sessionUser.orgId || 'org_firstsys_prod',
       role: sessionUser.role || 'owner',
-      scope: scope.join(' '),
+      scope: Array.from(requestedScopeSet).join(' '),
       resource,
       nonce
     });
@@ -341,6 +348,15 @@ oauthRouter.post('/oauth/token', express.urlencoded({ extended: true }), express
       const nowSec = Math.floor(Date.now() / 1000);
       const expiresInSec = 3600; // 1 hora de validade
 
+      // Expansão de escopos para garantir retrocompatibilidade total com clientes antigos
+      const grantedScopeSet = new Set((codeRecord.scope || '').split(' ').filter(Boolean));
+      if (grantedScopeSet.has('zatten:read') || grantedScopeSet.has('zatten:write') || grantedScopeSet.size === 0) {
+        grantedScopeSet.add('skills:read');
+        grantedScopeSet.add('skills:write');
+        grantedScopeSet.add('skills:manage');
+      }
+      const finalScopeStr = Array.from(grantedScopeSet).join(' ');
+
       // Emissão de Access Token JWT assinado assimetricamente (RS256)
       const tokenPayload: OAuthJwtPayload = {
         iss: issuer,
@@ -352,7 +368,7 @@ oauthRouter.post('/oauth/token', express.urlencoded({ extended: true }), express
         jti,
         org_id: codeRecord.orgId,
         role: codeRecord.role,
-        scope: codeRecord.scope,
+        scope: finalScopeStr,
         client_id: effectiveClientId
       };
 
@@ -365,7 +381,7 @@ oauthRouter.post('/oauth/token', express.urlencoded({ extended: true }), express
         userEmail: codeRecord.userEmail,
         orgId: codeRecord.orgId,
         role: codeRecord.role,
-        scope: codeRecord.scope,
+        scope: finalScopeStr,
         resource: targetAudience
       });
 
@@ -439,6 +455,15 @@ oauthRouter.post('/oauth/token', express.urlencoded({ extended: true }), express
       const nowSec = Math.floor(Date.now() / 1000);
       const expiresInSec = 900; // 15 minutos
 
+      // Expansão de escopos para garantir retrocompatibilidade total com clientes antigos
+      const refreshScopeSet = new Set((record.scope || '').split(' ').filter(Boolean));
+      if (refreshScopeSet.has('zatten:read') || refreshScopeSet.has('zatten:write') || refreshScopeSet.size === 0) {
+        refreshScopeSet.add('skills:read');
+        refreshScopeSet.add('skills:write');
+        refreshScopeSet.add('skills:manage');
+      }
+      const finalRefreshScopeStr = Array.from(refreshScopeSet).join(' ');
+
       const tokenPayload: OAuthJwtPayload = {
         iss: issuer,
         sub: record.userId,
@@ -449,7 +474,7 @@ oauthRouter.post('/oauth/token', express.urlencoded({ extended: true }), express
         jti,
         org_id: record.orgId,
         role: record.role,
-        scope: record.scope,
+        scope: finalRefreshScopeStr,
         client_id: record.clientId,
         token_family_id: record.familyId
       };
@@ -461,7 +486,7 @@ oauthRouter.post('/oauth/token', express.urlencoded({ extended: true }), express
         token_type: 'Bearer',
         expires_in: expiresInSec,
         refresh_token: newRefreshToken,
-        scope: record.scope
+        scope: finalRefreshScopeStr
       };
 
       res.setHeader('Cache-Control', 'no-store');
@@ -590,11 +615,34 @@ export function generateOpenApiSpec(issuer: string) {
             description: 'Erro interno ao processar ferramenta'
           }
         },
-        security: [
-          {
-            OAuth2: (tool.securitySchemes?.[0] as any)?.scopes || ['zatten:read']
+        security: (() => {
+          const declaredScopes: string[] = (tool.securitySchemes?.[0] as any)?.scopes || ['zatten:read'];
+          const isWrite = declaredScopes.some(s =>
+            s.includes(':write') ||
+            s.includes('_create') ||
+            s.includes('_update') ||
+            s.includes('_delete') ||
+            s.includes('_save') ||
+            s.includes('_restore') ||
+            s.includes('_rollback') ||
+            s.includes('_commit') ||
+            s.includes('_install') ||
+            s.includes('messages')
+          );
+
+          const alternativeScopeSet = new Set<string>(declaredScopes);
+          if (isWrite) {
+            alternativeScopeSet.add('zatten:write');
+            alternativeScopeSet.add('skills:write');
+          } else {
+            alternativeScopeSet.add('zatten:read');
+            alternativeScopeSet.add('skills:read');
           }
-        ]
+
+          return Array.from(alternativeScopeSet).map(scopeName => ({
+            OAuth2: [scopeName]
+          }));
+        })()
       }
     };
   }
@@ -627,7 +675,10 @@ export function generateOpenApiSpec(issuer: string) {
                 'connections:read': 'Listar conexões ativas',
                 'zatten:read': 'Consultar leads, dados Zatten e Skills',
                 'zatten:write': 'Atualizar propriedades no CRM Zatten e Skills',
-                'zatten:messages': 'Disparar mensagens via Zatten'
+                'zatten:messages': 'Disparar mensagens via Zatten',
+                'skills:read': 'Consultar biblioteca de skills, personas e arquivos de IA',
+                'skills:write': 'Criar, versionar, editar e instalar skills de IA',
+                'skills:manage': 'Gerenciamento completo do ecossistema de skills'
               }
             }
           }

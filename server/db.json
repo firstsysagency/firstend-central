@@ -298,7 +298,7 @@
       "version": "1.0.1",
       "author": "Firstsys AI",
       "createdAt": "2026-10-14T10:00:00.000Z",
-      "updatedAt": "2026-10-16T01:01:04.078Z",
+      "updatedAt": "2026-10-16T02:02:30.876Z",
       "files": [
         {
           "id": "file_sdr_qualificacao_SKILL_md",
@@ -1363,6 +1363,41 @@
       ],
       "createdAt": "2026-10-16T01:01:04.078Z",
       "createdBy": "test-runner"
+    },
+    {
+      "id": "ver_843a449f_85a0_",
+      "skillId": "skill_sdr_qualificacao",
+      "version": "1.0.1",
+      "changelog": "Teste de versionamento",
+      "snapshotHash": "373f1991b965be5c14f53313f740be1bede7c76d263b67b27a29bf7c84e6bc15",
+      "filesSnapshot": [
+        {
+          "path": "SKILL.md",
+          "sha256": "1deb846884b3690a830ddf214957a1aba163b32a548c2d085b4a5dbc845a0bc6",
+          "sizeBytes": 1098,
+          "name": "SKILL.md"
+        },
+        {
+          "path": "rules.json",
+          "sha256": "087ff3c0cd16b469145ffeb87c54a1f1c9a7fc217852482382b7903b67db73f6",
+          "sizeBytes": 223,
+          "name": "rules.json"
+        },
+        {
+          "path": "prompts/qualification.md",
+          "sha256": "b60fb4346dee34a34c5e9ad2da88952026612e823e71e7bd07db74f5c8217e7a",
+          "sizeBytes": 484,
+          "name": "qualification.md"
+        },
+        {
+          "path": "templates/message-template.md",
+          "sha256": "11d0b24469f7709982bf450151c999da09c40d00f1dcd758372448a5a557c15f",
+          "sizeBytes": 355,
+          "name": "message-template.md"
+        }
+      ],
+      "createdAt": "2026-10-16T02:02:30.876Z",
+      "createdBy": "test-runner"
     }
   ],
   "skill_installations": [
@@ -1532,6 +1567,38 @@
       "action": "skill.uninstalled",
       "details": "Desinstalada do contexto [agent: Agente SDR Teste Unitário]",
       "createdAt": "2026-10-16T01:01:04.098Z"
+    },
+    {
+      "id": "audit_a26b0628-ca12-4ec5-8c5e-9f3ee800da96",
+      "skillId": "skill_sdr_qualificacao",
+      "actor": "test-runner",
+      "action": "file.restored",
+      "details": "Arquivo \"prompts/test-automated.md\" restaurado com sucesso",
+      "createdAt": "2026-10-16T02:02:30.867Z"
+    },
+    {
+      "id": "audit_8638f52b-1770-4fcf-953d-16424ad29a6e",
+      "skillId": "skill_sdr_qualificacao",
+      "actor": "test-runner",
+      "action": "version.created",
+      "details": "Versão 1.0.1 registrada (Snapshot: 373f1991...)",
+      "createdAt": "2026-10-16T02:02:30.878Z"
+    },
+    {
+      "id": "audit_f07d60f0-c4e8-4a45-ad0f-7b6353a5583a",
+      "skillId": "skill_sdr_qualificacao",
+      "actor": "test-runner",
+      "action": "skill.installed",
+      "details": "Skill vinculada com sucesso ao contexto [agent: Agente SDR Teste Unitário] na versão 1.0.0",
+      "createdAt": "2026-10-16T02:02:30.884Z"
+    },
+    {
+      "id": "audit_6935fe5c-467a-412d-bff1-a9e5141c960e",
+      "skillId": "skill_sdr_qualificacao",
+      "actor": "test-runner",
+      "action": "skill.uninstalled",
+      "details": "Desinstalada do contexto [agent: Agente SDR Teste Unitário]",
+      "createdAt": "2026-10-16T02:02:30.890Z"
     }
   ]
 }

@@ -266,7 +266,13 @@ Detectar a natureza do chamado do cliente no WhatsApp e transferir para o time r
   // ============================================================================
   // 4. FIND SKILLS - VERCEL
   // ============================================================================
-  let findSkills = db.skills.find((s: any) => s.id === 'skill_find_skills_vercel' || s.slug === 'find-skills-vercel');
+  let findSkills = db.skills.find((s: any) => 
+    s.id === 'skill_find_skills_vercel' || 
+    s.slug === 'find-skills-vercel' ||
+    s.slug === 'descoberta-e-curadoria-de-skills' ||
+    s.id === 'skill_curada_find_skills_vercel' ||
+    (s.name && s.name.toLowerCase().includes('find skills'))
+  );
   const findSkillsFiles: SkillFile[] = [
     buildSkillFile('skill_find_skills_vercel', 'SKILL.md', `---
 name: find-skills-vercel
@@ -312,7 +318,7 @@ export interface SkillSearchResult {
   if (!findSkills) {
     findSkills = {
       id: 'skill_find_skills_vercel',
-      name: 'Find Skills - Vercel',
+      name: 'Find Skills — Vercel',
       slug: 'find-skills-vercel',
       description: 'Motor de descoberta semântica e busca de skills e plugins para ecossistemas modernos de IA e desenvolvimento web.',
       category: 'engenharia',
@@ -334,6 +340,9 @@ export interface SkillSearchResult {
     };
     db.skills.push(findSkills);
   } else {
+    findSkills.id = 'skill_find_skills_vercel';
+    findSkills.slug = 'find-skills-vercel';
+    findSkills.name = 'Find Skills — Vercel';
     findSkills.files = findSkillsFiles;
   }
 
