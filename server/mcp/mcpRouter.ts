@@ -27,16 +27,61 @@ import {
   ZattenLeadsLeadNumberAiPatchSchema,
   SkillListSchema,
   SkillGetSchema,
-  SkillInstallSchema,
   SkillCreateSchema,
   SkillUpdateSchema,
-  SkillDeleteSchema
+  SkillDeleteSchema,
+  SkillInstallSchema,
+  SkillUninstallSchema,
+  SkillFilesListSchema,
+  SkillFilesGetSchema,
+  SkillFilesCreateSchema,
+  SkillFilesUpdateSchema,
+  SkillFilesDeleteSchema,
+  SkillFilesRestoreSchema,
+  SkillImportPreviewSchema,
+  SkillImportFromGitSchema,
+  SkillImportStatusSchema,
+  SkillSyncPreviewSchema,
+  SkillSyncFromGitSchema,
+  SkillVersionsListSchema,
+  SkillVersionsGetSchema,
+  SkillVersionsCompareSchema,
+  SkillVersionsRestoreSchema,
+  SkillAuditListSchema,
+  SkillDependenciesListSchema,
+  SkillPermissionsGetSchema,
+  SkillPermissionsUpdateSchema
 } from './mcpSchemas.js';
+import {
+  listSkills,
+  getSkill,
+  createSkill,
+  updateSkill,
+  deleteSkill,
+  toggleInstallSkill,
+  listSkillFiles,
+  getSkillFile,
+  saveSkillFile,
+  deleteSkillFile,
+  restoreSkillFile,
+  listSkillVersions,
+  getSkillVersion,
+  compareSkillVersions,
+  listSkillInstallations,
+  createSkillInstallation,
+  deleteSkillInstallation,
+  listSkillAuditLogs
+} from '../skills/skillsStore.js';
+import {
+  previewGitRepository,
+  fetchSelectedGitFiles
+} from '../skills/gitImporter.js';
 import {
   sanitizeTemplateSecrets,
   validateNoRedactedOrEmptySecrets,
   mergeTemplatePatch
 } from './templateSanitizer.js';
+
 
 export const mcpRouter = Router();
 
@@ -892,7 +937,7 @@ export const MCP_TOOLS_CATALOG = [
   {
     name: 'firstsys_skills_get',
     title: 'Obter Detalhes e Arquivos da Skill (SKILL.md)',
-    description: 'Retorna a especificação completa, metadados e arquivos (SKILL.md, regras) de uma skill para que a IA possa assimilar suas instruções e operar em alto nível.',
+    description: 'Retorna a especificação completa, metadados e arquivos de uma skill para que a IA possa assimilar suas instruções e operar em alto nível.',
     inputSchema: {
       type: 'object',
       required: ['skill_id'],
@@ -907,35 +952,19 @@ export const MCP_TOOLS_CATALOG = [
     tags: ['skills', 'ai', 'read', 'files']
   },
   {
-    name: 'firstsys_skills_install',
-    title: 'Instalar ou Ativar Skill de IA',
-    description: 'Instala ou ativa uma skill de IA para a conexão atual, habilitando o uso de suas regras e instruções.',
-    inputSchema: {
-      type: 'object',
-      required: ['skill_id'],
-      properties: {
-        skill_id: { type: 'string', description: 'ID ou slug da skill a ser instalada ou ativada' },
-        install: { type: 'boolean', description: 'True para instalar/ativar, false para desinstalar/desativar' }
-      }
-    },
-    securitySchemes: [
-      { type: 'oauth2', scopes: ['skills:write', 'firstsys_skills_install', 'tool:firstsys_skills_install'] }
-    ],
-    annotations: { readOnlyHint: false, destructiveHint: false },
-    tags: ['skills', 'ai', 'install']
-  },
-  {
     name: 'firstsys_skills_create',
     title: 'Criar Nova Skill de IA',
-    description: 'Cria uma nova skill de IA na Central Firstsys com instruções em SKILL.md e metadados operacionais.',
+    description: 'Cria uma nova skill de IA na Central Firstsys com instruções e metadados operacionais.',
     inputSchema: {
       type: 'object',
       required: ['name', 'description'],
       properties: {
         name: { type: 'string', description: 'Nome da skill' },
         description: { type: 'string', description: 'Objetivo e descrição clara da skill' },
-        category: { type: 'string', description: 'Categoria (ex: vendas, atendimento, suporte, automacao)' },
+        category: { type: 'string', description: 'Categoria (ex: vendas, atendimento, suporte, engenharia, automacao)' },
         tags: { type: 'array', items: { type: 'string' }, description: 'Tags identificadoras' },
+        license: { type: 'string', description: 'Licença da skill' },
+        version: { type: 'string', description: 'Versão semântica inicial (ex: 1.0.0)' },
         skill_md_content: { type: 'string', description: 'Conteúdo detalhado das instruções em Markdown para o arquivo SKILL.md' }
       }
     },
@@ -947,16 +976,18 @@ export const MCP_TOOLS_CATALOG = [
   },
   {
     name: 'firstsys_skills_update',
-    title: 'Atualizar Skill ou Arquivo SKILL.md',
-    description: 'Atualiza o conteúdo do SKILL.md, nome ou descrição de uma skill existente na Central.',
+    title: 'Atualizar Metadados da Skill',
+    description: 'Atualiza o nome, descrição, categoria, tags ou versão de uma skill existente.',
     inputSchema: {
       type: 'object',
       required: ['skill_id'],
       properties: {
-        skill_id: { type: 'string', description: 'ID ou slug da skill a ser atualizada' },
+        skill_id: { type: 'string', description: 'ID da skill' },
         name: { type: 'string', description: 'Novo nome da skill' },
-        description: { type: 'string', description: 'Nova descrição da skill' },
-        skill_md_content: { type: 'string', description: 'Novo conteúdo em Markdown para o arquivo SKILL.md' }
+        description: { type: 'string', description: 'Nova descrição' },
+        category: { type: 'string', description: 'Nova categoria' },
+        tags: { type: 'array', items: { type: 'string' }, description: 'Novas tags' },
+        version: { type: 'string', description: 'Nova versão semântica' }
       }
     },
     securitySchemes: [
@@ -967,14 +998,15 @@ export const MCP_TOOLS_CATALOG = [
   },
   {
     name: 'firstsys_skills_delete',
-    title: 'Excluir Skill de IA da Central',
-    description: 'Remove permanentemente uma skill da Central. Exige confirmação explícita com confirm: true.',
+    title: 'Excluir Skill da Biblioteca',
+    description: 'Remove uma skill da biblioteca. Exige confirmação explícita com confirm: true.',
     inputSchema: {
       type: 'object',
       required: ['skill_id', 'confirm'],
       properties: {
         skill_id: { type: 'string', description: 'ID da skill a ser excluída' },
-        confirm: { type: 'boolean', description: 'Confirmação obrigatória (true) para autorizar exclusão' }
+        confirm: { type: 'boolean', description: 'Confirmação obrigatória (true) para autorizar exclusão' },
+        hard_delete: { type: 'boolean', description: 'Exclusão definitiva permanente (false para arquivamento)' }
       }
     },
     securitySchemes: [
@@ -982,8 +1014,393 @@ export const MCP_TOOLS_CATALOG = [
     ],
     annotations: { readOnlyHint: false, destructiveHint: true },
     tags: ['skills', 'ai', 'delete']
+  },
+  {
+    name: 'firstsys_skills_install',
+    title: 'Instalar Skill em Contexto',
+    description: 'Instala e vincula uma skill a um contexto específico (agente, conexão Zatten, projeto ou MCP).',
+    inputSchema: {
+      type: 'object',
+      required: ['skill_id'],
+      properties: {
+        skill_id: { type: 'string', description: 'ID da skill' },
+        context_type: { type: 'string', description: 'Tipo do contexto (agent, connection, project, mcp, environment)' },
+        context_id: { type: 'string', description: 'ID do contexto de execução' },
+        context_name: { type: 'string', description: 'Nome de exibição do contexto' },
+        pinned_version: { type: 'string', description: 'Versão semântica fixada' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['skills:write', 'firstsys_skills_install', 'tool:firstsys_skills_install'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    tags: ['skills', 'ai', 'install']
+  },
+  {
+    name: 'firstsys_skills_uninstall',
+    title: 'Desinstalar Skill de Contexto',
+    description: 'Desvincula e desinstala uma skill de um contexto operacional.',
+    inputSchema: {
+      type: 'object',
+      required: ['skill_id'],
+      properties: {
+        skill_id: { type: 'string', description: 'ID da skill' },
+        context_id: { type: 'string', description: 'ID do contexto de onde desinstalar' },
+        installation_id: { type: 'string', description: 'ID direto do registro de instalação' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['skills:write', 'firstsys_skills_uninstall', 'tool:firstsys_skills_uninstall'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: true },
+    tags: ['skills', 'ai', 'uninstall']
+  },
+  {
+    name: 'firstsys_skill_files_list',
+    title: 'Listar Arquivos da Skill',
+    description: 'Lista todos os arquivos em árvore de uma skill com hashes SHA-256 e tamanhos.',
+    inputSchema: {
+      type: 'object',
+      required: ['skill_id'],
+      properties: {
+        skill_id: { type: 'string', description: 'ID da skill' },
+        include_deleted: { type: 'boolean', description: 'Incluir arquivos na lixeira (soft delete)' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['skills:read', 'firstsys_skill_files_list', 'tool:firstsys_skill_files_list'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['skills', 'files', 'list']
+  },
+  {
+    name: 'firstsys_skill_files_get',
+    title: 'Obter Arquivo da Skill',
+    description: 'Lê o conteúdo textual de um arquivo específico de uma skill.',
+    inputSchema: {
+      type: 'object',
+      required: ['skill_id', 'path'],
+      properties: {
+        skill_id: { type: 'string', description: 'ID da skill' },
+        path: { type: 'string', description: 'Caminho relativo do arquivo (ex: prompts/qualification.md)' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['skills:read', 'firstsys_skill_files_get', 'tool:firstsys_skill_files_get'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['skills', 'files', 'get']
+  },
+  {
+    name: 'firstsys_skill_files_create',
+    title: 'Criar Arquivo na Skill',
+    description: 'Cria um novo arquivo textual dentro da pasta lógica da skill com validação de segurança.',
+    inputSchema: {
+      type: 'object',
+      required: ['skill_id', 'path', 'content'],
+      properties: {
+        skill_id: { type: 'string', description: 'ID da skill' },
+        path: { type: 'string', description: 'Caminho relativo do arquivo (ex: rules.json, prompts/test.md)' },
+        content: { type: 'string', description: 'Conteúdo textual do arquivo' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['skills:write', 'firstsys_skill_files_create', 'tool:firstsys_skill_files_create'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    tags: ['skills', 'files', 'create']
+  },
+  {
+    name: 'firstsys_skill_files_update',
+    title: 'Atualizar Arquivo na Skill',
+    description: 'Atualiza o conteúdo de um arquivo existente e gera novo hash SHA-256.',
+    inputSchema: {
+      type: 'object',
+      required: ['skill_id', 'path', 'content'],
+      properties: {
+        skill_id: { type: 'string', description: 'ID da skill' },
+        path: { type: 'string', description: 'Caminho relativo do arquivo' },
+        content: { type: 'string', description: 'Novo conteúdo' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['skills:write', 'firstsys_skill_files_update', 'tool:firstsys_skill_files_update'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    tags: ['skills', 'files', 'update']
+  },
+  {
+    name: 'firstsys_skill_files_delete',
+    title: 'Excluir Arquivo da Skill',
+    description: 'Exclui um arquivo da skill (SKILL.md não pode ser excluído).',
+    inputSchema: {
+      type: 'object',
+      required: ['skill_id', 'path'],
+      properties: {
+        skill_id: { type: 'string', description: 'ID da skill' },
+        path: { type: 'string', description: 'Caminho relativo do arquivo' },
+        permanent: { type: 'boolean', description: 'Exclusão definitiva permanente' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['skills:write', 'firstsys_skill_files_delete', 'tool:firstsys_skill_files_delete'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: true },
+    tags: ['skills', 'files', 'delete']
+  },
+  {
+    name: 'firstsys_skill_files_restore',
+    title: 'Restaurar Arquivo Excluído',
+    description: 'Restaura um arquivo que foi movido para a lixeira (soft delete).',
+    inputSchema: {
+      type: 'object',
+      required: ['skill_id', 'path'],
+      properties: {
+        skill_id: { type: 'string', description: 'ID da skill' },
+        path: { type: 'string', description: 'Caminho relativo do arquivo' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['skills:write', 'firstsys_skill_files_restore', 'tool:firstsys_skill_files_restore'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    tags: ['skills', 'files', 'restore']
+  },
+  {
+    name: 'firstsys_skills_import_preview',
+    title: 'Visualizar Repositório Git para Importação',
+    description: 'Inspeciona um repositório público GitHub/GitLab com proteção anti-SSRF e secret scanning antes de importar.',
+    inputSchema: {
+      type: 'object',
+      required: ['repo_url'],
+      properties: {
+        repo_url: { type: 'string', description: 'URL pública do repositório (ex: https://github.com/owner/repo)' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['skills:read', 'firstsys_skills_import_preview', 'tool:firstsys_skills_import_preview'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['skills', 'git', 'preview', 'security']
+  },
+  {
+    name: 'firstsys_skills_import_from_git',
+    title: 'Importar Skill de Repositório Git',
+    description: 'Importa arquivos selecionados de um repositório Git auditado criando um snapshot versionado.',
+    inputSchema: {
+      type: 'object',
+      required: ['repo_url', 'selected_paths'],
+      properties: {
+        repo_url: { type: 'string', description: 'URL do repositório' },
+        selected_paths: { type: 'array', items: { type: 'string' }, description: 'Lista de caminhos de arquivos a importar' },
+        skill_name: { type: 'string', description: 'Nome customizado para a skill' },
+        category: { type: 'string', description: 'Categoria' },
+        tags: { type: 'array', items: { type: 'string' }, description: 'Tags' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['skills:write', 'firstsys_skills_import_from_git', 'tool:firstsys_skills_import_from_git'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    tags: ['skills', 'git', 'import']
+  },
+  {
+    name: 'firstsys_skills_import_status',
+    title: 'Consultar Status de Origem Git da Skill',
+    description: 'Consulta informações de rastreabilidade Git da skill (URL, branch, commit SHA e data de sincronização).',
+    inputSchema: {
+      type: 'object',
+      required: ['skill_id'],
+      properties: {
+        skill_id: { type: 'string', description: 'ID da skill' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['skills:read', 'firstsys_skills_import_status', 'tool:firstsys_skills_import_status'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['skills', 'git', 'status']
+  },
+  {
+    name: 'firstsys_skills_sync_preview',
+    title: 'Comparar Atualizações do Repositório Git',
+    description: 'Compara a versão local da skill com a versão mais recente do branch remoto do Git.',
+    inputSchema: {
+      type: 'object',
+      required: ['skill_id'],
+      properties: {
+        skill_id: { type: 'string', description: 'ID da skill' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['skills:read', 'firstsys_skills_sync_preview', 'tool:firstsys_skills_sync_preview'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['skills', 'git', 'sync']
+  },
+  {
+    name: 'firstsys_skills_sync_from_git',
+    title: 'Sincronizar Atualizações do Git',
+    description: 'Aplica atualizações do repositório remoto Git sob confirmação explícita sem sobrescrever arquivos locais.',
+    inputSchema: {
+      type: 'object',
+      required: ['skill_id', 'confirm'],
+      properties: {
+        skill_id: { type: 'string', description: 'ID da skill' },
+        confirm: { type: 'boolean', description: 'Confirmação obrigatória (true)' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['skills:write', 'firstsys_skills_sync_from_git', 'tool:firstsys_skills_sync_from_git'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    tags: ['skills', 'git', 'sync']
+  },
+  {
+    name: 'firstsys_skills_versions_list',
+    title: 'Listar Versões da Skill',
+    description: 'Consulta o histórico imutável de versões e snapshots SHA-256 de uma skill.',
+    inputSchema: {
+      type: 'object',
+      required: ['skill_id'],
+      properties: {
+        skill_id: { type: 'string', description: 'ID da skill' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['skills:read', 'firstsys_skills_versions_list', 'tool:firstsys_skills_versions_list'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['skills', 'versions', 'list']
+  },
+  {
+    name: 'firstsys_skills_versions_get',
+    title: 'Obter Detalhes da Versão',
+    description: 'Recupera o snapshot de arquivos de uma versão semântica específica da skill.',
+    inputSchema: {
+      type: 'object',
+      required: ['skill_id', 'version'],
+      properties: {
+        skill_id: { type: 'string', description: 'ID da skill' },
+        version: { type: 'string', description: 'Versão semântica (ex: 1.0.0)' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['skills:read', 'firstsys_skills_versions_get', 'tool:firstsys_skills_versions_get'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['skills', 'versions', 'get']
+  },
+  {
+    name: 'firstsys_skills_versions_compare',
+    title: 'Comparar (Diff) Versões da Skill',
+    description: 'Compara arquivos adicionados, modificados e removidos entre duas versões da skill.',
+    inputSchema: {
+      type: 'object',
+      required: ['skill_id', 'version_a', 'version_b'],
+      properties: {
+        skill_id: { type: 'string', description: 'ID da skill' },
+        version_a: { type: 'string', description: 'Primeira versão a comparar' },
+        version_b: { type: 'string', description: 'Segunda versão a comparar' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['skills:read', 'firstsys_skills_versions_compare', 'tool:firstsys_skills_versions_compare'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['skills', 'versions', 'diff']
+  },
+  {
+    name: 'firstsys_skills_versions_restore',
+    title: 'Restaurar Versão Anterior (Rollback)',
+    description: 'Restaura a skill para um snapshot anterior com confirmação explícita.',
+    inputSchema: {
+      type: 'object',
+      required: ['skill_id', 'version', 'confirm'],
+      properties: {
+        skill_id: { type: 'string', description: 'ID da skill' },
+        version: { type: 'string', description: 'Versão alvo para rollback' },
+        confirm: { type: 'boolean', description: 'Confirmação obrigatória (true)' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['skills:write', 'firstsys_skills_versions_restore', 'tool:firstsys_skills_versions_restore'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: true },
+    tags: ['skills', 'versions', 'rollback']
+  },
+  {
+    name: 'firstsys_skills_audit_list',
+    title: 'Consultar Trilha de Auditoria da Skill',
+    description: 'Consulta o histórico cronológico de criações, edições, instalações e importações da skill.',
+    inputSchema: {
+      type: 'object',
+      required: ['skill_id'],
+      properties: {
+        skill_id: { type: 'string', description: 'ID da skill' },
+        limit: { type: 'number', description: 'Quantidade máxima de registros' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['skills:read', 'firstsys_skills_audit_list', 'tool:firstsys_skills_audit_list'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['skills', 'audit']
+  },
+  {
+    name: 'firstsys_skills_dependencies_list',
+    title: 'Listar Dependências da Skill',
+    description: 'Retorna a lista de pacotes, módulos e ferramentas necessários para o funcionamento da skill.',
+    inputSchema: {
+      type: 'object',
+      required: ['skill_id'],
+      properties: {
+        skill_id: { type: 'string', description: 'ID da skill' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['skills:read', 'firstsys_skills_dependencies_list', 'tool:firstsys_skills_dependencies_list'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['skills', 'dependencies']
+  },
+  {
+    name: 'firstsys_skills_permissions_get',
+    title: 'Consultar Permissões Requeridas da Skill',
+    description: 'Retorna os privilégios e permissões necessários para a skill operar.',
+    inputSchema: {
+      type: 'object',
+      required: ['skill_id'],
+      properties: {
+        skill_id: { type: 'string', description: 'ID da skill' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['skills:read', 'firstsys_skills_permissions_get', 'tool:firstsys_skills_permissions_get'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['skills', 'permissions']
+  },
+  {
+    name: 'firstsys_skills_permissions_update',
+    title: 'Atualizar Permissões da Skill',
+    description: 'Atualiza o rol de permissões autorizadas para a skill.',
+    inputSchema: {
+      type: 'object',
+      required: ['skill_id', 'permissions'],
+      properties: {
+        skill_id: { type: 'string', description: 'ID da skill' },
+        permissions: { type: 'array', items: { type: 'string' }, description: 'Lista de novas permissões' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['skills:write', 'firstsys_skills_permissions_update', 'tool:firstsys_skills_permissions_update'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    tags: ['skills', 'permissions']
   }
 ];
+
 
 // Helper para converter parâmetros de mídias do MCP em FormData (multipart/form-data)
 async function buildMediaFormData(
@@ -2095,49 +2512,39 @@ async function executeToolDirectly(name: string, rawArgs: any, user: OAuthJwtPay
         });
       }
 
-      let skills: any[] = [];
-      if (fs.existsSync(dbPath)) {
-        try {
-          const dbData = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
-          skills = dbData.skills || [];
-        } catch {}
-      }
+      const { category, query, origin, status, installed_only, page = 1, limit = 20 } = parseResult.data;
+      const allSkills = listSkills({
+        category,
+        query,
+        origin,
+        status,
+        installedOnly: installed_only
+      });
 
-      const { category, query, installed_only } = parseResult.data;
-
-      if (category && category !== 'todas') {
-        skills = skills.filter(s => s.category?.toLowerCase() === category.toLowerCase());
-      }
-
-      if (installed_only) {
-        skills = skills.filter(s => s.installed === true);
-      }
-
-      if (query) {
-        const q = query.toLowerCase();
-        skills = skills.filter(s =>
-          s.name?.toLowerCase().includes(q) ||
-          s.description?.toLowerCase().includes(q) ||
-          (Array.isArray(s.tags) && s.tags.some((t: string) => t.toLowerCase().includes(q)))
-        );
-      }
+      const startIndex = (page - 1) * limit;
+      const paginated = allSkills.slice(startIndex, startIndex + limit);
 
       return {
-        skills: skills.map(s => ({
+        skills: paginated.map(s => ({
           id: s.id,
-          name: s.name,
           slug: s.slug,
+          name: s.name,
           description: s.description,
           category: s.category,
           tags: s.tags,
+          origin: s.origin,
           status: s.status,
           installed: s.installed,
           version: s.version,
-          files_count: Array.isArray(s.files) ? s.files.length : 0,
-          files_available: Array.isArray(s.files) ? s.files.map((f: any) => f.name) : []
+          license: s.license,
+          risk_level: s.riskLevel,
+          files_count: (s.files || []).filter(f => !f.deletedAt).length,
+          files_available: (s.files || []).filter(f => !f.deletedAt).map(f => f.path)
         })),
-        total: skills.length,
-        info: "Utilize 'firstsys_skills_get' com o 'skill_id' para consultar o conteúdo integral do arquivo SKILL.md de uma skill."
+        page,
+        limit,
+        total: allSkills.length,
+        has_more: startIndex + limit < allSkills.length
       };
     }
 
@@ -2153,15 +2560,8 @@ async function executeToolDirectly(name: string, rawArgs: any, user: OAuthJwtPay
       }
 
       const { skill_id } = parseResult.data;
-      let skills: any[] = [];
-      if (fs.existsSync(dbPath)) {
-        try {
-          const dbData = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
-          skills = dbData.skills || [];
-        } catch {}
-      }
+      const skill = getSkill(skill_id);
 
-      const skill = skills.find(s => s.id === skill_id || s.slug === skill_id);
       if (!skill) {
         return formatMcpError({
           code: 'SKILL_NOT_FOUND',
@@ -2171,64 +2571,54 @@ async function executeToolDirectly(name: string, rawArgs: any, user: OAuthJwtPay
         });
       }
 
+      const versions = listSkillVersions(skill.id);
+      const installations = listSkillInstallations(skill.id);
+
       return {
         ok: true,
         skill: {
           id: skill.id,
-          name: skill.name,
           slug: skill.slug,
+          name: skill.name,
           description: skill.description,
           category: skill.category,
           tags: skill.tags,
+          author: skill.author,
+          origin: skill.origin,
           status: skill.status,
           installed: skill.installed,
           version: skill.version,
-          files: skill.files || []
+          license: skill.license,
+          risk_level: skill.riskLevel,
+          security_warnings: skill.securityWarnings,
+          dependencies: skill.dependencies,
+          permissions: skill.permissions,
+          files: (skill.files || []).filter(f => !f.deletedAt).map(f => ({
+            id: f.id,
+            path: f.path,
+            name: f.name,
+            extension: f.extension,
+            size_bytes: f.sizeBytes,
+            sha256: f.sha256,
+            content: f.content,
+            is_executable: f.isExecutable,
+            requires_review: f.requiresReview
+          })),
+          versions: versions.map(v => ({
+            version: v.version,
+            changelog: v.changelog,
+            snapshot_hash: v.snapshotHash,
+            created_at: v.createdAt
+          })),
+          installations: installations.map(i => ({
+            id: i.id,
+            context_type: i.contextType,
+            context_id: i.contextId,
+            context_name: i.contextName,
+            pinned_version: i.pinnedVersion,
+            status: i.status
+          }))
         }
-      };
-    }
-
-    case 'firstsys_skills_install': {
-      const parseResult = SkillInstallSchema.safeParse(rawArgs);
-      if (!parseResult.success) {
-        return formatMcpError({
-          code: 'INVALID_ARGUMENTS',
-          message: parseResult.error.issues[0]?.message || 'skill_id é obrigatório.',
-          httpStatus: 400,
-          correlationId
-        });
-      }
-
-      const { skill_id, install } = parseResult.data;
-      if (!fs.existsSync(dbPath)) {
-        return formatMcpError({ code: 'DB_ERROR', message: 'Banco indisponível.', httpStatus: 500, correlationId });
-      }
-
-      const dbData = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
-      const skills = dbData.skills || [];
-      const skill = skills.find((s: any) => s.id === skill_id || s.slug === skill_id);
-
-      if (!skill) {
-        return formatMcpError({
-          code: 'SKILL_NOT_FOUND',
-          message: `Skill '${skill_id}' não encontrada para instalação.`,
-          httpStatus: 404,
-          correlationId
-        });
-      }
-
-      skill.installed = install;
-      skill.status = install ? 'active' : 'inactive';
-      skill.updatedAt = new Date().toISOString();
-
-      fs.writeFileSync(dbPath, JSON.stringify(dbData, null, 2));
-
-      return {
-        ok: true,
-        message: install ? `Skill '${skill.name}' instalada e ativada com sucesso.` : `Skill '${skill.name}' desinstalada.`,
-        skill_id: skill.id,
-        installed: skill.installed,
-        status: skill.status
       };
     }
 
@@ -2244,55 +2634,26 @@ async function executeToolDirectly(name: string, rawArgs: any, user: OAuthJwtPay
         });
       }
 
-      const { name: skillName, description, category, tags, skill_md_content } = parseResult.data;
-      if (!fs.existsSync(dbPath)) {
-        return formatMcpError({ code: 'DB_ERROR', message: 'Banco indisponível.', httpStatus: 500, correlationId });
-      }
+      const { name: skillName, description, category, tags, license, version, skill_md_content } = parseResult.data;
 
-      const dbData = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
-      if (!dbData.skills) dbData.skills = [];
-
-      const slug = skillName
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)/g, '');
-
-      const id = `skill_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-      const now = new Date().toISOString();
-
-      const newSkill = {
-        id,
-        name: skillName.trim(),
-        slug: slug || id,
-        description: description.trim(),
-        category: (category || 'geral').toLowerCase().trim(),
-        tags: tags || [],
-        status: 'active',
-        installed: true,
-        version: '1.0.0',
-        author: 'ChatGPT / MCP Agent',
-        createdAt: now,
-        updatedAt: now,
-        files: [
-          {
-            name: 'SKILL.md',
-            path: '/SKILL.md',
-            language: 'markdown',
-            updatedAt: now,
-            content: skill_md_content?.trim() || `# Skill: ${skillName}\n\n## Objetivo\n${description}`
-          }
-        ]
-      };
-
-      dbData.skills.push(newSkill);
-      fs.writeFileSync(dbPath, JSON.stringify(dbData, null, 2));
+      const created = createSkill({
+        name: skillName,
+        description,
+        category,
+        tags,
+        license,
+        version,
+        files: skill_md_content ? [{ name: 'SKILL.md', path: 'SKILL.md', content: skill_md_content }] : []
+      }, user.sub || 'mcp-agent');
 
       return {
         ok: true,
-        message: `Skill '${newSkill.name}' criada com sucesso pela IA.`,
-        skill: newSkill
+        message: `Skill '${created.name}' criada com sucesso na Central Firstsys.`,
+        skill: {
+          id: created.id,
+          slug: created.slug,
+          version: created.version
+        }
       };
     }
 
@@ -2307,51 +2668,22 @@ async function executeToolDirectly(name: string, rawArgs: any, user: OAuthJwtPay
         });
       }
 
-      const { skill_id, name: newName, description: newDesc, skill_md_content } = parseResult.data;
-      if (!fs.existsSync(dbPath)) {
-        return formatMcpError({ code: 'DB_ERROR', message: 'Banco indisponível.', httpStatus: 500, correlationId });
-      }
+      const { skill_id, name: newName, description: newDesc, category, tags, status, version, license } = parseResult.data;
+      const patch: any = {};
+      if (newName) patch.name = newName;
+      if (newDesc) patch.description = newDesc;
+      if (category) patch.category = category;
+      if (tags) patch.tags = tags;
+      if (status) patch.status = status;
+      if (version) patch.version = version;
+      if (license) patch.license = license;
 
-      const dbData = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
-      const skills = dbData.skills || [];
-      const skill = skills.find((s: any) => s.id === skill_id || s.slug === skill_id);
-
-      if (!skill) {
-        return formatMcpError({
-          code: 'SKILL_NOT_FOUND',
-          message: `Skill '${skill_id}' não encontrada.`,
-          httpStatus: 404,
-          correlationId
-        });
-      }
-
-      if (newName) skill.name = newName.trim();
-      if (newDesc) skill.description = newDesc.trim();
-
-      if (skill_md_content) {
-        if (!Array.isArray(skill.files)) skill.files = [];
-        const skillMdFile = skill.files.find((f: any) => f.name.toLowerCase() === 'skill.md');
-        if (skillMdFile) {
-          skillMdFile.content = skill_md_content.trim();
-          skillMdFile.updatedAt = new Date().toISOString();
-        } else {
-          skill.files.push({
-            name: 'SKILL.md',
-            path: '/SKILL.md',
-            language: 'markdown',
-            updatedAt: new Date().toISOString(),
-            content: skill_md_content.trim()
-          });
-        }
-      }
-
-      skill.updatedAt = new Date().toISOString();
-      fs.writeFileSync(dbPath, JSON.stringify(dbData, null, 2));
+      const updated = updateSkill(skill_id, patch, user.sub || 'mcp-agent');
 
       return {
         ok: true,
-        message: `Skill '${skill.name}' atualizada com sucesso.`,
-        skill
+        message: `Skill '${updated.name}' atualizada com sucesso.`,
+        skill: updated
       };
     }
 
@@ -2366,32 +2698,607 @@ async function executeToolDirectly(name: string, rawArgs: any, user: OAuthJwtPay
         });
       }
 
-      const { skill_id } = parseResult.data;
-      if (!fs.existsSync(dbPath)) {
-        return formatMcpError({ code: 'DB_ERROR', message: 'Banco indisponível.', httpStatus: 500, correlationId });
+      const { skill_id, hard_delete } = parseResult.data;
+      deleteSkill(skill_id, user.sub || 'mcp-agent', hard_delete);
+
+      return {
+        ok: true,
+        message: `Skill '${skill_id}' removida com sucesso (${hard_delete ? 'exclusão permanente' : 'arquivada'}).`
+      };
+    }
+
+    case 'firstsys_skills_install': {
+      const parseResult = SkillInstallSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'Parâmetros inválidos.',
+          httpStatus: 400,
+          correlationId
+        });
       }
 
-      const dbData = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
-      const skills = dbData.skills || [];
-      const exists = skills.some((s: any) => s.id === skill_id || s.slug === skill_id);
+      const { skill_id, context_type = 'connection', context_id = 'conn_coolify_principal', context_name = 'Conexão Zatten', pinned_version, config } = parseResult.data;
+      const installation = createSkillInstallation(skill_id, {
+        contextType: context_type as any,
+        contextId: context_id,
+        contextName: context_name,
+        pinnedVersion: pinned_version,
+        config
+      }, user.sub || 'mcp-agent');
 
-      if (!exists) {
+      // Atualiza também flag para retrocompatibilidade
+      toggleInstallSkill(skill_id, true, user.sub || 'mcp-agent');
+
+      return {
+        ok: true,
+        message: `Skill vinculada com sucesso ao contexto [${installation.contextType}: ${installation.contextName}].`,
+        installation
+      };
+    }
+
+    case 'firstsys_skills_uninstall': {
+      const parseResult = SkillUninstallSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
         return formatMcpError({
-          code: 'SKILL_NOT_FOUND',
-          message: `Skill '${skill_id}' não encontrada.`,
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'skill_id é obrigatório.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { skill_id, context_id, installation_id } = parseResult.data;
+      if (installation_id) {
+        deleteSkillInstallation(skill_id, installation_id, user.sub || 'mcp-agent');
+      } else {
+        const installs = listSkillInstallations(skill_id);
+        const match = context_id ? installs.find(i => i.contextId === context_id) : installs[0];
+        if (match) {
+          deleteSkillInstallation(skill_id, match.id, user.sub || 'mcp-agent');
+        }
+      }
+
+      toggleInstallSkill(skill_id, false, user.sub || 'mcp-agent');
+
+      return {
+        ok: true,
+        message: `Skill '${skill_id}' desinstalada do contexto com sucesso.`
+      };
+    }
+
+    case 'firstsys_skill_files_list': {
+      const parseResult = SkillFilesListSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'skill_id é obrigatório.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { skill_id, include_deleted } = parseResult.data;
+      const files = listSkillFiles(skill_id, include_deleted);
+
+      return {
+        ok: true,
+        skill_id,
+        files: files.map(f => ({
+          path: f.path,
+          name: f.name,
+          extension: f.extension,
+          size_bytes: f.sizeBytes,
+          sha256: f.sha256,
+          is_executable: f.isExecutable,
+          requires_review: f.requiresReview,
+          deleted: !!f.deletedAt
+        })),
+        total: files.length
+      };
+    }
+
+    case 'firstsys_skill_files_get': {
+      const parseResult = SkillFilesGetSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'skill_id e path são obrigatórios.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { skill_id, path: filePath } = parseResult.data;
+      const file = getSkillFile(skill_id, filePath);
+
+      if (!file) {
+        return formatMcpError({
+          code: 'FILE_NOT_FOUND',
+          message: `Arquivo '${filePath}' não encontrado na skill '${skill_id}'.`,
           httpStatus: 404,
           correlationId
         });
       }
 
-      dbData.skills = skills.filter((s: any) => s.id !== skill_id && s.slug !== skill_id);
-      fs.writeFileSync(dbPath, JSON.stringify(dbData, null, 2));
+      return {
+        ok: true,
+        file: {
+          path: file.path,
+          name: file.name,
+          extension: file.extension,
+          content: file.content,
+          sha256: file.sha256,
+          size_bytes: file.sizeBytes,
+          is_executable: file.isExecutable
+        }
+      };
+    }
+
+    case 'firstsys_skill_files_create':
+    case 'firstsys_skill_files_update': {
+      const schema = name === 'firstsys_skill_files_create' ? SkillFilesCreateSchema : SkillFilesUpdateSchema;
+      const parseResult = schema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'Parâmetros inválidos.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { skill_id, path: filePath, content } = parseResult.data;
+      const { file } = saveSkillFile(skill_id, filePath, content, user.sub || 'mcp-agent');
 
       return {
         ok: true,
-        message: `Skill '${skill_id}' removida com sucesso pela IA.`
+        message: `Arquivo '${file.path}' salvo com sucesso.`,
+        file: {
+          path: file.path,
+          sha256: file.sha256,
+          size_bytes: file.sizeBytes,
+          is_executable: file.isExecutable
+        }
       };
     }
+
+    case 'firstsys_skill_files_delete': {
+      const parseResult = SkillFilesDeleteSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'Parâmetros inválidos.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { skill_id, path: filePath, permanent } = parseResult.data;
+      deleteSkillFile(skill_id, filePath, user.sub || 'mcp-agent', permanent);
+
+      return {
+        ok: true,
+        message: `Arquivo '${filePath}' removido (${permanent ? 'permanentemente' : 'soft delete'}).`
+      };
+    }
+
+    case 'firstsys_skill_files_restore': {
+      const parseResult = SkillFilesRestoreSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'Parâmetros inválidos.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { skill_id, path: filePath } = parseResult.data;
+      const { file } = restoreSkillFile(skill_id, filePath, user.sub || 'mcp-agent');
+
+      return {
+        ok: true,
+        message: `Arquivo '${file.path}' restaurado com sucesso.`
+      };
+    }
+
+    case 'firstsys_skills_import_preview': {
+      const parseResult = SkillImportPreviewSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'URL do repositório Git inválida.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { repo_url } = parseResult.data;
+      const preview = await previewGitRepository(repo_url);
+
+      return {
+        ok: true,
+        preview: {
+          repo_url: preview.repoUrl,
+          owner: preview.owner,
+          repo: preview.repo,
+          branch: preview.branch,
+          commit_sha: preview.commitSha,
+          license: preview.license,
+          detected_name: preview.detectedName,
+          detected_description: preview.detectedDescription,
+          risk_level: preview.riskLevel,
+          security_findings_count: preview.securityFindings.length,
+          security_findings: preview.securityFindings,
+          files_count: preview.files.length,
+          total_size_kb: Math.round(preview.totalSizeBytes / 1024),
+          dependencies_detected: preview.dependenciesDetected,
+          files_selectable: preview.files.filter(f => !f.isIgnored).map(f => f.path)
+        }
+      };
+    }
+
+    case 'firstsys_skills_import_from_git': {
+      const parseResult = SkillImportFromGitSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'Parâmetros inválidos para importação Git.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { repo_url, selected_paths, skill_name, category, tags, license } = parseResult.data;
+      const fetchedFiles = await fetchSelectedGitFiles(repo_url, selected_paths);
+      const preview = await previewGitRepository(repo_url);
+
+      const created = createSkill({
+        name: skill_name || preview.detectedName || preview.repo,
+        description: preview.detectedDescription || `Skill importada do repositório ${preview.owner}/${preview.repo}`,
+        category: category || preview.detectedCategory || 'engenharia',
+        tags: tags || preview.detectedTags || ['git-import'],
+        author: `${preview.owner} (Git)`,
+        origin: 'importada',
+        license: license || preview.license || 'Open Source',
+        repositoryUrl: preview.repoUrl,
+        repositoryOwner: preview.owner,
+        repositoryBranch: preview.branch,
+        repositoryCommitSha: preview.commitSha,
+        riskLevel: preview.riskLevel,
+        securityWarnings: preview.securityFindings.map(f => `[${f.severity.toUpperCase()}] ${f.rule} em ${f.filePath} (linha ${f.line})`),
+        dependencies: preview.dependenciesDetected,
+        files: fetchedFiles.map(f => ({
+          id: `file_git_${crypto.randomUUID().replace(/-/g, '_').substring(0, 12)}`,
+          skillId: '',
+          path: f.path,
+          name: path.basename(f.path),
+          extension: path.extname(f.path),
+          contentType: 'text/plain',
+          sizeBytes: f.sizeBytes,
+          sha256: f.sha256,
+          content: f.content,
+          origin: 'git',
+          isExecutable: false,
+          requiresReview: false,
+          version: '1.0.0',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          deletedAt: null
+        }))
+      }, user.sub || 'mcp-agent');
+
+      return {
+        ok: true,
+        message: `Skill '${created.name}' importada e versionada com sucesso.`,
+        skill: {
+          id: created.id,
+          slug: created.slug,
+          version: created.version
+        }
+      };
+    }
+
+    case 'firstsys_skills_import_status': {
+      const parseResult = SkillImportStatusSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'skill_id é obrigatório.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { skill_id } = parseResult.data;
+      const skill = getSkill(skill_id);
+      if (!skill) {
+        return formatMcpError({ code: 'SKILL_NOT_FOUND', message: `Skill '${skill_id}' não encontrada.`, httpStatus: 404, correlationId });
+      }
+
+      return {
+        ok: true,
+        origin: skill.origin,
+        repository_url: skill.repositoryUrl,
+        repository_owner: skill.repositoryOwner,
+        repository_branch: skill.repositoryBranch,
+        repository_commit_sha: skill.repositoryCommitSha,
+        last_sync_at: skill.lastSyncAt,
+        license: skill.license,
+        risk_level: skill.riskLevel,
+        security_warnings: skill.securityWarnings
+      };
+    }
+
+    case 'firstsys_skills_sync_preview': {
+      const parseResult = SkillSyncPreviewSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'skill_id é obrigatório.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { skill_id } = parseResult.data;
+      const skill = getSkill(skill_id);
+      if (!skill || !skill.repositoryUrl) {
+        return formatMcpError({
+          code: 'SKILL_NOT_SYNCABLE',
+          message: `A skill '${skill_id}' não possui repositório Git associado para sincronização.`,
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const preview = await previewGitRepository(skill.repositoryUrl);
+      const isUpToDate = skill.repositoryCommitSha === preview.commitSha;
+
+      return {
+        ok: true,
+        skill_id,
+        current_commit_sha: skill.repositoryCommitSha,
+        remote_commit_sha: preview.commitSha,
+        is_up_to_date: isUpToDate,
+        branch: preview.branch,
+        remote_files_count: preview.files.length,
+        security_findings_count: preview.securityFindings.length
+      };
+    }
+
+    case 'firstsys_skills_sync_from_git': {
+      const parseResult = SkillSyncFromGitSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'Sincronização requer confirm: true.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { skill_id } = parseResult.data;
+      const skill = getSkill(skill_id);
+      if (!skill || !skill.repositoryUrl) {
+        return formatMcpError({ code: 'SKILL_NOT_SYNCABLE', message: 'Skill não possui repositório associado.', httpStatus: 400, correlationId });
+      }
+
+      const preview = await previewGitRepository(skill.repositoryUrl);
+      const selectedPaths = (skill.files || []).map(f => f.path);
+      const fetched = await fetchSelectedGitFiles(skill.repositoryUrl, selectedPaths);
+
+      for (const item of fetched) {
+        saveSkillFile(skill.id, item.path, item.content, user.sub || 'mcp-agent', 'git');
+      }
+
+      updateSkill(skill.id, {
+        repositoryCommitSha: preview.commitSha,
+        lastSyncAt: new Date().toISOString()
+      }, user.sub || 'mcp-agent');
+
+      return {
+        ok: true,
+        message: `Skill '${skill.name}' sincronizada com sucesso para o commit ${preview.commitSha.substring(0, 8)}.`
+      };
+    }
+
+    case 'firstsys_skills_versions_list': {
+      const parseResult = SkillVersionsListSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'skill_id é obrigatório.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { skill_id } = parseResult.data;
+      const versions = listSkillVersions(skill_id);
+
+      return {
+        ok: true,
+        skill_id,
+        versions: versions.map(v => ({
+          version: v.version,
+          changelog: v.changelog,
+          snapshot_hash: v.snapshotHash,
+          files_count: v.filesSnapshot.length,
+          created_at: v.createdAt,
+          created_by: v.createdBy
+        })),
+        total: versions.length
+      };
+    }
+
+    case 'firstsys_skills_versions_get': {
+      const parseResult = SkillVersionsGetSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'skill_id e version são obrigatórios.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { skill_id, version } = parseResult.data;
+      const verRecord = getSkillVersion(skill_id, version);
+
+      if (!verRecord) {
+        return formatMcpError({ code: 'VERSION_NOT_FOUND', message: `Versão '${version}' não encontrada.`, httpStatus: 404, correlationId });
+      }
+
+      return {
+        ok: true,
+        version: verRecord
+      };
+    }
+
+    case 'firstsys_skills_versions_compare': {
+      const parseResult = SkillVersionsCompareSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'skill_id, version_a e version_b são obrigatórios.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { skill_id, version_a, version_b } = parseResult.data;
+      const diff = compareSkillVersions(skill_id, version_a, version_b);
+
+      return {
+        ok: true,
+        diff
+      };
+    }
+
+    case 'firstsys_skills_versions_restore': {
+      const parseResult = SkillVersionsRestoreSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'Rollback requer confirm: true.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { skill_id, version } = parseResult.data;
+      const verRecord = getSkillVersion(skill_id, version);
+      if (!verRecord) {
+        return formatMcpError({ code: 'VERSION_NOT_FOUND', message: `Versão '${version}' não encontrada.`, httpStatus: 404, correlationId });
+      }
+
+      updateSkill(skill_id, { version }, user.sub || 'mcp-agent');
+
+      return {
+        ok: true,
+        message: `Skill '${skill_id}' revertida com sucesso para o snapshot da versão ${version}.`
+      };
+    }
+
+    case 'firstsys_skills_audit_list': {
+      const parseResult = SkillAuditListSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'skill_id é obrigatório.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { skill_id, limit = 50 } = parseResult.data;
+      const logs = listSkillAuditLogs(skill_id).slice(0, limit);
+
+      return {
+        ok: true,
+        skill_id,
+        logs: logs.map(l => ({
+          id: l.id,
+          actor: l.actor,
+          action: l.action,
+          details: l.details,
+          created_at: l.createdAt
+        })),
+        total: logs.length
+      };
+    }
+
+    case 'firstsys_skills_dependencies_list': {
+      const parseResult = SkillDependenciesListSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'skill_id é obrigatório.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { skill_id } = parseResult.data;
+      const skill = getSkill(skill_id);
+      if (!skill) {
+        return formatMcpError({ code: 'SKILL_NOT_FOUND', message: `Skill '${skill_id}' não encontrada.`, httpStatus: 404, correlationId });
+      }
+
+      return {
+        ok: true,
+        skill_id,
+        dependencies: skill.dependencies || []
+      };
+    }
+
+    case 'firstsys_skills_permissions_get': {
+      const parseResult = SkillPermissionsGetSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'skill_id é obrigatório.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { skill_id } = parseResult.data;
+      const skill = getSkill(skill_id);
+      if (!skill) {
+        return formatMcpError({ code: 'SKILL_NOT_FOUND', message: `Skill '${skill_id}' não encontrada.`, httpStatus: 404, correlationId });
+      }
+
+      return {
+        ok: true,
+        skill_id,
+        permissions: skill.permissions || []
+      };
+    }
+
+    case 'firstsys_skills_permissions_update': {
+      const parseResult = SkillPermissionsUpdateSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'Parâmetros inválidos.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { skill_id, permissions } = parseResult.data;
+      const updated = updateSkill(skill_id, { permissions }, user.sub || 'mcp-agent');
+
+      return {
+        ok: true,
+        message: 'Permissões atualizadas com sucesso.',
+        permissions: updated.permissions
+      };
+    }
+
 
     default:
       throw new Error(`Ferramenta não encontrada: ${name}`);

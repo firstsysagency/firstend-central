@@ -181,7 +181,11 @@ export const ZattenLeadsLeadNumberAiPatchSchema = z.object({
 export const SkillListSchema = z.object({
   category: z.string().max(50).optional(),
   query: z.string().max(100).optional(),
-  installed_only: z.boolean().optional()
+  origin: z.string().max(50).optional(),
+  status: z.string().max(50).optional(),
+  installed_only: z.boolean().optional(),
+  page: z.number().int().min(1).default(1).optional(),
+  limit: z.number().int().min(1).max(50).default(20).optional()
 }).strict();
 
 // 11.2 firstsys_skills_get
@@ -189,33 +193,173 @@ export const SkillGetSchema = z.object({
   skill_id: z.string().min(1, 'skill_id ou slug é obrigatório').max(100)
 }).strict();
 
-// 11.3 firstsys_skills_install
-export const SkillInstallSchema = z.object({
-  skill_id: z.string().min(1, 'skill_id é obrigatório').max(100),
-  install: z.boolean().default(true)
-}).strict();
-
-// 11.4 firstsys_skills_create
+// 11.3 firstsys_skills_create
 export const SkillCreateSchema = z.object({
   name: z.string().min(2, 'Nome da skill deve ter no mínimo 2 caracteres').max(100),
   description: z.string().min(5, 'Descrição deve ter no mínimo 5 caracteres').max(500),
   category: z.string().max(50).default('geral'),
-  tags: z.array(z.string().max(30)).max(10).optional(),
-  skill_md_content: z.string().min(10, 'Conteúdo de SKILL.md obrigatório').max(20000).optional()
+  tags: z.array(z.string().max(30)).max(15).optional(),
+  license: z.string().max(100).optional(),
+  version: z.string().regex(/^\d+\.\d+\.\d+/, 'Versão semântica inválida (ex: 1.0.0)').optional(),
+  skill_md_content: z.string().min(10, 'Conteúdo de SKILL.md obrigatório').max(100000).optional()
 }).strict();
 
-// 11.5 firstsys_skills_update
+// 11.4 firstsys_skills_update
 export const SkillUpdateSchema = z.object({
   skill_id: z.string().min(1, 'skill_id é obrigatório').max(100),
   name: z.string().min(2).max(100).optional(),
   description: z.string().max(500).optional(),
-  skill_md_content: z.string().max(20000).optional()
+  category: z.string().max(50).optional(),
+  tags: z.array(z.string().max(30)).max(15).optional(),
+  status: z.enum(['rascunho', 'ativa', 'arquivada', 'descontinuada', 'active', 'inactive']).optional(),
+  version: z.string().regex(/^\d+\.\d+\.\d+/).optional(),
+  license: z.string().max(100).optional()
 }).strict();
 
-// 11.6 firstsys_skills_delete
+// 11.5 firstsys_skills_delete
 export const SkillDeleteSchema = z.object({
   skill_id: z.string().min(1, 'skill_id é obrigatório').max(100),
   confirm: z.boolean().refine(val => val === true, {
     message: 'A exclusão de uma skill requer confirm: true para evitar perdas acidentais.'
+  }),
+  hard_delete: z.boolean().default(false).optional()
+}).strict();
+
+// 11.6 firstsys_skills_install
+export const SkillInstallSchema = z.object({
+  skill_id: z.string().min(1, 'skill_id é obrigatório').max(100),
+  context_type: z.enum(['agent', 'connection', 'project', 'mcp', 'environment']).default('connection').optional(),
+  context_id: z.string().max(100).default('conn_coolify_principal').optional(),
+  context_name: z.string().max(150).default('Conexão Padrão').optional(),
+  pinned_version: z.string().regex(/^\d+\.\d+\.\d+/).optional(),
+  config: z.record(z.string(), z.any()).optional()
+}).strict();
+
+// 11.7 firstsys_skills_uninstall
+export const SkillUninstallSchema = z.object({
+  skill_id: z.string().min(1, 'skill_id é obrigatório').max(100),
+  context_id: z.string().max(100).optional(),
+  installation_id: z.string().max(100).optional()
+}).strict();
+
+// 11.8 firstsys_skill_files_list
+export const SkillFilesListSchema = z.object({
+  skill_id: z.string().min(1, 'skill_id é obrigatório').max(100),
+  include_deleted: z.boolean().default(false).optional()
+}).strict();
+
+// 11.9 firstsys_skill_files_get
+export const SkillFilesGetSchema = z.object({
+  skill_id: z.string().min(1, 'skill_id é obrigatório').max(100),
+  path: z.string().min(1, 'path do arquivo é obrigatório').max(255)
+}).strict();
+
+// 11.10 firstsys_skill_files_create
+export const SkillFilesCreateSchema = z.object({
+  skill_id: z.string().min(1, 'skill_id é obrigatório').max(100),
+  path: z.string().min(1, 'path relativo é obrigatório').max(255),
+  content: z.string().max(1000000, 'Arquivo excede 1MB')
+}).strict();
+
+// 11.11 firstsys_skill_files_update
+export const SkillFilesUpdateSchema = z.object({
+  skill_id: z.string().min(1, 'skill_id é obrigatório').max(100),
+  path: z.string().min(1, 'path relativo é obrigatório').max(255),
+  content: z.string().max(1000000, 'Arquivo excede 1MB')
+}).strict();
+
+// 11.12 firstsys_skill_files_delete
+export const SkillFilesDeleteSchema = z.object({
+  skill_id: z.string().min(1, 'skill_id é obrigatório').max(100),
+  path: z.string().min(1, 'path relativo é obrigatório').max(255),
+  permanent: z.boolean().default(false).optional()
+}).strict();
+
+// 11.13 firstsys_skill_files_restore
+export const SkillFilesRestoreSchema = z.object({
+  skill_id: z.string().min(1, 'skill_id é obrigatório').max(100),
+  path: z.string().min(1, 'path relativo é obrigatório').max(255)
+}).strict();
+
+// 11.14 firstsys_skills_import_preview
+export const SkillImportPreviewSchema = z.object({
+  repo_url: z.string().url('URL inválida').max(500)
+}).strict();
+
+// 11.15 firstsys_skills_import_from_git
+export const SkillImportFromGitSchema = z.object({
+  repo_url: z.string().url('URL inválida').max(500),
+  selected_paths: z.array(z.string().max(255)).min(1, 'Selecione ao menos um arquivo'),
+  skill_name: z.string().max(100).optional(),
+  category: z.string().max(50).optional(),
+  tags: z.array(z.string().max(30)).optional(),
+  license: z.string().max(100).optional()
+}).strict();
+
+// 11.16 firstsys_skills_import_status
+export const SkillImportStatusSchema = z.object({
+  skill_id: z.string().min(1).max(100)
+}).strict();
+
+// 11.17 firstsys_skills_sync_preview
+export const SkillSyncPreviewSchema = z.object({
+  skill_id: z.string().min(1).max(100)
+}).strict();
+
+// 11.18 firstsys_skills_sync_from_git
+export const SkillSyncFromGitSchema = z.object({
+  skill_id: z.string().min(1).max(100),
+  confirm: z.boolean().refine(v => v === true, {
+    message: 'A sincronização com repositório remoto exige confirm: true'
   })
 }).strict();
+
+// 11.19 firstsys_skills_versions_list
+export const SkillVersionsListSchema = z.object({
+  skill_id: z.string().min(1).max(100)
+}).strict();
+
+// 11.20 firstsys_skills_versions_get
+export const SkillVersionsGetSchema = z.object({
+  skill_id: z.string().min(1).max(100),
+  version: z.string().min(1).max(20)
+}).strict();
+
+// 11.21 firstsys_skills_versions_compare
+export const SkillVersionsCompareSchema = z.object({
+  skill_id: z.string().min(1).max(100),
+  version_a: z.string().min(1).max(20),
+  version_b: z.string().min(1).max(20)
+}).strict();
+
+// 11.22 firstsys_skills_versions_restore
+export const SkillVersionsRestoreSchema = z.object({
+  skill_id: z.string().min(1).max(100),
+  version: z.string().min(1).max(20),
+  confirm: z.boolean().refine(v => v === true, {
+    message: 'O rollback de versão exige confirm: true'
+  })
+}).strict();
+
+// 11.23 firstsys_skills_audit_list
+export const SkillAuditListSchema = z.object({
+  skill_id: z.string().min(1).max(100),
+  limit: z.number().int().min(1).max(100).default(50).optional()
+}).strict();
+
+// 11.24 firstsys_skills_dependencies_list
+export const SkillDependenciesListSchema = z.object({
+  skill_id: z.string().min(1).max(100)
+}).strict();
+
+// 11.25 firstsys_skills_permissions_get
+export const SkillPermissionsGetSchema = z.object({
+  skill_id: z.string().min(1).max(100)
+}).strict();
+
+// 11.26 firstsys_skills_permissions_update
+export const SkillPermissionsUpdateSchema = z.object({
+  skill_id: z.string().min(1).max(100),
+  permissions: z.array(z.string().max(50)).max(30)
+}).strict();
+

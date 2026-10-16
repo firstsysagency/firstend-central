@@ -17,7 +17,41 @@ import { generateOpaqueId } from './oauth/cryptoEngine.js';
 import { logAuditEvent } from '../src/lib/audit.js';
 import { syncEnvConnections, parseEnvConnections } from './vault/envConnectionsManager.js';
 import { buildZattenUrl } from './zatten/zattenClient.js';
+import {
+  listSkills,
+  getSkill,
+  createSkill,
+  updateSkill,
+  deleteSkill,
+  toggleInstallSkill,
+  listSkillFiles,
+  getSkillFile,
+  saveSkillFile,
+  deleteSkillFile,
+  restoreSkillFile,
+  createVersionSnapshot,
+  listSkillVersions,
+  getSkillVersion,
+  compareSkillVersions,
+  listSkillInstallations,
+  createSkillInstallation,
+  deleteSkillInstallation,
+  listSkillAuditLogs,
+  sanitizeRelativePath
+} from './skills/skillsStore.js';
+import {
+  previewGitRepository,
+  fetchSelectedGitFiles
+} from './skills/gitImporter.js';
+import { seedInitialSkills } from './skills/seedSkills.js';
 dotenv.config();
+
+// Inicialização e integridade do catálogo de skills
+try {
+  seedInitialSkills();
+} catch (e) {
+  console.warn('Alerta na inicialização do seed de skills:', e);
+}
 
 // Helper de Hashing PBKDF2 com Salt Individual (Padrão NIST SP 800-132)
 function hashPassword(password: string): { salt: string; hash: string } {
@@ -372,141 +406,96 @@ app.post('/api/mcp/permissions', (req, res) => {
 });
 
 // ==============================================================================
-// === ROTAS REST DE GERENCIAMENTO DE SKILLS DE IA (CENTRAL DE SKILLS) ===
+// === ROTAS REST DA BIBLIOTECA UNIVERSAL DE SKILLS DE IA FIRSTSYS ===
 // ==============================================================================
 
-// 1. Listar todas as skills
+// 1. Listar todas as skills com filtros avançados
 app.get('/api/skills', (req, res) => {
   try {
-    const db = getDatabase();
-    let skills = db.skills || [];
-    const query = typeof req.query.q === 'string' ? req.query.q.toLowerCase().trim() : '';
-    const category = typeof req.query.category === 'string' ? req.query.category.toLowerCase().trim() : '';
-
-    if (category && category !== 'todas') {
-      skills = skills.filter((s: any) => s.category?.toLowerCase() === category);
-    }
-
-    if (query) {
-      skills = skills.filter((s: any) => 
-        s.name?.toLowerCase().includes(query) ||
-        s.description?.toLowerCase().includes(query) ||
-        (Array.isArray(s.tags) && s.tags.some((t: string) => t.toLowerCase().includes(query)))
-      );
-    }
+    const { category, origin, status, riskLevel, q, installedOnly } = req.query;
+    const skills = listSkills({
+      category: typeof category === 'string' ? category : undefined,
+      origin: typeof origin === 'string' ? origin : undefined,
+      status: typeof status === 'string' ? status : undefined,
+      riskLevel: typeof riskLevel === 'string' ? riskLevel : undefined,
+      query: typeof q === 'string' ? q : undefined,
+      installedOnly: installedOnly === 'true'
+    });
 
     res.json({ success: true, skills, total: skills.length });
-  } catch (err) {
+  } catch (err: any) {
     console.error('Erro ao listar skills:', err);
-    res.status(500).json({ error: 'Erro ao carregar catálogo de skills.' });
+    res.status(500).json({ error: 'Erro ao carregar catálogo de skills.', details: err.message });
   }
 });
 
-// 2. Obter skill por ID
+// 2. Obter skill por ID ou Slug (incluindo versões e instalações)
 app.get('/api/skills/:id', (req, res) => {
   try {
     const { id } = req.params;
-    const db = getDatabase();
-    const skills = db.skills || [];
-    const skill = skills.find((s: any) => s.id === id || s.slug === id);
+    const skill = getSkill(id);
 
     if (!skill) {
       return res.status(404).json({ error: 'Skill não encontrada.' });
     }
 
-    res.json({ success: true, skill });
-  } catch (err) {
+    const versions = listSkillVersions(skill.id);
+    const installations = listSkillInstallations(skill.id);
+
+    res.json({ success: true, skill, versions, installations });
+  } catch (err: any) {
     console.error('Erro ao obter skill:', err);
-    res.status(500).json({ error: 'Erro ao obter detalhes da skill.' });
+    res.status(500).json({ error: 'Erro ao obter detalhes da skill.', details: err.message });
   }
 });
 
 // 3. Criar nova skill
 app.post('/api/skills', (req, res) => {
   try {
-    const { name, description, category, tags, initialContent, version } = req.body;
+    const { name, description, category, tags, initialContent, version, files, license, origin } = req.body;
 
     if (!name || typeof name !== 'string' || name.trim().length < 2) {
       return res.status(400).json({ error: 'Nome da skill é obrigatório (mínimo 2 caracteres).' });
     }
 
-    const db = getDatabase();
-    if (!db.skills) db.skills = [];
-
-    const slug = name
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)/g, '');
-
-    const id = `skill_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    const now = new Date().toISOString();
-
-    const defaultSkillMd = `---
-name: ${slug || id}
-description: "${(description || '').trim().replace(/"/g, '\\"')}"
-version: "${version?.trim() || '1.0.0'}"
-category: "${(category || 'geral').toLowerCase().trim()}"
----
-
-# Skill: ${name.trim()}
-
-## Objetivo
-${description?.trim() || 'Descreva aqui o propósito e resultado esperado desta skill de IA.'}
-
-## Instruções de Comportamento
-1. Atue com clareza, empatia e precisão operacional.
-2. Identifique os dados relevantes do lead no CRM Zatten.
-3. Utilize as ferramentas do MCP Zatten para atualizar status e tags quando apropriado.
-
-## Regras e Diretrizes
-- Respeite o tom de voz profissional e acolhedor.
-- Não tome decisões financeiras ou contratuais sem validação humana.
-`;
-
-    const newSkill = {
-      id,
+    const skillPayload: any = {
       name: name.trim(),
-      slug: slug || id,
       description: (description || '').trim(),
       category: (category || 'geral').toLowerCase().trim(),
       tags: Array.isArray(tags) ? tags.map((t: string) => String(t).trim().toLowerCase()).filter(Boolean) : [],
-      status: 'active',
-      installed: true,
       version: version?.trim() || '1.0.0',
-      author: 'Central Firstsys',
-      createdAt: now,
-      updatedAt: now,
-      files: [
-        {
-          name: 'SKILL.md',
-          path: '/SKILL.md',
-          language: 'markdown',
-          updatedAt: now,
-          content: (initialContent && typeof initialContent === 'string' && initialContent.trim().length > 0)
-            ? initialContent.trim()
-            : defaultSkillMd
-        }
-      ]
+      license: license || 'Proprietária Firstsys',
+      origin: origin || 'propria',
+      files: []
     };
 
-    db.skills.push(newSkill);
-    fs.writeFileSync(MOCK_DB_PATH, JSON.stringify(db, null, 2));
+    if (Array.isArray(files) && files.length > 0) {
+      skillPayload.files = files;
+    } else if (initialContent && typeof initialContent === 'string' && initialContent.trim().length > 0) {
+      skillPayload.files = [
+        {
+          name: 'SKILL.md',
+          path: 'SKILL.md',
+          content: initialContent.trim()
+        }
+      ];
+    }
+
+    const newSkill = createSkill(skillPayload, req.ip || 'admin');
 
     logAuditEvent({
       actor: 'usuario',
       action: 'skill.created',
       category: 'api_usage',
       severity: 'info',
-      description: `Nova skill '${newSkill.name}' (${newSkill.id}) criada com sucesso.`,
+      description: `Nova skill '${newSkill.name}' (${newSkill.id}) criada com sucesso na biblioteca Firstsys.`,
       ipAddress: req.ip || '127.0.0.1'
     });
 
     res.status(201).json({ success: true, skill: newSkill });
-  } catch (err) {
+  } catch (err: any) {
     console.error('Erro ao criar skill:', err);
-    res.status(500).json({ error: 'Erro ao cadastrar nova skill.' });
+    res.status(400).json({ error: err.message || 'Erro ao cadastrar nova skill.' });
   }
 });
 
@@ -514,179 +503,342 @@ ${description?.trim() || 'Descreva aqui o propósito e resultado esperado desta 
 app.put('/api/skills/:id', (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, category, tags, status, installed, version } = req.body;
+    const { name, description, category, tags, status, installed, version, license, riskLevel } = req.body;
 
-    const db = getDatabase();
-    const skills = db.skills || [];
-    const index = skills.findIndex((s: any) => s.id === id);
+    const patch: any = {};
+    if (name !== undefined) patch.name = String(name).trim();
+    if (description !== undefined) patch.description = String(description).trim();
+    if (category !== undefined) patch.category = String(category).toLowerCase().trim();
+    if (tags !== undefined) patch.tags = Array.isArray(tags) ? tags.map((t: string) => String(t).trim().toLowerCase()).filter(Boolean) : [];
+    if (status !== undefined) patch.status = status;
+    if (installed !== undefined) patch.installed = Boolean(installed);
+    if (version !== undefined) patch.version = String(version).trim();
+    if (license !== undefined) patch.license = String(license).trim();
+    if (riskLevel !== undefined) patch.riskLevel = riskLevel;
 
-    if (index === -1) {
-      return res.status(404).json({ error: 'Skill não encontrada para atualização.' });
-    }
-
-    const current = skills[index];
-    const updated = {
-      ...current,
-      name: name !== undefined ? String(name).trim() : current.name,
-      description: description !== undefined ? String(description).trim() : current.description,
-      category: category !== undefined ? String(category).toLowerCase().trim() : current.category,
-      tags: Array.isArray(tags) ? tags.map((t: string) => String(t).trim().toLowerCase()).filter(Boolean) : current.tags,
-      status: status !== undefined ? status : current.status,
-      installed: installed !== undefined ? Boolean(installed) : current.installed,
-      version: version !== undefined ? String(version).trim() : current.version,
-      updatedAt: new Date().toISOString()
-    };
-
-    skills[index] = updated;
-    db.skills = skills;
-    fs.writeFileSync(MOCK_DB_PATH, JSON.stringify(db, null, 2));
-
+    const updated = updateSkill(id, patch, req.ip || 'admin');
     res.json({ success: true, skill: updated });
-  } catch (err) {
+  } catch (err: any) {
     console.error('Erro ao atualizar skill:', err);
-    res.status(500).json({ error: 'Erro ao atualizar dados da skill.' });
+    res.status(400).json({ error: err.message || 'Erro ao atualizar dados da skill.' });
   }
 });
 
-// 5. Excluir skill
+// 5. Excluir skill (soft delete por padrão, ou hard delete se confirm=true)
 app.delete('/api/skills/:id', (req, res) => {
   try {
     const { id } = req.params;
-    const db = getDatabase();
-    let skills = db.skills || [];
-    const exists = skills.some((s: any) => s.id === id);
+    const hardDelete = req.query.hard === 'true';
 
-    if (!exists) {
-      return res.status(404).json({ error: 'Skill não encontrada para exclusão.' });
-    }
-
-    db.skills = skills.filter((s: any) => s.id !== id);
-    fs.writeFileSync(MOCK_DB_PATH, JSON.stringify(db, null, 2));
+    deleteSkill(id, req.ip || 'admin', hardDelete);
 
     logAuditEvent({
       actor: 'usuario',
       action: 'skill.deleted',
       category: 'api_usage',
       severity: 'warning',
-      description: `Skill '${id}' removida do catálogo.`,
+      description: `Skill '${id}' ${hardDelete ? 'removida permanentemente' : 'arquivada'}.`,
       ipAddress: req.ip || '127.0.0.1'
     });
 
-    res.json({ success: true, message: 'Skill removida com sucesso.' });
-  } catch (err) {
+    res.json({ success: true, message: `Skill ${hardDelete ? 'removida permanentemente' : 'arquivada'} com sucesso.` });
+  } catch (err: any) {
     console.error('Erro ao excluir skill:', err);
-    res.status(500).json({ error: 'Erro ao remover skill.' });
+    res.status(400).json({ error: err.message || 'Erro ao remover skill.' });
   }
 });
 
-// 6. Alternar status de instalação da skill
+// 6. Alternar status de instalação da skill (Retrocompatibilidade Zatten)
 app.post('/api/skills/:id/toggle-install', (req, res) => {
   try {
     const { id } = req.params;
-    const db = getDatabase();
-    const skills = db.skills || [];
-    const skill = skills.find((s: any) => s.id === id);
-
-    if (!skill) {
-      return res.status(404).json({ error: 'Skill não encontrada.' });
-    }
-
-    skill.installed = !skill.installed;
-    skill.status = skill.installed ? 'active' : 'inactive';
-    skill.updatedAt = new Date().toISOString();
-
-    fs.writeFileSync(MOCK_DB_PATH, JSON.stringify(db, null, 2));
-    res.json({ success: true, installed: skill.installed, skill });
-  } catch (err) {
+    const result = toggleInstallSkill(id, undefined, req.ip || 'admin');
+    res.json({ success: true, installed: result.installed, skill: result.skill });
+  } catch (err: any) {
     console.error('Erro ao alternar instalação da skill:', err);
-    res.status(500).json({ error: 'Erro ao alterar status de instalação da skill.' });
+    res.status(400).json({ error: err.message || 'Erro ao alterar status de instalação da skill.' });
   }
 });
 
-// 7. Adicionar ou atualizar arquivo dentro da skill
+// 7. Gerenciamento de Arquivos: Listar arquivos da skill
+app.get('/api/skills/:id/files', (req, res) => {
+  try {
+    const { id } = req.params;
+    const includeDeleted = req.query.includeDeleted === 'true';
+    const files = listSkillFiles(id, includeDeleted);
+    res.json({ success: true, files, total: files.length });
+  } catch (err: any) {
+    res.status(404).json({ error: err.message || 'Skill não encontrada.' });
+  }
+});
+
+// 8. Obter arquivo individual da skill
+app.get('/api/skills/:id/files/*', (req, res) => {
+  try {
+    const { id } = req.params;
+    const rawPath = req.params[0] || (req.query.path as string);
+    if (!rawPath) {
+      return res.status(400).json({ error: 'Caminho do arquivo não fornecido.' });
+    }
+    const file = getSkillFile(id, rawPath);
+    if (!file) {
+      return res.status(404).json({ error: 'Arquivo não encontrado na skill.' });
+    }
+    res.json({ success: true, file });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 9. Adicionar ou atualizar arquivo dentro da skill com proteção anti-traversal
 app.post('/api/skills/:id/files', (req, res) => {
   try {
     const { id } = req.params;
-    const { name, content, language } = req.body;
+    const { name, path: reqPath, content } = req.body;
+    const targetPath = reqPath || name;
 
-    if (!name || typeof name !== 'string' || name.trim().length === 0) {
-      return res.status(400).json({ error: 'Nome do arquivo é obrigatório.' });
+    if (!targetPath || typeof targetPath !== 'string') {
+      return res.status(400).json({ error: 'Nome ou caminho do arquivo é obrigatório.' });
     }
 
-    const db = getDatabase();
-    const skills = db.skills || [];
-    const skill = skills.find((s: any) => s.id === id);
-
-    if (!skill) {
-      return res.status(404).json({ error: 'Skill não encontrada.' });
+    if (content === undefined || content === null) {
+      return res.status(400).json({ error: 'Conteúdo do arquivo não pode ser nulo.' });
     }
 
-    if (!Array.isArray(skill.files)) skill.files = [];
-
-    const fileName = name.trim();
-    const fileIndex = skill.files.findIndex((f: any) => f.name.toLowerCase() === fileName.toLowerCase());
-    const now = new Date().toISOString();
-
-    let finalContent = content !== undefined ? String(content) : '';
-    if (fileName.toLowerCase() === 'skill.md') {
-      const trimmed = finalContent.replace(/^\uFEFF/, '').trim();
-      if (!trimmed.startsWith('---')) {
-        const slug = (skill.slug || skill.name || id).toLowerCase().replace(/[^a-z0-9]+/g, '-');
-        const desc = (skill.description || '').replace(/[\r\n]+/g, ' ').replace(/"/g, '\\"').trim();
-        finalContent = `---\nname: ${slug}\ndescription: "${desc}"\n---\n\n${trimmed}\n`;
-      }
-    }
-
-    const fileRecord = {
-      name: fileName,
-      path: fileName.startsWith('/') ? fileName : `/${fileName}`,
-      language: language || (fileName.endsWith('.md') ? 'markdown' : fileName.endsWith('.json') ? 'json' : 'text'),
-      content: finalContent,
-      updatedAt: now
-    };
-
-    if (fileIndex >= 0) {
-      skill.files[fileIndex] = fileRecord;
-    } else {
-      skill.files.push(fileRecord);
-    }
-
-    skill.updatedAt = now;
-    fs.writeFileSync(MOCK_DB_PATH, JSON.stringify(db, null, 2));
-
-    res.json({ success: true, file: fileRecord, skill });
-  } catch (err) {
+    const { skill, file } = saveSkillFile(id, targetPath, String(content), req.ip || 'admin', 'local');
+    res.json({ success: true, file, skill });
+  } catch (err: any) {
     console.error('Erro ao salvar arquivo da skill:', err);
-    res.status(500).json({ error: 'Erro ao salvar arquivo da skill.' });
+    res.status(400).json({ error: err.message || 'Erro ao salvar arquivo da skill.' });
   }
 });
 
-// 8. Remover arquivo da skill
-app.delete('/api/skills/:id/files/:filename', (req, res) => {
+// 10. Remover arquivo da skill (soft delete com proteção para SKILL.md)
+app.delete('/api/skills/:id/files/*', (req, res) => {
   try {
-    const { id, filename } = req.params;
-    const db = getDatabase();
-    const skills = db.skills || [];
-    const skill = skills.find((s: any) => s.id === id);
+    const { id } = req.params;
+    const rawPath = req.params[0] || (req.query.path as string);
+    const permanent = req.query.permanent === 'true';
 
-    if (!skill) {
-      return res.status(404).json({ error: 'Skill não encontrada.' });
+    if (!rawPath) {
+      return res.status(400).json({ error: 'Caminho do arquivo não fornecido.' });
     }
 
-    if (!Array.isArray(skill.files) || skill.files.length <= 1) {
-      return res.status(400).json({ error: 'A skill deve conter ao menos um arquivo de instrução (ex: SKILL.md).' });
-    }
-
-    skill.files = skill.files.filter((f: any) => f.name.toLowerCase() !== filename.toLowerCase());
-    skill.updatedAt = new Date().toISOString();
-
-    fs.writeFileSync(MOCK_DB_PATH, JSON.stringify(db, null, 2));
-    res.json({ success: true, message: `Arquivo '${filename}' removido com sucesso.`, skill });
-  } catch (err) {
+    const { skill } = deleteSkillFile(id, rawPath, req.ip || 'admin', permanent);
+    res.json({ success: true, message: `Arquivo '${rawPath}' ${permanent ? 'excluído' : 'movido para lixeira'}.`, skill });
+  } catch (err: any) {
     console.error('Erro ao excluir arquivo da skill:', err);
-    res.status(500).json({ error: 'Erro ao remover arquivo da skill.' });
+    res.status(400).json({ error: err.message || 'Erro ao remover arquivo da skill.' });
   }
 });
+
+// 11. Restaurar arquivo soft-deleted da skill
+app.post('/api/skills/:id/files/*/restore', (req, res) => {
+  try {
+    const { id } = req.params;
+    const rawPath = req.params[0] || (req.query.path as string);
+
+    if (!rawPath) {
+      return res.status(400).json({ error: 'Caminho do arquivo não fornecido.' });
+    }
+
+    const { skill, file } = restoreSkillFile(id, rawPath, req.ip || 'admin');
+    res.json({ success: true, message: `Arquivo '${rawPath}' restaurado com sucesso.`, file, skill });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 12. Git Importer: Preview e Detecção Segura (SSRF + Secret Scanning)
+app.post('/api/skills/import/preview', async (req, res) => {
+  try {
+    const { repoUrl } = req.body;
+    if (!repoUrl || typeof repoUrl !== 'string') {
+      return res.status(400).json({ error: 'URL do repositório Git é obrigatória.' });
+    }
+
+    const preview = await previewGitRepository(repoUrl);
+    res.json({ success: true, preview });
+  } catch (err: any) {
+    console.error('Erro no preview de importação Git:', err);
+    res.status(400).json({ error: err.message || 'Falha ao analisar repositório Git.' });
+  }
+});
+
+// 13. Git Importer: Confirmar Importação de Arquivos Selecionados
+app.post('/api/skills/import/commit', async (req, res) => {
+  try {
+    const { repoUrl, selectedPaths, skillName, category, tags, license } = req.body;
+
+    if (!repoUrl || !Array.isArray(selectedPaths) || selectedPaths.length === 0) {
+      return res.status(400).json({ error: 'URL do repositório e seleção de ao menos um arquivo são obrigatórios.' });
+    }
+
+    // Baixar conteúdo seguro dos arquivos selecionados
+    const fetchedFiles = await fetchSelectedGitFiles(repoUrl, selectedPaths);
+    if (fetchedFiles.length === 0) {
+      return res.status(400).json({ error: 'Nenhum dos arquivos selecionados pôde ser baixado com sucesso.' });
+    }
+
+    const now = new Date().toISOString();
+    const preview = await previewGitRepository(repoUrl);
+
+    const nameToUse = skillName?.trim() || preview.detectedName || preview.repo;
+    const descToUse = preview.detectedDescription || `Skill importada do repositório ${preview.owner}/${preview.repo}`;
+
+    const newSkill = createSkill({
+      name: nameToUse,
+      description: descToUse,
+      category: category?.trim() || preview.detectedCategory || 'engenharia',
+      tags: tags || preview.detectedTags || ['git-import'],
+      author: `${preview.owner} (Git)`,
+      origin: 'importada',
+      license: license || preview.license || 'Open Source',
+      repositoryUrl: preview.repoUrl,
+      repositoryOwner: preview.owner,
+      repositoryBranch: preview.branch,
+      repositoryCommitSha: preview.commitSha,
+      lastSyncAt: now,
+      riskLevel: preview.riskLevel,
+      securityWarnings: preview.securityFindings.map(f => `[${f.severity.toUpperCase()}] ${f.rule} em ${f.filePath} (linha ${f.line})`),
+      dependencies: preview.dependenciesDetected,
+      files: fetchedFiles.map(f => ({
+        id: `file_git_${crypto.randomUUID().replace(/-/g, '_').substring(0, 12)}`,
+        skillId: '',
+        path: sanitizeRelativePath(f.path),
+        name: path.basename(f.path),
+        extension: path.extname(f.path),
+        contentType: 'text/plain',
+        sizeBytes: f.sizeBytes,
+        sha256: f.sha256,
+        content: f.content,
+        origin: 'git',
+        isExecutable: false,
+        requiresReview: false,
+        version: '1.0.0',
+        createdAt: now,
+        updatedAt: now,
+        deletedAt: null
+      }))
+    }, req.ip || 'admin');
+
+    res.status(201).json({ success: true, skill: newSkill });
+  } catch (err: any) {
+    console.error('Erro ao efetivar importação Git:', err);
+    res.status(400).json({ error: err.message || 'Erro ao importar repositório Git.' });
+  }
+});
+
+// 14. Versionamento: Listar versões de uma skill
+app.get('/api/skills/:id/versions', (req, res) => {
+  try {
+    const { id } = req.params;
+    const versions = listSkillVersions(id);
+    res.json({ success: true, versions, total: versions.length });
+  } catch (err: any) {
+    res.status(404).json({ error: err.message });
+  }
+});
+
+// 15. Versionamento: Obter versão específica
+app.get('/api/skills/:id/versions/:version', (req, res) => {
+  try {
+    const { id, version } = req.params;
+    const versionRecord = getSkillVersion(id, version);
+    if (!versionRecord) {
+      return res.status(404).json({ error: `Versão "${version}" não encontrada para esta skill.` });
+    }
+    res.json({ success: true, version: versionRecord });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 16. Versionamento: Comparar (Diff) duas versões
+app.post('/api/skills/:id/versions/compare', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { versionA, versionB } = req.body;
+    if (!versionA || !versionB) {
+      return res.status(400).json({ error: 'versionA e versionB são obrigatórias para comparação.' });
+    }
+    const diff = compareSkillVersions(id, versionA, versionB);
+    res.json({ success: true, diff });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 17. Versionamento: Criar snapshot manual de versão
+app.post('/api/skills/:id/versions', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { changelog, version } = req.body;
+    const snapshot = createVersionSnapshot(id, changelog || 'Snapshot criado manualmente', req.ip || 'admin', version);
+    res.status(201).json({ success: true, snapshot });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 18. Instalações por Contexto: Listar vínculos
+app.get('/api/skills/:id/installations', (req, res) => {
+  try {
+    const { id } = req.params;
+    const installations = listSkillInstallations(id);
+    res.json({ success: true, installations, total: installations.length });
+  } catch (err: any) {
+    res.status(404).json({ error: err.message });
+  }
+});
+
+// 19. Instalações por Contexto: Instalar em Agente, Conexão, Projeto ou MCP
+app.post('/api/skills/:id/installations', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { contextType, contextId, contextName, pinnedVersion, config, grantedPermissions } = req.body;
+
+    if (!contextType || !contextId || !contextName) {
+      return res.status(400).json({ error: 'contextType, contextId e contextName são obrigatórios.' });
+    }
+
+    const installation = createSkillInstallation(id, {
+      contextType,
+      contextId,
+      contextName,
+      pinnedVersion,
+      config,
+      grantedPermissions
+    }, req.ip || 'admin');
+
+    res.status(201).json({ success: true, installation });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 20. Instalações por Contexto: Remover vínculo
+app.delete('/api/skills/:id/installations/:installationId', (req, res) => {
+  try {
+    const { id, installationId } = req.params;
+    deleteSkillInstallation(id, installationId, req.ip || 'admin');
+    res.json({ success: true, message: 'Skill desinstalada do contexto com sucesso.' });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 21. Auditoria: Listar histórico de auditoria da skill
+app.get('/api/skills/:id/audit', (req, res) => {
+  try {
+    const { id } = req.params;
+    const logs = listSkillAuditLogs(id);
+    res.json({ success: true, logs, total: logs.length });
+  } catch (err: any) {
+    res.status(404).json({ error: err.message });
+  }
+});
+
 
 // === ROTAS DE AUTENTICAÇÃO COM SEGURANÇA MILITAR ===
 

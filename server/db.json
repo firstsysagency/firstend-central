@@ -295,26 +295,87 @@
       ],
       "status": "active",
       "installed": true,
-      "version": "1.0.0",
+      "version": "1.0.1",
       "author": "Firstsys AI",
       "createdAt": "2026-10-14T10:00:00.000Z",
-      "updatedAt": "2026-10-14T10:00:00.000Z",
+      "updatedAt": "2026-10-16T01:01:04.078Z",
       "files": [
         {
+          "id": "file_sdr_qualificacao_SKILL_md",
+          "skillId": "skill_sdr_qualificacao",
+          "path": "SKILL.md",
           "name": "SKILL.md",
-          "path": "/SKILL.md",
-          "language": "markdown",
-          "updatedAt": "2026-10-14T10:00:00.000Z",
-          "content": "---\nname: sdr-qualificacao\ndescription: Skill para conduzir conversas de qualificação de leads via WhatsApp, aplicando metodologia BANT e coletando dores e orçamento.\nversion: 1.0.0\ncategory: vendas\n---\n\n# Skill: Qualificação e SDR Automatizado\n\n## Objetivo\nQualificar leads recebidos pelo WhatsApp identificando com precisão necessidade, autoridade, orçamento e timing (BANT).\n\n## Diretrizes de Comportamento\n1. Faça perguntas curtas e empáticas (máximo 2 frases por mensagem).\n2. Identifique o segmento do cliente e volume atual de atendimento.\n3. Quando o lead atender aos critérios de qualificação, mova-o no Kanban para a coluna 'Qualificado' e atribua ao time comercial.\n4. Caso o lead informe dados de contato ou empresa, salve nas propriedades customizadas correspondentes.\n\n## Gatilhos de Notificação\n- Quando o lead solicitar proposta ou reunião imediatamente, execute `zatten_leads_leadnumber_notification_post` com título 'Lead Quente Solicitou Contato'."
+          "extension": ".md",
+          "contentType": "text/markdown",
+          "sizeBytes": 1098,
+          "sha256": "1deb846884b3690a830ddf214957a1aba163b32a548c2d085b4a5dbc845a0bc6",
+          "content": "---\nname: sdr-qualificacao\ndescription: Skill para conduzir conversas de qualificação de leads via WhatsApp, aplicando metodologia BANT e coletando dores e orçamento.\nversion: 1.0.0\ncategory: vendas\nauthor: Firstsys AI\nlicense: Proprietária Firstsys\n---\n\n# Skill: Qualificação e SDR Automatizado\n\n## Objetivo\nQualificar leads recebidos pelo WhatsApp identificando com precisão necessidade, autoridade, orçamento e timing (BANT), preparando a oportunidade para o time de vendas da Firstsys ou do CRM Zatten.\n\n## Diretrizes de Comportamento\n1. Faça perguntas curtas e empáticas (máximo 2 frases por mensagem).\n2. Identifique o segmento do cliente e volume atual de atendimento.\n3. Quando o lead atender aos critérios de qualificação, mova-o no Kanban para a coluna 'Qualificado' e atribua ao time comercial.\n4. Caso o lead informe dados de contato ou empresa, salve nas propriedades customizadas correspondentes.\n\n## Gatilhos de Notificação\n- Quando o lead solicitar proposta ou reunião imediatamente, execute a ferramenta correspondente com título 'Lead Quente Solicitou Contato'.\n",
+          "origin": "local",
+          "isExecutable": false,
+          "requiresReview": false,
+          "version": "1.0.0",
+          "createdAt": "2026-10-16T00:46:15.521Z",
+          "updatedAt": "2026-10-16T00:46:15.521Z",
+          "deletedAt": null
         },
         {
+          "id": "file_sdr_qualificacao_rules_json",
+          "skillId": "skill_sdr_qualificacao",
+          "path": "rules.json",
           "name": "rules.json",
-          "path": "/rules.json",
-          "language": "json",
-          "updatedAt": "2026-10-14T10:00:00.000Z",
-          "content": "{\n  \"max_questions_per_turn\": 1,\n  \"qualification_threshold_score\": 75,\n  \"auto_tag_qualified\": true,\n  \"tag_name\": \"sdr-qualificado\"\n}"
+          "extension": ".json",
+          "contentType": "application/json",
+          "sizeBytes": 223,
+          "sha256": "087ff3c0cd16b469145ffeb87c54a1f1c9a7fc217852482382b7903b67db73f6",
+          "content": "{\n  \"max_questions_per_turn\": 1,\n  \"qualification_threshold_score\": 75,\n  \"auto_tag_qualified\": true,\n  \"tag_name\": \"sdr-qualificado\",\n  \"required_fields\": [\n    \"segmento\",\n    \"volume_mensal\",\n    \"decisor_presente\"\n  ]\n}",
+          "origin": "local",
+          "isExecutable": false,
+          "requiresReview": false,
+          "version": "1.0.0",
+          "createdAt": "2026-10-16T00:46:15.522Z",
+          "updatedAt": "2026-10-16T00:46:15.522Z",
+          "deletedAt": null
+        },
+        {
+          "id": "file_sdr_qualificacao_qualification_md",
+          "skillId": "skill_sdr_qualificacao",
+          "path": "prompts/qualification.md",
+          "name": "qualification.md",
+          "extension": ".md",
+          "contentType": "text/markdown",
+          "sizeBytes": 484,
+          "sha256": "b60fb4346dee34a34c5e9ad2da88952026612e823e71e7bd07db74f5c8217e7a",
+          "content": "# Prompt: Condução de Qualificação BANT\n\nVocê é um SDR sênior consultivo da Firstsys. Seu tom é profissional, direto e amigável.\nEvite saudações prolixas ou justificativas longas.\n\nFluxo de Sondagem:\n1. \"Tudo bem? Vi que você tem interesse na nossa solução. Hoje você busca automatizar vendas ou suporte?\"\n2. \"Perfeito. Quantas conversas ou leads sua equipe atende por mês atualmente?\"\n3. \"Entendido. Você mesmo quem define a contratação da ferramenta na empresa?\"\n",
+          "origin": "local",
+          "isExecutable": false,
+          "requiresReview": false,
+          "version": "1.0.0",
+          "createdAt": "2026-10-16T00:46:15.522Z",
+          "updatedAt": "2026-10-16T00:46:15.522Z",
+          "deletedAt": null
+        },
+        {
+          "id": "file_sdr_qualificacao_message_template_md",
+          "skillId": "skill_sdr_qualificacao",
+          "path": "templates/message-template.md",
+          "name": "message-template.md",
+          "extension": ".md",
+          "contentType": "text/markdown",
+          "sizeBytes": 355,
+          "sha256": "11d0b24469f7709982bf450151c999da09c40d00f1dcd758372448a5a557c15f",
+          "content": "# Template de Encerramento de Qualificação Positiva\n\n\"Excelente, {{nome}}! Com base no seu volume de {{volume}} atendimentos, nossa tecnologia consegue economizar cerca de 70% do seu tempo manual. \nVou passar seu contato para o nosso consultor especialista agendar uma demonstração rápida de 15 minutos com você ainda hoje. Qual o melhor horário?\"\n",
+          "origin": "local",
+          "isExecutable": false,
+          "requiresReview": false,
+          "version": "1.0.0",
+          "createdAt": "2026-10-16T00:46:15.522Z",
+          "updatedAt": "2026-10-16T00:46:15.522Z",
+          "deletedAt": null
         }
-      ]
+      ],
+      "origin": "propria",
+      "license": "Proprietária Firstsys",
+      "riskLevel": "baixo"
     },
     {
       "id": "skill_followup_inteligente",
@@ -336,13 +397,63 @@
       "updatedAt": "2026-10-14T11:00:00.000Z",
       "files": [
         {
+          "id": "file_followup_inteligente_SKILL_md",
+          "skillId": "skill_followup_inteligente",
+          "path": "SKILL.md",
           "name": "SKILL.md",
-          "path": "/SKILL.md",
-          "language": "markdown",
-          "updatedAt": "2026-10-14T11:00:00.000Z",
-          "content": "---\nname: followup-inteligente\ndescription: Cadência automatizada de reengajamento para contatos sem resposta recente, quebrando objeções comuns e resgatando oportunidades.\nversion: 1.1.0\ncategory: atendimento\n---\n\n# Skill: Follow-up e Reengajamento Inteligente\n\n## Objetivo\nReconectar com leads que pararam de responder após o envio de apresentação ou proposta.\n\n## Estratégia de Cadência\n- **D+1 (24 horas após envio):** Mensagem de cortesia perguntando se conseguiu visualizar o material.\n- **D+3 (72 horas):** Envio de case de sucesso do mesmo nicho do lead.\n- **D+7 (Última tentativa amigável):** Pergunta direta de fechamento ou encerramento temporário de contato.\n\n## Instruções para a IA\n- Sempre verifique o histórico via `zatten_messages_history_get` antes de enviar nova mensagem.\n- Respeite o tom humanizado e jamais envie mensagens robotizadas ou insistentes demais."
+          "extension": ".md",
+          "contentType": "text/markdown",
+          "sizeBytes": 934,
+          "sha256": "ca018d4d3ab49b0c028918bbad6411020dab033269c4468c7412296392789f3e",
+          "content": "---\nname: followup-inteligente\ndescription: Cadência automatizada de reengajamento para contatos sem resposta recente, quebrando objeções comuns e resgatando oportunidades.\nversion: 1.1.0\ncategory: atendimento\nauthor: Firstsys AI\nlicense: Proprietária Firstsys\n---\n\n# Skill: Follow-up e Reengajamento Inteligente\n\n## Objetivo\nReconectar com leads e clientes que pararam de responder após o envio de apresentação ou proposta comercial.\n\n## Estratégia de Cadência\n- **D+1 (24 horas após envio):** Mensagem de cortesia perguntando se conseguiu visualizar o material.\n- **D+3 (72 horas):** Envio de case de sucesso do mesmo nicho do lead.\n- **D+7 (Última tentativa amigável):** Pergunta direta de fechamento ou encerramento temporário de contato.\n\n## Instruções para a IA\n- Sempre verifique o histórico antes de enviar nova mensagem.\n- Respeite o tom humanizado e jamais envie mensagens robotizadas ou insistentes demais.\n",
+          "origin": "local",
+          "isExecutable": false,
+          "requiresReview": false,
+          "version": "1.0.0",
+          "createdAt": "2026-10-16T00:46:15.522Z",
+          "updatedAt": "2026-10-16T00:46:15.522Z",
+          "deletedAt": null
+        },
+        {
+          "id": "file_followup_inteligente_config_json",
+          "skillId": "skill_followup_inteligente",
+          "path": "config.json",
+          "name": "config.json",
+          "extension": ".json",
+          "contentType": "application/json",
+          "sizeBytes": 133,
+          "sha256": "657232ac0cc0e473a571525635f39f40f3f8dce6bffe3738fc54c672b8082bc5",
+          "content": "{\n  \"cadence_days\": [\n    1,\n    3,\n    7\n  ],\n  \"stop_on_reply\": true,\n  \"max_followup_attempts\": 3,\n  \"business_hours_only\": true\n}",
+          "origin": "local",
+          "isExecutable": false,
+          "requiresReview": false,
+          "version": "1.0.0",
+          "createdAt": "2026-10-16T00:46:15.522Z",
+          "updatedAt": "2026-10-16T00:46:15.522Z",
+          "deletedAt": null
+        },
+        {
+          "id": "file_followup_inteligente_reengagement_md",
+          "skillId": "skill_followup_inteligente",
+          "path": "prompts/reengagement.md",
+          "name": "reengagement.md",
+          "extension": ".md",
+          "contentType": "text/markdown",
+          "sizeBytes": 302,
+          "sha256": "52409345761d246168883c135c07dd29a0895e00b865e612eb0947026664ed1e",
+          "content": "# Prompt de Reengajamento Não Invasivo\n\nSeja breve e nunca pareça cobrador. Use perguntas abertas focadas no interesse do lead:\n- \"Oi {{nome}}, conseguiu dar uma olhada na proposta que te enviei ontem?\"\n- \"Passando só para compartilhar esse caso de um cliente que reduziu tempo de resposta em 85%.\"\n",
+          "origin": "local",
+          "isExecutable": false,
+          "requiresReview": false,
+          "version": "1.0.0",
+          "createdAt": "2026-10-16T00:46:15.522Z",
+          "updatedAt": "2026-10-16T00:46:15.522Z",
+          "deletedAt": null
         }
-      ]
+      ],
+      "origin": "propria",
+      "license": "Proprietária Firstsys",
+      "riskLevel": "baixo"
     },
     {
       "id": "skill_triagem_suporte",
@@ -364,11 +475,481 @@
       "updatedAt": "2026-10-14T12:00:00.000Z",
       "files": [
         {
+          "id": "file_triagem_suporte_SKILL_md",
+          "skillId": "skill_triagem_suporte",
+          "path": "SKILL.md",
           "name": "SKILL.md",
-          "path": "/SKILL.md",
-          "language": "markdown",
-          "updatedAt": "2026-10-14T12:00:00.000Z",
-          "content": "---\nname: triagem-suporte\ndescription: Identificação de solicitações técnicas, financeiras e contratuais, roteando para os departamentos corretos no CRM.\nversion: 1.0.0\ncategory: suporte\n---\n\n# Skill: Triagem e Roteamento de Suporte\n\n## Objetivo\nDetectar a natureza do chamado do cliente no WhatsApp e transferir para o time responsável utilizando `zatten_leads_leadnumber_assignee_patch`.\n\n## Mapeamento de Departamentos\n- **Dúvidas de Cobrança / Boletos / NFs:** Atribuir ao Departamento Financeiro.\n- **Problemas Técnicos e Bugs:** Coletar print ou descrição detalhada e atribuir ao Suporte Técnico Nível 2.\n- **Renovação de Contrato / Upgrade:** Atribuir ao Comercial."
+          "extension": ".md",
+          "contentType": "text/markdown",
+          "sizeBytes": 713,
+          "sha256": "226bb9ec308cb2a923df7d6fea21f2eeb45518dcc998fd0cca401a5aafbd4314",
+          "content": "---\nname: triagem-suporte\ndescription: Identificação de solicitações técnicas, financeiras e contratuais, roteando para os departamentos corretos no CRM.\nversion: 1.0.0\ncategory: suporte\nauthor: Firstsys AI\nlicense: Proprietária Firstsys\n---\n\n# Skill: Triagem e Roteamento de Suporte\n\n## Objetivo\nDetectar a natureza do chamado do cliente no WhatsApp e transferir para o time responsável com contexto estruturado.\n\n## Mapeamento de Departamentos\n- **Dúvidas de Cobrança / Boletos / NFs:** Atribuir ao Departamento Financeiro.\n- **Problemas Técnicos e Bugs:** Coletar print ou descrição detalhada e atribuir ao Suporte Técnico Nível 2.\n- **Renovação de Contrato / Upgrade:** Atribuir ao Comercial.\n",
+          "origin": "local",
+          "isExecutable": false,
+          "requiresReview": false,
+          "version": "1.0.0",
+          "createdAt": "2026-10-16T00:46:15.522Z",
+          "updatedAt": "2026-10-16T00:46:15.522Z",
+          "deletedAt": null
+        },
+        {
+          "id": "file_triagem_suporte_rules_json",
+          "skillId": "skill_triagem_suporte",
+          "path": "rules.json",
+          "name": "rules.json",
+          "extension": ".json",
+          "contentType": "application/json",
+          "sizeBytes": 204,
+          "sha256": "771de760a0c5e049b722b08c238e2d573b475980024e1ff00a59e5d4e2b33f20",
+          "content": "{\n  \"sentiment_analysis_enabled\": true,\n  \"escalate_urgency_words\": [\n    \"urgente\",\n    \"parou\",\n    \"fora do ar\",\n    \"processo\",\n    \"reclame aqui\",\n    \"cancelar\"\n  ],\n  \"auto_ticket_creation\": true\n}",
+          "origin": "local",
+          "isExecutable": false,
+          "requiresReview": false,
+          "version": "1.0.0",
+          "createdAt": "2026-10-16T00:46:15.522Z",
+          "updatedAt": "2026-10-16T00:46:15.522Z",
+          "deletedAt": null
+        },
+        {
+          "id": "file_triagem_suporte_department_routing_md",
+          "skillId": "skill_triagem_suporte",
+          "path": "references/department-routing.md",
+          "name": "department-routing.md",
+          "extension": ".md",
+          "contentType": "text/markdown",
+          "sizeBytes": 451,
+          "sha256": "8b090f6e5a8965260318b3c71f199ba15b83509e327e836ec2f8b4ab3bfb8f6c",
+          "content": "# Matriz de Roteamento Departamental\n\n| Tipo de Solicitação | Departamento Destino | Prioridade Padrão |\n|----------------------|----------------------|-------------------|\n| Boleto / 2ª via      | Financeiro           | Média             |\n| Erro 500 / Sistema   | Suporte N2           | Alta              |\n| Novo contrato        | Comercial            | Alta              |\n| Dúvida de uso        | Atendimento N1       | Normal            |\n",
+          "origin": "local",
+          "isExecutable": false,
+          "requiresReview": false,
+          "version": "1.0.0",
+          "createdAt": "2026-10-16T00:46:15.522Z",
+          "updatedAt": "2026-10-16T00:46:15.522Z",
+          "deletedAt": null
+        }
+      ],
+      "origin": "propria",
+      "license": "Proprietária Firstsys",
+      "riskLevel": "baixo"
+    },
+    {
+      "id": "skill_find_skills_vercel",
+      "name": "Find Skills - Vercel",
+      "slug": "find-skills-vercel",
+      "description": "Motor de descoberta semântica e busca de skills e plugins para ecossistemas modernos de IA e desenvolvimento web.",
+      "category": "engenharia",
+      "tags": [
+        "vercel",
+        "descoberta",
+        "plugins",
+        "engenharia",
+        "typescript"
+      ],
+      "status": "ativa",
+      "installed": false,
+      "version": "1.2.0",
+      "author": "Vercel / Curadoria Firstsys",
+      "origin": "curada",
+      "license": "MIT",
+      "repositoryUrl": "https://github.com/vercel/ai",
+      "riskLevel": "baixo",
+      "securityWarnings": [
+        "Contém referências de código TypeScript mantidas sob licença aberta MIT."
+      ],
+      "dependencies": [
+        "@vercel/ai"
+      ],
+      "permissions": [
+        "fs:read"
+      ],
+      "createdAt": "2026-10-16T00:46:15.521Z",
+      "updatedAt": "2026-10-16T00:46:15.521Z",
+      "files": [
+        {
+          "id": "file_find_skills_vercel_SKILL_md",
+          "skillId": "skill_find_skills_vercel",
+          "path": "SKILL.md",
+          "name": "SKILL.md",
+          "extension": ".md",
+          "contentType": "text/markdown",
+          "sizeBytes": 671,
+          "sha256": "e7a6ff93186767448a76044ae11eef43c1f704f4fc5fb9b3a1fab4bd75e75b89",
+          "content": "---\nname: find-skills-vercel\ndescription: Motor de descoberta semântica e busca de skills e plugins para ecossistemas modernos de IA e desenvolvimento web.\nversion: 1.2.0\ncategory: engenharia\nauthor: Vercel / Curadoria Firstsys\nlicense: MIT\n---\n\n# Find Skills - Vercel Integration\n\n## Visão Geral\nEsta skill fornece capacidades de busca inteligente, recomendação de ferramentas baseadas no contexto de desenvolvimento de software e emparelhamento de plugins sob demanda.\n\n## Casos de Uso\n1. Identificar se uma determinada demanda já possui uma skill ou biblioteca testada.\n2. Sugerir bibliotecas modernas mantidas e sem risco de segurança na cadeia de suprimentos.\n",
+          "origin": "local",
+          "isExecutable": false,
+          "requiresReview": false,
+          "version": "1.0.0",
+          "createdAt": "2026-10-16T00:46:15.522Z",
+          "updatedAt": "2026-10-16T00:46:15.522Z",
+          "deletedAt": null
+        },
+        {
+          "id": "file_find_skills_vercel_README_md",
+          "skillId": "skill_find_skills_vercel",
+          "path": "README.md",
+          "name": "README.md",
+          "extension": ".md",
+          "contentType": "text/markdown",
+          "sizeBytes": 200,
+          "sha256": "0ba761b67022a6a0f4ad7216ff2461e37e82451daba3e67079cf4aa39d6851da",
+          "content": "# Vercel Find Skills Reference\n\nInspirado no ecossistema Vercel AI SDK e repositórios abertos de skills para agentes.\nPermite aos agentes localizar scripts de automação e templates reutilizáveis.\n",
+          "origin": "local",
+          "isExecutable": false,
+          "requiresReview": false,
+          "version": "1.0.0",
+          "createdAt": "2026-10-16T00:46:15.522Z",
+          "updatedAt": "2026-10-16T00:46:15.522Z",
+          "deletedAt": null
+        },
+        {
+          "id": "file_find_skills_vercel_discovery_ts",
+          "skillId": "skill_find_skills_vercel",
+          "path": "scripts/discovery.ts",
+          "name": "discovery.ts",
+          "extension": ".ts",
+          "contentType": "text/typescript",
+          "sizeBytes": 276,
+          "sha256": "3bf649afdf15efce762a1b3b1e3564a4b52906418f16df62992f5cb9a53b2a51",
+          "content": "/**\n * Script de descoberta de skills (apenas leitura de metadados)\n * NOTA DE SEGURANÇA: Execução automática desabilitada. Tratado apenas como referência estruturada.\n */\nexport interface SkillSearchResult {\n  slug: string;\n  relevanceScore: number;\n  tags: string[];\n}\n",
+          "origin": "local",
+          "isExecutable": true,
+          "requiresReview": true,
+          "version": "1.0.0",
+          "createdAt": "2026-10-16T00:46:15.522Z",
+          "updatedAt": "2026-10-16T00:46:15.522Z",
+          "deletedAt": null
+        },
+        {
+          "id": "file_find_skills_vercel_registry_json",
+          "skillId": "skill_find_skills_vercel",
+          "path": "references/registry.json",
+          "name": "registry.json",
+          "extension": ".json",
+          "contentType": "application/json",
+          "sizeBytes": 230,
+          "sha256": "c634ac4b4c6d2d35f5e794ca22763b510d5465be359aa5cdf9804ceaffa36e37",
+          "content": "{\n  \"curated_registries\": [\n    {\n      \"name\": \"Firstsys Skills Library\",\n      \"url\": \"https://firstend.firstsys.com.br/skills\"\n    },\n    {\n      \"name\": \"Vercel AI SDK Catalog\",\n      \"url\": \"https://sdk.vercel.ai\"\n    }\n  ]\n}",
+          "origin": "local",
+          "isExecutable": false,
+          "requiresReview": false,
+          "version": "1.0.0",
+          "createdAt": "2026-10-16T00:46:15.522Z",
+          "updatedAt": "2026-10-16T00:46:15.522Z",
+          "deletedAt": null
+        }
+      ]
+    },
+    {
+      "id": "skill_opensquad_orchestration",
+      "name": "OpenSquad - Orquestração Multiagente",
+      "slug": "opensquad-orchestration",
+      "description": "Padrões de decomposição de tarefas complexas entre agentes especializados com handoff explícito e supervisão central.",
+      "category": "orquestracao",
+      "tags": [
+        "orquestracao",
+        "multiagente",
+        "handoff",
+        "squads",
+        "arquitetura"
+      ],
+      "status": "ativa",
+      "installed": false,
+      "version": "2.0.0",
+      "author": "OpenSquad Community / Firstsys",
+      "origin": "curada",
+      "license": "Apache-2.0",
+      "repositoryUrl": "https://github.com/opensquad/opensquad",
+      "riskLevel": "baixo",
+      "securityWarnings": [],
+      "dependencies": [],
+      "permissions": [
+        "net:http",
+        "agent:delegate"
+      ],
+      "createdAt": "2026-10-16T00:46:15.521Z",
+      "updatedAt": "2026-10-16T00:46:15.521Z",
+      "files": [
+        {
+          "id": "file_opensquad_orchestration_SKILL_md",
+          "skillId": "skill_opensquad_orchestration",
+          "path": "SKILL.md",
+          "name": "SKILL.md",
+          "extension": ".md",
+          "contentType": "text/markdown",
+          "sizeBytes": 767,
+          "sha256": "dd62ce42fce0481c2e58bb669591d2404886b50dbbbe742ac94dd6509b4ce766",
+          "content": "---\nname: opensquad-orchestration\ndescription: Padrões de decomposição de tarefas complexas entre múltiplos agentes especializados com handoff explícito e supervisão central.\nversion: 2.0.0\ncategory: orquestracao\nauthor: OpenSquad Community / Firstsys\nlicense: Apache-2.0\n---\n\n# OpenSquad: Orquestração Multiagente\n\n## Princípios Arquiteturais\n- **Divisão de Responsabilidades:** Cada agente tem apenas uma persona e responsabilidade bem delimitada (ex: Pesquisador, Redator, Auditor, Executor).\n- **Handoff Transparente:** O repasse de contexto entre agentes é feito via payloads JSON imutáveis com histórico de decisões.\n- **Supervisão do Orquestrador:** Um agente líder avalia a qualidade da entrega antes de retornar a resposta final ao usuário.\n",
+          "origin": "local",
+          "isExecutable": false,
+          "requiresReview": false,
+          "version": "1.0.0",
+          "createdAt": "2026-10-16T00:46:15.522Z",
+          "updatedAt": "2026-10-16T00:46:15.522Z",
+          "deletedAt": null
+        },
+        {
+          "id": "file_opensquad_orchestration_README_md",
+          "skillId": "skill_opensquad_orchestration",
+          "path": "README.md",
+          "name": "README.md",
+          "extension": ".md",
+          "contentType": "text/markdown",
+          "sizeBytes": 258,
+          "sha256": "c84dbc332e06674b3ff0554cdc41665a207ccc0050c3df75253deb868366a845",
+          "content": "# OpenSquad Architecture Guide\n\nArquitetura distribuída para agentes que colaboram em squads temáticos:\n- Squad de Vendas (SDR + Closer + Onboarding)\n- Squad de Engenharia (Coder + Reviewer + QA Tester)\n- Squad de Suporte (Triador + Nível 2 + Financeiro)\n",
+          "origin": "local",
+          "isExecutable": false,
+          "requiresReview": false,
+          "version": "1.0.0",
+          "createdAt": "2026-10-16T00:46:15.522Z",
+          "updatedAt": "2026-10-16T00:46:15.522Z",
+          "deletedAt": null
+        },
+        {
+          "id": "file_opensquad_orchestration_config_json",
+          "skillId": "skill_opensquad_orchestration",
+          "path": "config.json",
+          "name": "config.json",
+          "extension": ".json",
+          "contentType": "application/json",
+          "sizeBytes": 99,
+          "sha256": "6beb5b9d700204430eb1900751ffc188f328978578af46d6990818e3cd2f996e",
+          "content": "{\n  \"max_handoff_turns\": 5,\n  \"enable_consensus_voting\": false,\n  \"timeout_seconds_per_agent\": 30\n}",
+          "origin": "local",
+          "isExecutable": false,
+          "requiresReview": false,
+          "version": "1.0.0",
+          "createdAt": "2026-10-16T00:46:15.522Z",
+          "updatedAt": "2026-10-16T00:46:15.522Z",
+          "deletedAt": null
+        },
+        {
+          "id": "file_opensquad_orchestration_agent_router_md",
+          "skillId": "skill_opensquad_orchestration",
+          "path": "prompts/agent-router.md",
+          "name": "agent-router.md",
+          "extension": ".md",
+          "contentType": "text/markdown",
+          "sizeBytes": 283,
+          "sha256": "9b944a51b0ca346362e7b3184fb80e92b1ace59f269aa1f0f159d1a855d11bdf",
+          "content": "# Prompt: Roteador de Tarefas Multiagente\n\nVocê é o Orquestrador Central. Ao receber um objetivo do usuário:\n1. Decomponha a solicitação em até 3 subtarefas sequenciais.\n2. Indique qual subagente deve executar cada etapa.\n3. Não invente saídas parciais; delegue e consolide.\n",
+          "origin": "local",
+          "isExecutable": false,
+          "requiresReview": false,
+          "version": "1.0.0",
+          "createdAt": "2026-10-16T00:46:15.522Z",
+          "updatedAt": "2026-10-16T00:46:15.522Z",
+          "deletedAt": null
+        }
+      ]
+    },
+    {
+      "id": "skill_vibe_coding_toolkit",
+      "name": "Vibe Coding Toolkit - Engenharia e Quality Gates",
+      "slug": "vibe-coding-toolkit",
+      "description": "Conjunto de boas práticas de desenvolvimento ágil assistido por IA, validação contínua de tipos, testes e prevenção de código duplicado.",
+      "category": "engenharia",
+      "tags": [
+        "engenharia",
+        "quality-gate",
+        "typescript",
+        "clean-code",
+        "seguranca"
+      ],
+      "status": "ativa",
+      "installed": false,
+      "version": "1.0.0",
+      "author": "Firstsys Dev Core",
+      "origin": "curada",
+      "license": "MIT",
+      "riskLevel": "baixo",
+      "securityWarnings": [],
+      "dependencies": [
+        "typescript",
+        "oxlint"
+      ],
+      "permissions": [
+        "fs:read"
+      ],
+      "createdAt": "2026-10-16T00:46:15.521Z",
+      "updatedAt": "2026-10-16T00:46:15.521Z",
+      "files": [
+        {
+          "id": "file_vibe_coding_toolkit_SKILL_md",
+          "skillId": "skill_vibe_coding_toolkit",
+          "path": "SKILL.md",
+          "name": "SKILL.md",
+          "extension": ".md",
+          "contentType": "text/markdown",
+          "sizeBytes": 773,
+          "sha256": "97e989967cc1acd57fc2cab7dfbd1db22ebdce321d5bef8792851514205374cd",
+          "content": "---\nname: vibe-coding-toolkit\ndescription: Conjunto de boas práticas de desenvolvimento ágil assistido por IA, validação contínua de tipos, testes e prevenção de código duplicado.\nversion: 1.0.0\ncategory: engenharia\nauthor: Firstsys Dev Core\nlicense: MIT\n---\n\n# Vibe Coding Toolkit: Engenharia e Quality Gates\n\n## Diretrizes de Qualidade\n1. **Inspeção Prévia (Look Before You Leap):** Nunca presuma a ausência de um arquivo. Inspecione sempre antes de criar ou modificar.\n2. **Edição Cirúrgica:** Nunca sobrescreva um arquivo inteiro quando edições pontuais bastam.\n3. **Typecheck Contínuo:** Valide com o compilador TypeScript antes de declarar uma tarefa concluída.\n4. **Prevenção de Código Duplicado:** Reutilize módulos e componentes existentes.\n",
+          "origin": "local",
+          "isExecutable": false,
+          "requiresReview": false,
+          "version": "1.0.0",
+          "createdAt": "2026-10-16T00:46:15.522Z",
+          "updatedAt": "2026-10-16T00:46:15.522Z",
+          "deletedAt": null
+        },
+        {
+          "id": "file_vibe_coding_toolkit_rules_json",
+          "skillId": "skill_vibe_coding_toolkit",
+          "path": "rules.json",
+          "name": "rules.json",
+          "extension": ".json",
+          "contentType": "application/json",
+          "sizeBytes": 131,
+          "sha256": "4429e123c05ed6e82467fb79c216f3fa5fba0244f0157f0654b57810a4400819",
+          "content": "{\n  \"enforce_strict_types\": true,\n  \"max_function_lines\": 60,\n  \"require_unit_tests\": true,\n  \"prohibit_full_file_rewrites\": true\n}",
+          "origin": "local",
+          "isExecutable": false,
+          "requiresReview": false,
+          "version": "1.0.0",
+          "createdAt": "2026-10-16T00:46:15.522Z",
+          "updatedAt": "2026-10-16T00:46:15.522Z",
+          "deletedAt": null
+        },
+        {
+          "id": "file_vibe_coding_toolkit_quality_gate_ts",
+          "skillId": "skill_vibe_coding_toolkit",
+          "path": "scripts/quality-gate.ts",
+          "name": "quality-gate.ts",
+          "extension": ".ts",
+          "contentType": "text/typescript",
+          "sizeBytes": 219,
+          "sha256": "e36a8f60d5c3c96f980c0f10cf371d85dbb88c71e1e4b7b07505cb2f30ed8c36",
+          "content": "/**\n * Quality Gate Linter Rules\n * Exemplo de especificação de regras estáticas de engenharia Firstsys.\n */\nexport const QUALITY_STANDARDS = {\n  zeroAnyTypes: true,\n  explicitReturnType: true,\n  noDeadCode: true\n};\n",
+          "origin": "local",
+          "isExecutable": true,
+          "requiresReview": true,
+          "version": "1.0.0",
+          "createdAt": "2026-10-16T00:46:15.522Z",
+          "updatedAt": "2026-10-16T00:46:15.522Z",
+          "deletedAt": null
+        },
+        {
+          "id": "file_vibe_coding_toolkit_best_practices_md",
+          "skillId": "skill_vibe_coding_toolkit",
+          "path": "references/best-practices.md",
+          "name": "best-practices.md",
+          "extension": ".md",
+          "contentType": "text/markdown",
+          "sizeBytes": 318,
+          "sha256": "3b9b24b54c00df64d826e00b89972ca264b84864ff93b952e4064310123e8d46",
+          "content": "# Boas Práticas de Engenharia Firstsys\n\n- **Frontend:** React 19, TypeScript estrito, Framer Motion a 60 FPS estáveis, Tailwind CSS v4.\n- **Backend:** Node.js ESM, Express, Schemas Zod, Hash SHA-256 para integridade.\n- **Segurança:** Zod strict, sanitização de caminhos (anti-traversal), zero secrets no cliente.\n",
+          "origin": "local",
+          "isExecutable": false,
+          "requiresReview": false,
+          "version": "1.0.0",
+          "createdAt": "2026-10-16T00:46:15.522Z",
+          "updatedAt": "2026-10-16T00:46:15.522Z",
+          "deletedAt": null
+        }
+      ]
+    },
+    {
+      "id": "skill_openjarvis_local_first",
+      "name": "OpenJarvis - Agentes Local-First",
+      "slug": "openjarvis-local-first",
+      "description": "Arquitetura local-first para execução de tarefas autônomas com privacidade de dados e failover resiliente.",
+      "category": "automacao",
+      "tags": [
+        "local-first",
+        "privacidade",
+        "mcp",
+        "automacao",
+        "resiliencia"
+      ],
+      "status": "ativa",
+      "installed": false,
+      "version": "1.0.0",
+      "author": "Jarvis Community / Curadoria Firstsys",
+      "origin": "curada",
+      "license": "MIT",
+      "repositoryUrl": "https://github.com/openjarvis/openjarvis",
+      "riskLevel": "baixo",
+      "securityWarnings": [],
+      "dependencies": [],
+      "permissions": [
+        "fs:read",
+        "fs:write"
+      ],
+      "createdAt": "2026-10-16T00:46:15.521Z",
+      "updatedAt": "2026-10-16T00:46:15.521Z",
+      "files": [
+        {
+          "id": "file_openjarvis_local_first_SKILL_md",
+          "skillId": "skill_openjarvis_local_first",
+          "path": "SKILL.md",
+          "name": "SKILL.md",
+          "extension": ".md",
+          "contentType": "text/markdown",
+          "sizeBytes": 751,
+          "sha256": "62d124523a5c3eb76cba448d70d257acb4d518fe9a23ca2de8b19d8d62d90e40",
+          "content": "---\nname: openjarvis-local-first\ndescription: Arquitetura local-first para execução de tarefas autônomas com privacidade de dados e failover resiliente.\nversion: 1.0.0\ncategory: automacao\nauthor: Jarvis Community / Curadoria Firstsys\nlicense: MIT\n---\n\n# OpenJarvis: Agentes Local-First\n\n## Visão Geral\nHabilita agentes autônomos que priorizam a execução em nós locais ou em infraestrutura privada (VPS Firstsys), garantindo que dados confidenciais e credenciais nunca trafeguem por serviços externos desnecessários.\n\n## Pilares\n1. **Privacidade Absoluta:** Vetores e dados em repouso cifrados.\n2. **Resiliência Offline:** Suporte a cache local com failover gracioso.\n3. **Auditoria Criptográfica:** Toda transação assina um log SHA-256.\n",
+          "origin": "local",
+          "isExecutable": false,
+          "requiresReview": false,
+          "version": "1.0.0",
+          "createdAt": "2026-10-16T00:46:15.522Z",
+          "updatedAt": "2026-10-16T00:46:15.522Z",
+          "deletedAt": null
+        },
+        {
+          "id": "file_openjarvis_local_first_README_md",
+          "skillId": "skill_openjarvis_local_first",
+          "path": "README.md",
+          "name": "README.md",
+          "extension": ".md",
+          "contentType": "text/markdown",
+          "sizeBytes": 115,
+          "sha256": "1e8a0b649e5183bdf1a653c5990ff2205f3923529abd1da700e5d03d6d0c1357",
+          "content": "# OpenJarvis Protocol Specifications\n\nPadrões de comunicação via MCP (Model Context Protocol) e JSON-RPC local.\n",
+          "origin": "local",
+          "isExecutable": false,
+          "requiresReview": false,
+          "version": "1.0.0",
+          "createdAt": "2026-10-16T00:46:15.522Z",
+          "updatedAt": "2026-10-16T00:46:15.522Z",
+          "deletedAt": null
+        },
+        {
+          "id": "file_openjarvis_local_first_config_json",
+          "skillId": "skill_openjarvis_local_first",
+          "path": "config.json",
+          "name": "config.json",
+          "extension": ".json",
+          "contentType": "application/json",
+          "sizeBytes": 122,
+          "sha256": "fb5df5856a8d93048ac831413aaf391feb74a2c29bc88b6553d6b134dad7ac7b",
+          "content": "{\n  \"local_storage_path\": \"./storage/local-first\",\n  \"encryption_cipher\": \"aes-256-gcm\",\n  \"allow_cloud_fallback\": false\n}",
+          "origin": "local",
+          "isExecutable": false,
+          "requiresReview": false,
+          "version": "1.0.0",
+          "createdAt": "2026-10-16T00:46:15.522Z",
+          "updatedAt": "2026-10-16T00:46:15.522Z",
+          "deletedAt": null
+        },
+        {
+          "id": "file_openjarvis_local_first_local_protocols_md",
+          "skillId": "skill_openjarvis_local_first",
+          "path": "references/local-protocols.md",
+          "name": "local-protocols.md",
+          "extension": ".md",
+          "contentType": "text/markdown",
+          "sizeBytes": 171,
+          "sha256": "26777d8abb8ef71e5401daf55f8dcd5a2cbcd04ba0bb47de3bc00e7953f29bf8",
+          "content": "# Protocolos de Comunicação Local\n\n1. Chamadas locais autenticadas via Bearer Token e HMAC SHA-256.\n2. Persistência em arquivo JSON estruturado atômico com .tmp swap.\n",
+          "origin": "local",
+          "isExecutable": false,
+          "requiresReview": false,
+          "version": "1.0.0",
+          "createdAt": "2026-10-16T00:46:15.522Z",
+          "updatedAt": "2026-10-16T00:46:15.522Z",
+          "deletedAt": null
         }
       ]
     }
@@ -407,6 +988,550 @@
       "language": "pt_BR",
       "status": "APPROVED",
       "description": "Template de confirmação de agendamento e alinhamento de atendimento ao lead."
+    }
+  ],
+  "skill_versions": [
+    {
+      "id": "ver_sdr_qualificacao_init",
+      "skillId": "skill_sdr_qualificacao",
+      "version": "1.0.0",
+      "changelog": "Snapshot inicial da biblioteca corporativa de skills",
+      "snapshotHash": "373f1991b965be5c14f53313f740be1bede7c76d263b67b27a29bf7c84e6bc15",
+      "filesSnapshot": [
+        {
+          "path": "SKILL.md",
+          "sha256": "1deb846884b3690a830ddf214957a1aba163b32a548c2d085b4a5dbc845a0bc6",
+          "sizeBytes": 1098,
+          "name": "SKILL.md"
+        },
+        {
+          "path": "rules.json",
+          "sha256": "087ff3c0cd16b469145ffeb87c54a1f1c9a7fc217852482382b7903b67db73f6",
+          "sizeBytes": 223,
+          "name": "rules.json"
+        },
+        {
+          "path": "prompts/qualification.md",
+          "sha256": "b60fb4346dee34a34c5e9ad2da88952026612e823e71e7bd07db74f5c8217e7a",
+          "sizeBytes": 484,
+          "name": "qualification.md"
+        },
+        {
+          "path": "templates/message-template.md",
+          "sha256": "11d0b24469f7709982bf450151c999da09c40d00f1dcd758372448a5a557c15f",
+          "sizeBytes": 355,
+          "name": "message-template.md"
+        }
+      ],
+      "createdAt": "2026-10-16T00:46:15.521Z",
+      "createdBy": "Firstsys System"
+    },
+    {
+      "id": "ver_followup_inteligente_init",
+      "skillId": "skill_followup_inteligente",
+      "version": "1.1.0",
+      "changelog": "Snapshot inicial da biblioteca corporativa de skills",
+      "snapshotHash": "29fd14e54af794b64ec3375967c45b7ebe4604a69454caba6928492ccced8b1d",
+      "filesSnapshot": [
+        {
+          "path": "SKILL.md",
+          "sha256": "ca018d4d3ab49b0c028918bbad6411020dab033269c4468c7412296392789f3e",
+          "sizeBytes": 934,
+          "name": "SKILL.md"
+        },
+        {
+          "path": "config.json",
+          "sha256": "657232ac0cc0e473a571525635f39f40f3f8dce6bffe3738fc54c672b8082bc5",
+          "sizeBytes": 133,
+          "name": "config.json"
+        },
+        {
+          "path": "prompts/reengagement.md",
+          "sha256": "52409345761d246168883c135c07dd29a0895e00b865e612eb0947026664ed1e",
+          "sizeBytes": 302,
+          "name": "reengagement.md"
+        }
+      ],
+      "createdAt": "2026-10-16T00:46:15.521Z",
+      "createdBy": "Firstsys System"
+    },
+    {
+      "id": "ver_triagem_suporte_init",
+      "skillId": "skill_triagem_suporte",
+      "version": "1.0.0",
+      "changelog": "Snapshot inicial da biblioteca corporativa de skills",
+      "snapshotHash": "41e149f961f95248ad313dfe50889c6fcc4d51194f61f35c9102009da68e68af",
+      "filesSnapshot": [
+        {
+          "path": "SKILL.md",
+          "sha256": "226bb9ec308cb2a923df7d6fea21f2eeb45518dcc998fd0cca401a5aafbd4314",
+          "sizeBytes": 713,
+          "name": "SKILL.md"
+        },
+        {
+          "path": "rules.json",
+          "sha256": "771de760a0c5e049b722b08c238e2d573b475980024e1ff00a59e5d4e2b33f20",
+          "sizeBytes": 204,
+          "name": "rules.json"
+        },
+        {
+          "path": "references/department-routing.md",
+          "sha256": "8b090f6e5a8965260318b3c71f199ba15b83509e327e836ec2f8b4ab3bfb8f6c",
+          "sizeBytes": 451,
+          "name": "department-routing.md"
+        }
+      ],
+      "createdAt": "2026-10-16T00:46:15.521Z",
+      "createdBy": "Firstsys System"
+    },
+    {
+      "id": "ver_find_skills_vercel_init",
+      "skillId": "skill_find_skills_vercel",
+      "version": "1.2.0",
+      "changelog": "Snapshot inicial da biblioteca corporativa de skills",
+      "snapshotHash": "7a3051065fd5a5941fe28ba369eb63c85a94ee2aaf4b4bc2ae63d54322eb4af1",
+      "filesSnapshot": [
+        {
+          "path": "SKILL.md",
+          "sha256": "e7a6ff93186767448a76044ae11eef43c1f704f4fc5fb9b3a1fab4bd75e75b89",
+          "sizeBytes": 671,
+          "name": "SKILL.md"
+        },
+        {
+          "path": "README.md",
+          "sha256": "0ba761b67022a6a0f4ad7216ff2461e37e82451daba3e67079cf4aa39d6851da",
+          "sizeBytes": 200,
+          "name": "README.md"
+        },
+        {
+          "path": "scripts/discovery.ts",
+          "sha256": "3bf649afdf15efce762a1b3b1e3564a4b52906418f16df62992f5cb9a53b2a51",
+          "sizeBytes": 276,
+          "name": "discovery.ts"
+        },
+        {
+          "path": "references/registry.json",
+          "sha256": "c634ac4b4c6d2d35f5e794ca22763b510d5465be359aa5cdf9804ceaffa36e37",
+          "sizeBytes": 230,
+          "name": "registry.json"
+        }
+      ],
+      "createdAt": "2026-10-16T00:46:15.521Z",
+      "createdBy": "Firstsys System"
+    },
+    {
+      "id": "ver_opensquad_orchestration_init",
+      "skillId": "skill_opensquad_orchestration",
+      "version": "2.0.0",
+      "changelog": "Snapshot inicial da biblioteca corporativa de skills",
+      "snapshotHash": "88e4d2907bc30f0aa2011e9d57346c1011333acb7f74ac5311fa88e43e5a58b6",
+      "filesSnapshot": [
+        {
+          "path": "SKILL.md",
+          "sha256": "dd62ce42fce0481c2e58bb669591d2404886b50dbbbe742ac94dd6509b4ce766",
+          "sizeBytes": 767,
+          "name": "SKILL.md"
+        },
+        {
+          "path": "README.md",
+          "sha256": "c84dbc332e06674b3ff0554cdc41665a207ccc0050c3df75253deb868366a845",
+          "sizeBytes": 258,
+          "name": "README.md"
+        },
+        {
+          "path": "config.json",
+          "sha256": "6beb5b9d700204430eb1900751ffc188f328978578af46d6990818e3cd2f996e",
+          "sizeBytes": 99,
+          "name": "config.json"
+        },
+        {
+          "path": "prompts/agent-router.md",
+          "sha256": "9b944a51b0ca346362e7b3184fb80e92b1ace59f269aa1f0f159d1a855d11bdf",
+          "sizeBytes": 283,
+          "name": "agent-router.md"
+        }
+      ],
+      "createdAt": "2026-10-16T00:46:15.521Z",
+      "createdBy": "Firstsys System"
+    },
+    {
+      "id": "ver_vibe_coding_toolkit_init",
+      "skillId": "skill_vibe_coding_toolkit",
+      "version": "1.0.0",
+      "changelog": "Snapshot inicial da biblioteca corporativa de skills",
+      "snapshotHash": "e05bb33f1ba8aeaf16b1ce78a6d6949fc55e45614702802a53807e6c81ff1138",
+      "filesSnapshot": [
+        {
+          "path": "SKILL.md",
+          "sha256": "97e989967cc1acd57fc2cab7dfbd1db22ebdce321d5bef8792851514205374cd",
+          "sizeBytes": 773,
+          "name": "SKILL.md"
+        },
+        {
+          "path": "rules.json",
+          "sha256": "4429e123c05ed6e82467fb79c216f3fa5fba0244f0157f0654b57810a4400819",
+          "sizeBytes": 131,
+          "name": "rules.json"
+        },
+        {
+          "path": "scripts/quality-gate.ts",
+          "sha256": "e36a8f60d5c3c96f980c0f10cf371d85dbb88c71e1e4b7b07505cb2f30ed8c36",
+          "sizeBytes": 219,
+          "name": "quality-gate.ts"
+        },
+        {
+          "path": "references/best-practices.md",
+          "sha256": "3b9b24b54c00df64d826e00b89972ca264b84864ff93b952e4064310123e8d46",
+          "sizeBytes": 318,
+          "name": "best-practices.md"
+        }
+      ],
+      "createdAt": "2026-10-16T00:46:15.521Z",
+      "createdBy": "Firstsys System"
+    },
+    {
+      "id": "ver_openjarvis_local_first_init",
+      "skillId": "skill_openjarvis_local_first",
+      "version": "1.0.0",
+      "changelog": "Snapshot inicial da biblioteca corporativa de skills",
+      "snapshotHash": "60acd03182c2e418d4183456bb40e93dabf1d8ec5a84c33b5c275e5aef13f7eb",
+      "filesSnapshot": [
+        {
+          "path": "SKILL.md",
+          "sha256": "62d124523a5c3eb76cba448d70d257acb4d518fe9a23ca2de8b19d8d62d90e40",
+          "sizeBytes": 751,
+          "name": "SKILL.md"
+        },
+        {
+          "path": "README.md",
+          "sha256": "1e8a0b649e5183bdf1a653c5990ff2205f3923529abd1da700e5d03d6d0c1357",
+          "sizeBytes": 115,
+          "name": "README.md"
+        },
+        {
+          "path": "config.json",
+          "sha256": "fb5df5856a8d93048ac831413aaf391feb74a2c29bc88b6553d6b134dad7ac7b",
+          "sizeBytes": 122,
+          "name": "config.json"
+        },
+        {
+          "path": "references/local-protocols.md",
+          "sha256": "26777d8abb8ef71e5401daf55f8dcd5a2cbcd04ba0bb47de3bc00e7953f29bf8",
+          "sizeBytes": 171,
+          "name": "local-protocols.md"
+        }
+      ],
+      "createdAt": "2026-10-16T00:46:15.521Z",
+      "createdBy": "Firstsys System"
+    },
+    {
+      "id": "ver_d9bac4fa_53a6_",
+      "skillId": "skill_sdr_qualificacao",
+      "version": "1.0.1",
+      "changelog": "Teste de versionamento",
+      "snapshotHash": "373f1991b965be5c14f53313f740be1bede7c76d263b67b27a29bf7c84e6bc15",
+      "filesSnapshot": [
+        {
+          "path": "SKILL.md",
+          "sha256": "1deb846884b3690a830ddf214957a1aba163b32a548c2d085b4a5dbc845a0bc6",
+          "sizeBytes": 1098,
+          "name": "SKILL.md"
+        },
+        {
+          "path": "rules.json",
+          "sha256": "087ff3c0cd16b469145ffeb87c54a1f1c9a7fc217852482382b7903b67db73f6",
+          "sizeBytes": 223,
+          "name": "rules.json"
+        },
+        {
+          "path": "prompts/qualification.md",
+          "sha256": "b60fb4346dee34a34c5e9ad2da88952026612e823e71e7bd07db74f5c8217e7a",
+          "sizeBytes": 484,
+          "name": "qualification.md"
+        },
+        {
+          "path": "templates/message-template.md",
+          "sha256": "11d0b24469f7709982bf450151c999da09c40d00f1dcd758372448a5a557c15f",
+          "sizeBytes": 355,
+          "name": "message-template.md"
+        }
+      ],
+      "createdAt": "2026-10-16T00:54:24.053Z",
+      "createdBy": "test-runner"
+    },
+    {
+      "id": "ver_bd2edd75_7332_",
+      "skillId": "skill_sdr_qualificacao",
+      "version": "1.0.1",
+      "changelog": "Teste de versionamento",
+      "snapshotHash": "373f1991b965be5c14f53313f740be1bede7c76d263b67b27a29bf7c84e6bc15",
+      "filesSnapshot": [
+        {
+          "path": "SKILL.md",
+          "sha256": "1deb846884b3690a830ddf214957a1aba163b32a548c2d085b4a5dbc845a0bc6",
+          "sizeBytes": 1098,
+          "name": "SKILL.md"
+        },
+        {
+          "path": "rules.json",
+          "sha256": "087ff3c0cd16b469145ffeb87c54a1f1c9a7fc217852482382b7903b67db73f6",
+          "sizeBytes": 223,
+          "name": "rules.json"
+        },
+        {
+          "path": "prompts/qualification.md",
+          "sha256": "b60fb4346dee34a34c5e9ad2da88952026612e823e71e7bd07db74f5c8217e7a",
+          "sizeBytes": 484,
+          "name": "qualification.md"
+        },
+        {
+          "path": "templates/message-template.md",
+          "sha256": "11d0b24469f7709982bf450151c999da09c40d00f1dcd758372448a5a557c15f",
+          "sizeBytes": 355,
+          "name": "message-template.md"
+        }
+      ],
+      "createdAt": "2026-10-16T00:54:51.617Z",
+      "createdBy": "test-runner"
+    },
+    {
+      "id": "ver_eb93299f_12dc_",
+      "skillId": "skill_sdr_qualificacao",
+      "version": "1.0.1",
+      "changelog": "Teste de versionamento",
+      "snapshotHash": "373f1991b965be5c14f53313f740be1bede7c76d263b67b27a29bf7c84e6bc15",
+      "filesSnapshot": [
+        {
+          "path": "SKILL.md",
+          "sha256": "1deb846884b3690a830ddf214957a1aba163b32a548c2d085b4a5dbc845a0bc6",
+          "sizeBytes": 1098,
+          "name": "SKILL.md"
+        },
+        {
+          "path": "rules.json",
+          "sha256": "087ff3c0cd16b469145ffeb87c54a1f1c9a7fc217852482382b7903b67db73f6",
+          "sizeBytes": 223,
+          "name": "rules.json"
+        },
+        {
+          "path": "prompts/qualification.md",
+          "sha256": "b60fb4346dee34a34c5e9ad2da88952026612e823e71e7bd07db74f5c8217e7a",
+          "sizeBytes": 484,
+          "name": "qualification.md"
+        },
+        {
+          "path": "templates/message-template.md",
+          "sha256": "11d0b24469f7709982bf450151c999da09c40d00f1dcd758372448a5a557c15f",
+          "sizeBytes": 355,
+          "name": "message-template.md"
+        }
+      ],
+      "createdAt": "2026-10-16T00:55:41.788Z",
+      "createdBy": "test-runner"
+    },
+    {
+      "id": "ver_3c220ac3_c556_",
+      "skillId": "skill_sdr_qualificacao",
+      "version": "1.0.1",
+      "changelog": "Teste de versionamento",
+      "snapshotHash": "373f1991b965be5c14f53313f740be1bede7c76d263b67b27a29bf7c84e6bc15",
+      "filesSnapshot": [
+        {
+          "path": "SKILL.md",
+          "sha256": "1deb846884b3690a830ddf214957a1aba163b32a548c2d085b4a5dbc845a0bc6",
+          "sizeBytes": 1098,
+          "name": "SKILL.md"
+        },
+        {
+          "path": "rules.json",
+          "sha256": "087ff3c0cd16b469145ffeb87c54a1f1c9a7fc217852482382b7903b67db73f6",
+          "sizeBytes": 223,
+          "name": "rules.json"
+        },
+        {
+          "path": "prompts/qualification.md",
+          "sha256": "b60fb4346dee34a34c5e9ad2da88952026612e823e71e7bd07db74f5c8217e7a",
+          "sizeBytes": 484,
+          "name": "qualification.md"
+        },
+        {
+          "path": "templates/message-template.md",
+          "sha256": "11d0b24469f7709982bf450151c999da09c40d00f1dcd758372448a5a557c15f",
+          "sizeBytes": 355,
+          "name": "message-template.md"
+        }
+      ],
+      "createdAt": "2026-10-16T01:01:04.078Z",
+      "createdBy": "test-runner"
+    }
+  ],
+  "skill_installations": [
+    {
+      "id": "inst_sdr_conn_coolify",
+      "skillId": "skill_sdr_qualificacao",
+      "contextType": "connection",
+      "contextId": "conn_coolify_principal",
+      "contextName": "Zatten Produção (Coolify)",
+      "pinnedVersion": "1.0.0",
+      "status": "active",
+      "config": {
+        "auto_reply": true,
+        "max_response_delay_sec": 5
+      },
+      "grantedPermissions": [
+        "zatten:read",
+        "zatten:write"
+      ],
+      "installedAt": "2026-10-16T00:46:15.521Z",
+      "installedBy": "Lucas Santos"
+    },
+    {
+      "id": "inst_followup_conn_coolify",
+      "skillId": "skill_followup_inteligente",
+      "contextType": "connection",
+      "contextId": "conn_coolify_principal",
+      "contextName": "Zatten Produção (Coolify)",
+      "pinnedVersion": "1.1.0",
+      "status": "active",
+      "config": {
+        "cadence_interval_hours": 24
+      },
+      "grantedPermissions": [
+        "zatten:read",
+        "zatten:write"
+      ],
+      "installedAt": "2026-10-16T00:46:15.521Z",
+      "installedBy": "Lucas Santos"
+    }
+  ],
+  "skill_audit_logs": [
+    {
+      "id": "audit_ac663a2f-f394-46b7-883a-120db7329d28",
+      "skillId": "skill_sdr_qualificacao",
+      "actor": "test-runner",
+      "action": "file.restored",
+      "details": "Arquivo \"prompts/test-automated.md\" restaurado com sucesso",
+      "createdAt": "2026-10-16T00:54:24.041Z"
+    },
+    {
+      "id": "audit_12fb9305-dee5-4b4a-a1b4-321ade49d75d",
+      "skillId": "skill_sdr_qualificacao",
+      "actor": "test-runner",
+      "action": "version.created",
+      "details": "Versão 1.0.1 registrada (Snapshot: 373f1991...)",
+      "createdAt": "2026-10-16T00:54:24.057Z"
+    },
+    {
+      "id": "audit_cbb07c30-65bc-4c0d-9eb0-18bc590e9a39",
+      "skillId": "skill_sdr_qualificacao",
+      "actor": "test-runner",
+      "action": "skill.installed",
+      "details": "Skill vinculada com sucesso ao contexto [agent: Agente SDR Teste Unitário] na versão 1.0.0",
+      "createdAt": "2026-10-16T00:54:24.067Z"
+    },
+    {
+      "id": "audit_985c7795-68c3-4cfb-a821-e1097b7168bb",
+      "skillId": "skill_sdr_qualificacao",
+      "actor": "test-runner",
+      "action": "skill.uninstalled",
+      "details": "Desinstalada do contexto [agent: Agente SDR Teste Unitário]",
+      "createdAt": "2026-10-16T00:54:24.074Z"
+    },
+    {
+      "id": "audit_319a70f7-3ecd-495a-9106-195823ebd59f",
+      "skillId": "skill_sdr_qualificacao",
+      "actor": "test-runner",
+      "action": "file.restored",
+      "details": "Arquivo \"prompts/test-automated.md\" restaurado com sucesso",
+      "createdAt": "2026-10-16T00:54:51.606Z"
+    },
+    {
+      "id": "audit_851cd351-a882-42d2-afc5-82c71ac10a4a",
+      "skillId": "skill_sdr_qualificacao",
+      "actor": "test-runner",
+      "action": "version.created",
+      "details": "Versão 1.0.1 registrada (Snapshot: 373f1991...)",
+      "createdAt": "2026-10-16T00:54:51.620Z"
+    },
+    {
+      "id": "audit_a4fc2da3-26dd-47c8-a50b-b409b579a430",
+      "skillId": "skill_sdr_qualificacao",
+      "actor": "test-runner",
+      "action": "skill.installed",
+      "details": "Skill vinculada com sucesso ao contexto [agent: Agente SDR Teste Unitário] na versão 1.0.0",
+      "createdAt": "2026-10-16T00:54:51.627Z"
+    },
+    {
+      "id": "audit_f0d205d9-5c3c-430a-a94c-6d5555db2fce",
+      "skillId": "skill_sdr_qualificacao",
+      "actor": "test-runner",
+      "action": "skill.uninstalled",
+      "details": "Desinstalada do contexto [agent: Agente SDR Teste Unitário]",
+      "createdAt": "2026-10-16T00:54:51.636Z"
+    },
+    {
+      "id": "audit_67fed379-5aff-4e75-a1ff-b7f1e02b352c",
+      "skillId": "skill_sdr_qualificacao",
+      "actor": "test-runner",
+      "action": "file.restored",
+      "details": "Arquivo \"prompts/test-automated.md\" restaurado com sucesso",
+      "createdAt": "2026-10-16T00:55:41.772Z"
+    },
+    {
+      "id": "audit_70fde5c2-ed86-441d-9a78-2a1cfd9616ec",
+      "skillId": "skill_sdr_qualificacao",
+      "actor": "test-runner",
+      "action": "version.created",
+      "details": "Versão 1.0.1 registrada (Snapshot: 373f1991...)",
+      "createdAt": "2026-10-16T00:55:41.792Z"
+    },
+    {
+      "id": "audit_a9cfa7ee-c0a2-4b82-b718-08abbe8501c2",
+      "skillId": "skill_sdr_qualificacao",
+      "actor": "test-runner",
+      "action": "skill.installed",
+      "details": "Skill vinculada com sucesso ao contexto [agent: Agente SDR Teste Unitário] na versão 1.0.0",
+      "createdAt": "2026-10-16T00:55:41.802Z"
+    },
+    {
+      "id": "audit_11a0d36a-781c-46f2-893c-9f2b590450e4",
+      "skillId": "skill_sdr_qualificacao",
+      "actor": "test-runner",
+      "action": "skill.uninstalled",
+      "details": "Desinstalada do contexto [agent: Agente SDR Teste Unitário]",
+      "createdAt": "2026-10-16T00:55:41.811Z"
+    },
+    {
+      "id": "audit_b83094cb-d6c4-4fd8-88c3-148e702361cd",
+      "skillId": "skill_sdr_qualificacao",
+      "actor": "test-runner",
+      "action": "file.restored",
+      "details": "Arquivo \"prompts/test-automated.md\" restaurado com sucesso",
+      "createdAt": "2026-10-16T01:01:04.065Z"
+    },
+    {
+      "id": "audit_c912d237-dcdc-4c1d-92a6-a8cdcaca0236",
+      "skillId": "skill_sdr_qualificacao",
+      "actor": "test-runner",
+      "action": "version.created",
+      "details": "Versão 1.0.1 registrada (Snapshot: 373f1991...)",
+      "createdAt": "2026-10-16T01:01:04.082Z"
+    },
+    {
+      "id": "audit_07a1f088-f510-4f3a-aa30-68e702f0f9ed",
+      "skillId": "skill_sdr_qualificacao",
+      "actor": "test-runner",
+      "action": "skill.installed",
+      "details": "Skill vinculada com sucesso ao contexto [agent: Agente SDR Teste Unitário] na versão 1.0.0",
+      "createdAt": "2026-10-16T01:01:04.091Z"
+    },
+    {
+      "id": "audit_efa07f8a-aa5e-4b92-be43-360d34b156dd",
+      "skillId": "skill_sdr_qualificacao",
+      "actor": "test-runner",
+      "action": "skill.uninstalled",
+      "details": "Desinstalada do contexto [agent: Agente SDR Teste Unitário]",
+      "createdAt": "2026-10-16T01:01:04.098Z"
     }
   ]
 }
