@@ -1168,23 +1168,30 @@ app.post('/api/connections/:id/revoke', verifyAuthToken, async (req, res) => {
 
 // 1.5. Rota explícita de download do Pacote MCP ChatGPT (Sem Cache)
 const PLUGIN_ZIP_NAME = 'plugin_asdk_app_6acb2a1e159c8191a53f5f2b3da33e8c.zip';
-const APP_ZIP_NAME = 'app_6acb2a1e159c8191a53f5f2b3da33e8c.zip';
+const APP_ZIP_NAME = 'asdk_app_6acb2a1e159c8191a53f5f2b3da33e8c.zip';
+const FIRSTSYS_MCP_ZIP = 'Firstsys-MCP.zip';
 const BUNDLE_ZIP_NAME = 'firstsys-zatten-mcp-bundle.zip';
 
 app.get([
   '/firstsys-zatten-mcp-bundle.zip',
   '/api/mcp/bundle.zip',
+  `/${FIRSTSYS_MCP_ZIP}`,
+  `/api/mcp/${FIRSTSYS_MCP_ZIP}`,
   `/${PLUGIN_ZIP_NAME}`,
   `/api/mcp/${PLUGIN_ZIP_NAME}`,
   `/${APP_ZIP_NAME}`,
-  `/api/mcp/${APP_ZIP_NAME}`
+  `/api/mcp/${APP_ZIP_NAME}`,
+  '/app_6acb2a1e159c8191a53f5f2b3da33e8c.zip',
+  '/api/mcp/app_6acb2a1e159c8191a53f5f2b3da33e8c.zip'
 ], (req, res) => {
   const reqUrl = req.path || '';
   const chosenName = reqUrl.includes(PLUGIN_ZIP_NAME) 
     ? PLUGIN_ZIP_NAME 
     : reqUrl.includes(APP_ZIP_NAME) 
       ? APP_ZIP_NAME 
-      : BUNDLE_ZIP_NAME;
+      : reqUrl.includes(FIRSTSYS_MCP_ZIP)
+        ? FIRSTSYS_MCP_ZIP
+        : BUNDLE_ZIP_NAME;
 
   res.setHeader('Content-Type', 'application/zip');
   res.setHeader('Content-Disposition', `attachment; filename="${chosenName}"`);

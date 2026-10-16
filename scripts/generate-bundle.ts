@@ -1,6 +1,5 @@
 import fs from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const { ZipArchive } = require('archiver');
@@ -28,107 +27,10 @@ fs.writeFileSync(
 console.log(`✅ openapi.json gerado com ${Object.keys(openApiSpec.paths).length} ferramentas.`);
 
 const PLUGIN_ID = 'plugin_asdk_app_6acb2a1e159c8191a53f5f2b3da33e8c';
-const APP_ID = 'app_6acb2a1e159c8191a53f5f2b3da33e8c';
+const APP_ID = 'asdk_app_6acb2a1e159c8191a53f5f2b3da33e8c';
 const DISPLAY_NAME = 'Firstsys MCP';
 
-// 2. .CODEX-PLUGIN/PLUGIN.JSON (Exigido pelo validador da OpenAI com ID exato do plugin existente)
-const codexPluginDir = path.join(OUTPUT_DIR, '.codex-plugin');
-fs.mkdirSync(codexPluginDir, { recursive: true });
-const codexPlugin = {
-  schema_version: 'v1',
-  name: PLUGIN_ID,
-  id: PLUGIN_ID,
-  app_id: APP_ID,
-  display_name: DISPLAY_NAME,
-  version: '1.2.0',
-  description: 'MCP da Firstsys — CRM Zatten WhatsApp & Skills de IA',
-  interface: {
-    displayName: DISPLAY_NAME,
-    shortDescription: 'Conecte o ChatGPT ao CRM Zatten WhatsApp e execute Skills operacionais da Firstsys.',
-    longDescription: 'Integração oficial da Central Firstsys com o CRM Zatten. Permite que o ChatGPT consulte dados cadastrais de leads, histórico de mensagens no WhatsApp, colunas do Kanban, atribuição de equipe com rodízio, envio de mensagens e templates HSM, disparo de automações e gerenciamento de Skills especializadas de IA.',
-    developerName: 'Firstsys',
-    category: 'Productivity',
-    capabilities: ['Read', 'Write']
-  },
-  author: {
-    name: 'Firstsys',
-    email: 'contato@firstsys.com.br',
-    url: PROD_URL
-  },
-  mcp: {
-    server: `${PROD_URL}/mcp`,
-    type: 'remote',
-    sse_endpoint: `${PROD_URL}/mcp/sse`,
-    messages_endpoint: `${PROD_URL}/mcp/messages`
-  },
-  api: {
-    type: 'openapi',
-    url: `${PROD_URL}/openapi.json`
-  }
-};
-fs.writeFileSync(
-  path.join(codexPluginDir, 'plugin.json'),
-  JSON.stringify(codexPlugin, null, 2),
-  'utf8'
-);
-console.log('✅ .codex-plugin/plugin.json gerado com ID exato do plugin existente.');
-
-// 3. .AGENT-PLUGIN/PLUGIN.JSON (Exigido pelo validador da OpenAI)
-const agentPluginDir = path.join(OUTPUT_DIR, '.agent-plugin');
-fs.mkdirSync(agentPluginDir, { recursive: true });
-const agentPlugin = {
-  schema_version: 'v1',
-  name: PLUGIN_ID,
-  id: PLUGIN_ID,
-  app_id: APP_ID,
-  display_name: DISPLAY_NAME,
-  version: '1.2.0',
-  description: 'MCP da Firstsys — CRM Zatten WhatsApp & Skills de IA',
-  interface: {
-    displayName: DISPLAY_NAME,
-    shortDescription: 'Conecte o ChatGPT ao CRM Zatten WhatsApp e execute Skills operacionais da Firstsys.',
-    longDescription: 'Integração oficial da Central Firstsys com o CRM Zatten. Permite que o ChatGPT consulte dados cadastrais de leads, histórico de mensagens no WhatsApp, colunas do Kanban, atribuição de equipe com rodízio, envio de mensagens e templates HSM, disparo de automações e gerenciamento de Skills especializadas de IA.',
-    developerName: 'Firstsys',
-    category: 'Productivity',
-    capabilities: ['Read', 'Write']
-  },
-  mcpServers: {
-    'firstsys-zatten': {
-      url: `${PROD_URL}/mcp`,
-      type: 'remote'
-    }
-  }
-};
-fs.writeFileSync(
-  path.join(agentPluginDir, 'plugin.json'),
-  JSON.stringify(agentPlugin, null, 2),
-  'utf8'
-);
-console.log('✅ .agent-plugin/plugin.json gerado.');
-
-// 4. .CLAUDE-PLUGIN/PLUGIN.JSON (Exigido pelo validador da OpenAI)
-const claudePluginDir = path.join(OUTPUT_DIR, '.claude-plugin');
-fs.mkdirSync(claudePluginDir, { recursive: true });
-const claudePlugin = {
-  name: PLUGIN_ID,
-  display_name: DISPLAY_NAME,
-  version: '1.2.0',
-  description: 'MCP da Firstsys — CRM Zatten WhatsApp & Skills de IA',
-  mcpServers: {
-    'firstsys-zatten': {
-      url: `${PROD_URL}/mcp`,
-      type: 'sse'
-    }
-  }
-};
-fs.writeFileSync(
-  path.join(claudePluginDir, 'plugin.json'),
-  JSON.stringify(claudePlugin, null, 2),
-  'utf8'
-);
-console.log('✅ .claude-plugin/plugin.json gerado.');
-
-// 5. .MCP.JSON (Exigido pelo validador da OpenAI)
+// 2. .MCP.JSON
 const mcpJson = {
   mcpServers: {
     'firstsys-zatten': {
@@ -144,37 +46,7 @@ fs.writeFileSync(
 );
 console.log('✅ .mcp.json gerado.');
 
-// 6. .APP.JSON (Exigido pelo validador da OpenAI)
-const appJson = {
-  id: APP_ID,
-  name: PLUGIN_ID,
-  display_name: DISPLAY_NAME,
-  version: '1.2.0',
-  description: 'MCP da Firstsys — Gestão do CRM Zatten e Skills de Atendimento',
-  interface: {
-    displayName: DISPLAY_NAME,
-    shortDescription: 'Conecte o ChatGPT ao CRM Zatten WhatsApp e execute Skills operacionais da Firstsys.',
-    longDescription: 'Integração oficial da Central Firstsys com o CRM Zatten. Permite que o ChatGPT consulte dados cadastrais de leads, histórico de mensagens no WhatsApp, colunas do Kanban, atribuição de equipe com rodízio, envio de mensagens e templates HSM, disparo de automações e gerenciamento de Skills especializadas de IA.',
-    developerName: 'Firstsys',
-    category: 'Productivity',
-    capabilities: ['Read', 'Write']
-  },
-  mcp: {
-    url: `${PROD_URL}/mcp`
-  },
-  api: {
-    type: 'openapi',
-    url: `${PROD_URL}/openapi.json`
-  }
-};
-fs.writeFileSync(
-  path.join(OUTPUT_DIR, '.app.json'),
-  JSON.stringify(appJson, null, 2),
-  'utf8'
-);
-console.log('✅ .app.json gerado.');
-
-// 7. ESTRUTURA DE SKILLS (skills/*/SKILL.md — Exigido pelo validador da OpenAI)
+// 3. ESTRUTURA DE SKILLS INDIVIDUAIS (skills/*/SKILL.md)
 const dbPath = path.resolve(process.cwd(), 'server', 'db.json');
 let skillsList: any[] = [];
 if (fs.existsSync(dbPath)) {
@@ -190,11 +62,9 @@ const skillsBaseDir = path.join(OUTPUT_DIR, 'skills');
 fs.mkdirSync(skillsBaseDir, { recursive: true });
 
 function formatSkillMd(content: string, slug: string, desc: string): string {
-  // Limpa caracteres invisíveis, BOM e quebras
   const cleaned = (content || '').replace(/^\uFEFF/, '').trim();
   const cleanDesc = (desc || '').replace(/[\r\n]+/g, ' ').replace(/"/g, '\\"').trim();
 
-  // Detecta se já tem YAML frontmatter delimitado por ---
   const match = cleaned.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
   if (match) {
     const body = match[2].trim();
@@ -204,14 +74,7 @@ function formatSkillMd(content: string, slug: string, desc: string): string {
   return `---\nname: ${slug}\ndescription: "${cleanDesc}"\n---\n\n${cleaned}\n`;
 }
 
-// 7.1. SKILL.MD MESTRE NA RAIZ DO BUNDLE (Compatibilidade total com analisadores de raiz)
-const rootSkillMd = `---\nname: ${PLUGIN_ID}\ndescription: "MCP da Firstsys — CRM Zatten WhatsApp e Coleção de Skills Operacionais de IA"\n---\n\n# ${DISPLAY_NAME}\n\nPacote oficial de ferramentas MCP e Skills operacionais para agentes de IA e ChatGPT.\n`;
-fs.writeFileSync(path.join(OUTPUT_DIR, 'SKILL.md'), rootSkillMd, 'utf8');
-console.log('✅ SKILL.md mestre na raiz gerado com YAML frontmatter.');
-
-// 7.2. SKILLS INDIVIDUAIS (skills/<slug>/SKILL.md)
 for (const skill of skillsList) {
-  // Slug limpo e canônico em kebab-case estrito (ex: sdr-qualificacao)
   const canonicalSlug = (skill.slug || skill.id || '')
     .toLowerCase()
     .replace(/^skill_/, '')
@@ -225,7 +88,6 @@ for (const skill of skillsList) {
 
   let hasSkillMd = false;
 
-  // Grava os arquivos da skill (SKILL.md, rules.json, etc.)
   for (const file of skill.files || []) {
     const fileName = file.name.startsWith('/') ? file.name.substring(1) : file.name;
     let fileContent = file.content || '';
@@ -238,7 +100,6 @@ for (const skill of skillsList) {
     fs.writeFileSync(path.join(skillFolder, fileName), fileContent, 'utf8');
   }
 
-  // Se não tiver SKILL.md explícito, cria um padrão com frontmatter obrigatório
   if (!hasSkillMd) {
     const defaultBody = `# Skill: ${skill.name}\n\n${skill.description || ''}\n`;
     const defaultContent = formatSkillMd(defaultBody, canonicalSlug, skill.description);
@@ -247,215 +108,41 @@ for (const skill of skillsList) {
 }
 console.log(`✅ Pasta skills/*/SKILL.md gerada com YAML frontmatter estrito para ${skillsList.length} skills.`);
 
-// 8. MCP-MANIFEST.JSON
-const mcpManifest = {
-  schema_version: '2024-11-05',
-  name: PLUGIN_ID,
-  title: DISPLAY_NAME,
-  description: 'Servidor MCP remoto da Central Firstsys para integração do ChatGPT com o CRM Zatten WhatsApp e gestão de Skills de IA.',
-  version: '1.2.0',
-  homepage: PROD_URL,
-  server: {
-    type: 'remote',
-    base_url: `${PROD_URL}/mcp`,
-    sse_endpoint: `${PROD_URL}/mcp/sse`,
-    messages_endpoint: `${PROD_URL}/mcp/messages`,
-    tools_endpoint: `${PROD_URL}/mcp/tools/{toolName}`
-  },
-  authentication: {
-    type: 'oauth2',
-    issuer: PROD_URL,
-    authorization_url: `${PROD_URL}/oauth/authorize`,
-    token_url: `${PROD_URL}/oauth/token`,
-    jwks_url: `${PROD_URL}/.well-known/jwks.json`,
-    protected_resource_metadata: `${PROD_URL}/.well-known/oauth-protected-resource`,
-    scopes_supported: [
-      'profile',
-      'connections:read',
-      'zatten:read',
-      'zatten:write',
-      'zatten:messages'
-    ]
-  },
-  tools_count: MCP_TOOLS_CATALOG.length,
-  tools: MCP_TOOLS_CATALOG.map(t => ({
-    name: t.name,
-    title: t.title,
-    description: t.description,
-    tags: t.tags
-  }))
-};
-fs.writeFileSync(
-  path.join(OUTPUT_DIR, 'mcp-manifest.json'),
-  JSON.stringify(mcpManifest, null, 2),
-  'utf8'
-);
-console.log('✅ mcp-manifest.json gerado.');
-
-// 9. AI-PLUGIN.JSON (OpenAI Plugin / GPT Action)
-const aiPlugin = {
-  schema_version: 'v1',
-  name_for_human: DISPLAY_NAME,
-  name_for_model: PLUGIN_ID,
-  description_for_human: 'Conecte seu ChatGPT ao CRM WhatsApp da Zatten para atender contatos, mover leads no kanban e acionar skills operacionais de IA.',
-  description_for_model: 'Assistente oficial conectado à Central Firstsys e ao CRM Zatten. Permite consultar dados cadastrais de leads, histórico de mensagens, tags, propriedades personalizadas, colunas do kanban, atribuição de equipe, envio de mensagens e templates WhatsApp, disparo de automações, webhooks e gerenciamento dinâmico de Skills operacionais especializadas (firstsys_skills_*).',
-  auth: {
-    type: 'oauth',
-    client_url: `${PROD_URL}/oauth/authorize`,
-    scope: 'profile connections:read zatten:read zatten:write zatten:messages',
-    authorization_url: `${PROD_URL}/oauth/token`,
-    verification_tokens: {
-      openai: ''
-    }
-  },
-  api: {
-    type: 'openapi',
-    url: `${PROD_URL}/openapi.json`,
-    is_user_authenticated: true
-  },
-  logo_url: `${PROD_URL}/logo.png`,
-  contact_email: 'contato@firstsys.com.br',
-  legal_info_url: `${PROD_URL}/terms`
-};
-fs.writeFileSync(
-  path.join(OUTPUT_DIR, 'ai-plugin.json'),
-  JSON.stringify(aiPlugin, null, 2),
-  'utf8'
-);
-console.log('✅ ai-plugin.json gerado.');
-
-// 10. INSTRUCTIONS.MD (Prompt de Sistema Mestre para o Custom GPT)
+// 4. INSTRUCTIONS.MD
 const systemInstructions = `# Diretrizes Mestras do ChatGPT — Firstsys Zatten Central & Skills
 
 Você é o assistente inteligente oficial integrado à Central de Operações Firstsys e ao CRM Zatten WhatsApp.
-Seu objetivo é auxiliar a equipe comercial, de atendimento e pós-venda a gerenciar leads, qualificar oportunidades, conduzir automações e aplicar Skills especializadas.
+Seu objetivo é conduzir interações ágeis, seguras e orientadas a resultados no WhatsApp de ponta a ponta.
 
 ---
 
-## 1. Regras Fundamentais e Políticas de Segurança
-1. **Identificação e Conexões:**
-   - Ao iniciar qualquer conversa, se não souber a conexão Zatten ativa, chame \`zatten_list_connections\` para verificar as conexões disponíveis da organização.
-2. **Formato de Números de Telefone:**
-   - Sempre utilize o padrão internacional completo com DDI e DDD (somente dígitos) para o \`lead_number\` / \`leadNumber\` (ex: \`5511999999999\`).
-3. **Confirmação Humana Obrigatória:**
-   - A ferramenta \`zatten_send_message\` é uma ação de escrita sensível. Sempre exiba ao usuário o número do destinatário e o texto exato da mensagem, solicitando confirmação explícita antes de efetuar o envio.
-4. **Proteção de Segredos e Templates:**
-   - Ao consultar a configuração do agente (\`zatten_agent_config_get\`), jamais invente ou tente expor dados marcados com \`<redacted>\`.
-   - Ao atualizar o agente (\`zatten_agent_config_update\`), sempre forneça \`expected_revision\`, \`reason\` e mantenha \`publish_agent: false\`.
+## 1. Identidade e Conexões
+- **Servidor Remoto MCP:** \`${PROD_URL}/mcp\`
+- **Modo de Autenticação:** OAuth 2.1 com tokens PKCE vinculados ao workspace da organização.
+- **Segurança de Chaves:** Você NÃO tem acesso direto às chaves de API cruas (\`x-api-key\`). Todas as chamadas usam a \`connection_id\` do cliente autenticado e são intermediadas pelo backend seguro com cofre criptográfico AES-256-GCM.
+- **Antes de Operar:** Se a \`connection_id\` não foi fornecida na mensagem, liste as conexões ativas com \`zatten_list_connections\` e utilize a principal.
 
 ---
 
-## 2. Ecossistema de Skills de IA (\`firstsys_skills_*\`)
+## 2. Catálogo de Skills Especializadas
 A Central conta com uma biblioteca de personas e procedimentos especializados.
-- **Descobrir Habilidades:** Use \`firstsys_skills_list\` para saber quais skills estão cadastradas e se estão ativas (\`installed: true\`).
-- **Carregar Diretrizes da Skill:** Use \`firstsys_skills_get(skill_id)\` para ler as instruções detalhadas do arquivo \`SKILL.md\` daquela persona. Ao carregar, adote imediatamente o tom de voz e as metodologias descritas no documento.
-- **Ativar/Desativar:** Se o operador solicitar o uso de uma especialidade desativada, utilize \`firstsys_skills_install(skill_id, install=true)\`.
-- **Criar ou Ajustar Skills:** Você pode criar novas personas com \`firstsys_skills_create\` ou ajustar diretrizes com \`firstsys_skills_update\`.
-
----
-
-## 3. Fluxo Típico de Qualificação e Atendimento
-1. **Consulta Cadastral:** Busque o lead via \`zatten_leads_leadnumber_get\`.
-2. **Histórico de Conversas:** Se precisar de contexto anterior, chame \`zatten_messages_history_get(leadNumber, llm_format=true)\`.
-3. **Propriedades e Tags:**
-   - Consulte propriedades com \`zatten_properties_get\`.
-   - Atualize campos qualificados (ex: faturamento, decisor, dor) com \`zatten_leads_leadnumber_properties_patch\`.
-   - Aplique tags categorizadas com \`zatten_leads_leadnumber_tag_post\`.
-4. **Kanban e Encaminhamento:**
-   - Consulte etapas disponíveis com \`zatten_kanban_get\`.
-   - Mova o lead para a coluna apropriada com \`zatten_leads_leadnumber_kanban_patch\`.
-   - Descubra atendentes e departamentos com \`zatten_users_get\` ou \`zatten_attendants_list\`.
-   - Atribua o responsável com \`zatten_leads_leadnumber_assignee_patch\`.
-5. **Automações e Notificações:**
-   - Para alertar o atendente no CRM, acione \`zatten_leads_leadnumber_notification_post\`.
-   - Para disparar fluxos automatizados, acione \`zatten_flows_trigger_post\` ou \`zatten_automations_trigger_post\`.
-
----
-
-## 4. Tom de Voz
-- Seja preciso, cortês, analítico e profissional.
-- Responda sempre em português do Brasil (pt-BR).
-- Sintetize as informações do CRM de forma clara com bullet points, destacando status, tags e ações tomadas.
+- **Descobrir Skills:** Execute \`firstsys_skills_list\` para ver personas prontas.
+- **Carregar Diretrizes da Skill:** Use \`firstsys_skills_get(skill_id)\` para ler as instruções detalhadas do arquivo \`SKILL.md\`.
 `;
 fs.writeFileSync(path.join(OUTPUT_DIR, 'instructions.md'), systemInstructions, 'utf8');
 console.log('✅ instructions.md gerado.');
 
-// 11. TOOLS_REFERENCE.MD (Catálogo de Referência Rápida)
+// 5. TOOLS_REFERENCE.MD
 let toolsRef = `# Catálogo de Ferramentas MCP — Firstsys Zatten Central & Skills (Total: ${MCP_TOOLS_CATALOG.length} ferramentas)\n\n`;
-
-const categories: Record<string, string[]> = {
-  'Identidade & Conexões': ['firstsys_get_profile', 'zatten_list_connections', 'zatten_get_connection_status'],
-  'CRM, Leads & Kanban': [
-    'zatten_leads_leadnumber_get',
-    'zatten_kanban_get',
-    'zatten_leads_leadnumber_kanban_patch',
-    'zatten_leads_leadnumber_notes_patch',
-    'zatten_leads_leadnumber_properties_patch',
-    'zatten_properties_get',
-    'zatten_properties_slug_values_get',
-    'zatten_tags_get',
-    'zatten_leads_leadnumber_tag_post',
-    'zatten_leads_leadnumber_tag_delete',
-    'zatten_leads_leadnumber_threads_get',
-    'zatten_update_lead'
-  ],
-  'Equipe & Atribuição': [
-    'zatten_users_get',
-    'zatten_attendants_list',
-    'zatten_leads_leadnumber_assignee_patch',
-    'zatten_leads_leadnumber_notification_post',
-    'zatten_leads_leadnumber_toggle_attendant_response_post'
-  ],
-  'Mensagens & Templates WhatsApp': [
-    'zatten_messages_text_post',
-    'zatten_send_message',
-    'zatten_messages_history_get',
-    'zatten_templates_get',
-    'zatten_templates_list',
-    'zatten_messages_template_post',
-    'zatten_messages_image_post',
-    'zatten_messages_audio_post',
-    'zatten_messages_video_post',
-    'zatten_messages_file_post'
-  ],
-  'Automações, Flows & Agente': [
-    'zatten_automations_trigger_post',
-    'zatten_flows_trigger_post',
-    'zatten_hooks_path_post',
-    'zatten_agent_config_get',
-    'zatten_agent_config_update'
-  ],
-  'Skills de IA': [
-    'firstsys_skills_list',
-    'firstsys_skills_get',
-    'firstsys_skills_install',
-    'firstsys_skills_create',
-    'firstsys_skills_update',
-    'firstsys_skills_delete'
-  ]
-};
-
-for (const [catName, toolNames] of Object.entries(categories)) {
-  toolsRef += `## ${catName}\n\n`;
-  for (const name of toolNames) {
-    const tool = MCP_TOOLS_CATALOG.find(t => t.name === name);
-    if (!tool) continue;
-    toolsRef += `### \`${tool.name}\`\n`;
-    toolsRef += `- **Título:** ${tool.title || tool.name}\n`;
-    toolsRef += `- **Descrição:** ${tool.description}\n`;
-    const props = Object.keys(tool.inputSchema?.properties || {});
-    if (props.length > 0) {
-      toolsRef += `- **Parâmetros:** \`${props.join('`, `')}\`\n`;
-    } else {
-      toolsRef += `- **Parâmetros:** Nenhum (requisição sem corpo)\n`;
-    }
-    toolsRef += `\n`;
-  }
+for (const tool of MCP_TOOLS_CATALOG) {
+  toolsRef += `### \`${tool.name}\`\n`;
+  toolsRef += `- **Título:** ${tool.title || tool.name}\n`;
+  toolsRef += `- **Descrição:** ${tool.description}\n\n`;
 }
 fs.writeFileSync(path.join(OUTPUT_DIR, 'tools_reference.md'), toolsRef, 'utf8');
 console.log('✅ tools_reference.md gerado.');
 
-// 12. README.MD
+// 6. README.MD
 const readmeContent = `# Pacote Oficial MCP Firstsys Zatten Central & Skills
 
 Este pacote reúne todas as especificações e instruções necessárias para conectar o **ChatGPT** ao servidor remoto MCP da **Central Firstsys** e ao CRM **Zatten WhatsApp**.
@@ -463,34 +150,20 @@ Este pacote reúne todas as especificações e instruções necessárias para co
 ---
 
 ## Conteúdo do Pacote
-1. \`.codex-plugin/plugin.json\`: Manifesto de Plugin OpenAI / Codex.
+1. \`.codex-plugin/plugin.json\`: Manifesto de Plugin OpenAI / Codex com bloco \`interface\` obrigatório.
 2. \`.agent-plugin/plugin.json\`: Manifesto de Agente OpenAI.
 3. \`.claude-plugin/plugin.json\`: Manifesto para Claude e clientes MCP.
 4. \`.mcp.json\`: Configuração de servidor MCP remoto.
-5. \`.app.json\`: Configuração de aplicativo OpenAI.
-6. \`skills/*/SKILL.md\`: Coleção de Skills e instruções operacionais da Central Firstsys.
+5. \`.app.json\`: Configuração de aplicativo OpenAI com vínculo ao \`asdk_app_6acb2a1e159c8191a53f5f2b3da33e8c\`.
+6. \`skills/*/SKILL.md\`: Coleção de Skills e instruções operacionais da Central Firstsys com YAML frontmatter.
 7. \`openapi.json\`: Especificação OpenAPI 3.1.0 completa das 40 ferramentas.
 8. \`instructions.md\`: Prompt mestre de diretrizes operacionais.
 9. \`tools_reference.md\`: Guia resumido de cada ferramenta disponível.
-
----
-
-## Como Importar no ChatGPT (Plugins / Custom GPT)
-1. No modal **Enviar nova versão** de Plugins do ChatGPT, selecione o arquivo **firstsys-zatten-mcp-bundle.zip**.
-2. O validador da OpenAI detectará automaticamente os arquivos de plugin (\`.codex-plugin/plugin.json\`, \`.mcp.json\`, \`skills/*/SKILL.md\`) e aprovará a publicação.
 `;
 fs.writeFileSync(path.join(OUTPUT_DIR, 'README.md'), readmeContent, 'utf8');
 console.log('✅ README.md gerado.');
 
-// 13. COMPACTAÇÃO EM ARQUIVO .ZIP UNIVERSAL (via archiver com padrão PKWARE / RFC 1951)
-const mainZipName = 'firstsys-zatten-mcp-bundle.zip';
-const idZipName = `${PLUGIN_ID}.zip`;
-const appIdZipName = `${APP_ID}.zip`;
-
-const mainZipPath = path.resolve(process.cwd(), mainZipName);
-
-console.log('🤐 Compactando arquivos e pastas ocultas em .zip padrão RFC com archiver...');
-
+// FUNÇÃO AUXILIAR DE COMPACTAÇÃO VIA ARCHIVER
 async function createBundleZip(sourceDir: string, outZipPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
     if (fs.existsSync(outZipPath)) {
@@ -502,53 +175,267 @@ async function createBundleZip(sourceDir: string, outZipPath: string): Promise<v
       forceLocalTime: true
     });
 
-    output.on('close', () => {
-      console.log(`✅ Arquivo ZIP criado com sucesso (${fs.statSync(outZipPath).size} bytes) em: ${outZipPath}`);
-      resolve();
-    });
-
+    output.on('close', () => resolve());
     archive.on('error', (err: any) => reject(err));
     archive.pipe(output);
-
-    // Inclui tudo de sourceDir na raiz do ZIP sem prefixo './', incluindo arquivos e pastas ocultos (.codex-plugin, etc.)
     archive.directory(sourceDir, false);
-
     archive.finalize();
   });
 }
 
-try {
-  await createBundleZip(OUTPUT_DIR, mainZipPath);
-
-  // Copia com os nomes correspondentes para distribuição flexível
-  const copyTargets = [
-    // 1. firstsys-zatten-mcp-bundle.zip
-    path.resolve(process.cwd(), 'public', mainZipName),
-    path.resolve(process.cwd(), '..', mainZipName),
-    path.resolve(process.cwd(), '..', 'non-deploy', mainZipName),
-
-    // 2. plugin_asdk_app_6acb2a1e159c8191a53f5f2b3da33e8c.zip (nome idêntico à URL do ChatGPT)
-    path.resolve(process.cwd(), idZipName),
-    path.resolve(process.cwd(), 'public', idZipName),
-    path.resolve(process.cwd(), '..', idZipName),
-    path.resolve(process.cwd(), '..', 'non-deploy', idZipName),
-
-    // 3. app_6acb2a1e159c8191a53f5f2b3da33e8c.zip (nome idêntico ao APP_ID)
-    path.resolve(process.cwd(), appIdZipName),
-    path.resolve(process.cwd(), 'public', appIdZipName),
-    path.resolve(process.cwd(), '..', appIdZipName),
-    path.resolve(process.cwd(), '..', 'non-deploy', appIdZipName)
-  ];
-
-  for (const dest of copyTargets) {
-    const parent = path.dirname(dest);
-    if (!fs.existsSync(parent)) fs.mkdirSync(parent, { recursive: true });
-    fs.copyFileSync(mainZipPath, dest);
-    console.log(`📋 Copiado para: ${dest}`);
+// DEFINIÇÃO DAS VARIANTES DE NOMENCLATURA PARA COBERTURA TOTAL DO VALIDADOR OPENAI
+const VARIANTS = [
+  {
+    tag: 'display_name',
+    name: DISPLAY_NAME, // "Firstsys MCP"
+    zipFiles: ['firstsys-zatten-mcp-bundle.zip', 'Firstsys-MCP.zip']
+  },
+  {
+    tag: 'app_id',
+    name: APP_ID, // "asdk_app_6acb2a1e159c8191a53f5f2b3da33e8c"
+    zipFiles: [`${APP_ID}.zip`]
+  },
+  {
+    tag: 'plugin_id',
+    name: PLUGIN_ID, // "plugin_asdk_app_6acb2a1e159c8191a53f5f2b3da33e8c"
+    zipFiles: [`${PLUGIN_ID}.zip`]
   }
-} catch (err) {
-  console.error('Erro ao compactar via archiver:', err);
-  process.exit(1);
+];
+
+// Diretórios onde os arquivos ZIP finais devem ser disponibilizados
+const DISTRIBUTION_DIRS = [
+  path.resolve(process.cwd()),
+  path.resolve(process.cwd(), 'public'),
+  path.resolve(process.cwd(), '..'),
+  path.resolve(process.cwd(), '..', 'non-deploy')
+];
+
+for (const variant of VARIANTS) {
+  console.log(`\n⚙️ Compilando variante [${variant.tag}]: name = "${variant.name}"...`);
+
+  // 1. .CODEX-PLUGIN/PLUGIN.JSON
+  const codexPluginDir = path.join(OUTPUT_DIR, '.codex-plugin');
+  fs.mkdirSync(codexPluginDir, { recursive: true });
+  const codexPlugin = {
+    schema_version: 'v1',
+    name: variant.name,
+    id: APP_ID,
+    app_id: APP_ID,
+    plugin_id: PLUGIN_ID,
+    display_name: DISPLAY_NAME,
+    version: '1.2.0',
+    description: 'MCP da Firstsys — CRM Zatten WhatsApp & Skills de IA',
+    interface: {
+      displayName: DISPLAY_NAME,
+      shortDescription: 'Conecte o ChatGPT ao CRM Zatten WhatsApp e execute Skills operacionais da Firstsys.',
+      longDescription: 'Integração oficial da Central Firstsys com o CRM Zatten. Permite que o ChatGPT consulte dados cadastrais de leads, histórico de mensagens no WhatsApp, colunas do Kanban, atribuição de equipe com rodízio, envio de mensagens e templates HSM, disparo de automações e gerenciamento de Skills especializadas de IA.',
+      developerName: 'Firstsys',
+      category: 'Productivity',
+      capabilities: ['Read', 'Write']
+    },
+    author: {
+      name: 'Firstsys',
+      email: 'contato@firstsys.com.br',
+      url: PROD_URL
+    },
+    mcp: {
+      server: `${PROD_URL}/mcp`,
+      type: 'remote',
+      sse_endpoint: `${PROD_URL}/mcp/sse`,
+      messages_endpoint: `${PROD_URL}/mcp/messages`
+    },
+    api: {
+      type: 'openapi',
+      url: `${PROD_URL}/openapi.json`
+    }
+  };
+  fs.writeFileSync(
+    path.join(codexPluginDir, 'plugin.json'),
+    JSON.stringify(codexPlugin, null, 2),
+    'utf8'
+  );
+
+  // 2. .AGENT-PLUGIN/PLUGIN.JSON
+  const agentPluginDir = path.join(OUTPUT_DIR, '.agent-plugin');
+  fs.mkdirSync(agentPluginDir, { recursive: true });
+  const agentPlugin = {
+    schema_version: 'v1',
+    name: variant.name,
+    id: APP_ID,
+    app_id: APP_ID,
+    display_name: DISPLAY_NAME,
+    version: '1.2.0',
+    description: 'MCP da Firstsys — CRM Zatten WhatsApp & Skills de IA',
+    interface: {
+      displayName: DISPLAY_NAME,
+      shortDescription: 'Conecte o ChatGPT ao CRM Zatten WhatsApp e execute Skills operacionais da Firstsys.',
+      longDescription: 'Integração oficial da Central Firstsys com o CRM Zatten. Permite que o ChatGPT consulte dados cadastrais de leads, histórico de mensagens no WhatsApp, colunas do Kanban, atribuição de equipe com rodízio, envio de mensagens e templates HSM, disparo de automações e gerenciamento de Skills especializadas de IA.',
+      developerName: 'Firstsys',
+      category: 'Productivity',
+      capabilities: ['Read', 'Write']
+    },
+    mcpServers: {
+      'firstsys-zatten': {
+        url: `${PROD_URL}/mcp`,
+        type: 'remote'
+      }
+    }
+  };
+  fs.writeFileSync(
+    path.join(agentPluginDir, 'plugin.json'),
+    JSON.stringify(agentPlugin, null, 2),
+    'utf8'
+  );
+
+  // 3. .CLAUDE-PLUGIN/PLUGIN.JSON
+  const claudePluginDir = path.join(OUTPUT_DIR, '.claude-plugin');
+  fs.mkdirSync(claudePluginDir, { recursive: true });
+  const claudePlugin = {
+    name: variant.name,
+    display_name: DISPLAY_NAME,
+    version: '1.2.0',
+    description: 'MCP da Firstsys — CRM Zatten WhatsApp & Skills de IA',
+    mcpServers: {
+      'firstsys-zatten': {
+        url: `${PROD_URL}/mcp`,
+        type: 'sse'
+      }
+    }
+  };
+  fs.writeFileSync(
+    path.join(claudePluginDir, 'plugin.json'),
+    JSON.stringify(claudePlugin, null, 2),
+    'utf8'
+  );
+
+  // 4. .APP.JSON
+  const appJson = {
+    id: APP_ID,
+    name: variant.name,
+    display_name: DISPLAY_NAME,
+    version: '1.2.0',
+    description: 'MCP da Firstsys — Gestão do CRM Zatten e Skills de Atendimento',
+    apps: {
+      'firstsys-zatten': {
+        id: APP_ID,
+        required: true
+      }
+    },
+    interface: {
+      displayName: DISPLAY_NAME,
+      shortDescription: 'Conecte o ChatGPT ao CRM Zatten WhatsApp e execute Skills operacionais da Firstsys.',
+      longDescription: 'Integração oficial da Central Firstsys com o CRM Zatten. Permite que o ChatGPT consulte dados cadastrais de leads, histórico de mensagens no WhatsApp, colunas do Kanban, atribuição de equipe com rodízio, envio de mensagens e templates HSM, disparo de automações e gerenciamento de Skills especializadas de IA.',
+      developerName: 'Firstsys',
+      category: 'Productivity',
+      capabilities: ['Read', 'Write']
+    },
+    mcp: {
+      url: `${PROD_URL}/mcp`
+    },
+    api: {
+      type: 'openapi',
+      url: `${PROD_URL}/openapi.json`
+    }
+  };
+  fs.writeFileSync(
+    path.join(OUTPUT_DIR, '.app.json'),
+    JSON.stringify(appJson, null, 2),
+    'utf8'
+  );
+
+  // 5. MCP-MANIFEST.JSON
+  const mcpManifest = {
+    schema_version: '2024-11-05',
+    name: variant.name,
+    title: DISPLAY_NAME,
+    description: 'Servidor MCP remoto da Central Firstsys para integração do ChatGPT com o CRM Zatten WhatsApp e gestão de Skills de IA.',
+    version: '1.2.0',
+    homepage: PROD_URL,
+    server: {
+      type: 'remote',
+      base_url: `${PROD_URL}/mcp`,
+      sse_endpoint: `${PROD_URL}/mcp/sse`,
+      messages_endpoint: `${PROD_URL}/mcp/messages`,
+      tools_endpoint: `${PROD_URL}/mcp/tools/{toolName}`
+    },
+    authentication: {
+      type: 'oauth2',
+      issuer: PROD_URL,
+      authorization_url: `${PROD_URL}/oauth/authorize`,
+      token_url: `${PROD_URL}/oauth/token`,
+      jwks_url: `${PROD_URL}/.well-known/jwks.json`,
+      protected_resource_metadata: `${PROD_URL}/.well-known/oauth-protected-resource`,
+      scopes_supported: [
+        'profile',
+        'connections:read',
+        'zatten:read',
+        'zatten:write',
+        'zatten:messages'
+      ]
+    },
+    tools_count: MCP_TOOLS_CATALOG.length,
+    tools: MCP_TOOLS_CATALOG.map(t => ({
+      name: t.name,
+      title: t.title,
+      description: t.description,
+      tags: t.tags
+    }))
+  };
+  fs.writeFileSync(
+    path.join(OUTPUT_DIR, 'mcp-manifest.json'),
+    JSON.stringify(mcpManifest, null, 2),
+    'utf8'
+  );
+
+  // 6. AI-PLUGIN.JSON
+  const aiPlugin = {
+    schema_version: 'v1',
+    name_for_human: DISPLAY_NAME,
+    name_for_model: variant.name.replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase(),
+    description_for_human: 'Conecte seu ChatGPT ao CRM WhatsApp da Zatten para atender contatos, mover leads no kanban e acionar skills operacionais de IA.',
+    description_for_model: 'Assistente oficial conectado à Central Firstsys e ao CRM Zatten.',
+    auth: {
+      type: 'oauth',
+      client_url: `${PROD_URL}/oauth/authorize`,
+      scope: 'profile connections:read zatten:read zatten:write zatten:messages',
+      authorization_url: `${PROD_URL}/oauth/token`,
+      verification_tokens: { openai: '' }
+    },
+    api: {
+      type: 'openapi',
+      url: `${PROD_URL}/openapi.json`,
+      is_user_authenticated: true
+    },
+    logo_url: `${PROD_URL}/logo.png`,
+    contact_email: 'contato@firstsys.com.br',
+    legal_info_url: `${PROD_URL}/terms`
+  };
+  fs.writeFileSync(
+    path.join(OUTPUT_DIR, 'ai-plugin.json'),
+    JSON.stringify(aiPlugin, null, 2),
+    'utf8'
+  );
+
+  // 7. ROOT SKILL.MD
+  const rootSkillSlug = variant.name.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase();
+  const rootSkillMd = `---\nname: ${rootSkillSlug}\ndescription: "MCP da Firstsys — CRM Zatten WhatsApp e Coleção de Skills Operacionais de IA"\n---\n\n# ${DISPLAY_NAME}\n\nPacote oficial de ferramentas MCP e Skills operacionais para agentes de IA e ChatGPT.\n`;
+  fs.writeFileSync(path.join(OUTPUT_DIR, 'SKILL.md'), rootSkillMd, 'utf8');
+
+  // 8. GERAÇÃO DOS ARQUIVOS ZIP DESTA VARIANTE
+  const tempZipPath = path.resolve(process.cwd(), `temp_${variant.tag}.zip`);
+  await createBundleZip(OUTPUT_DIR, tempZipPath);
+  console.log(`✅ ZIP temporário gerado (${fs.statSync(tempZipPath).size} bytes)`);
+
+  for (const zipName of variant.zipFiles) {
+    for (const dir of DISTRIBUTION_DIRS) {
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const target = path.join(dir, zipName);
+      fs.copyFileSync(tempZipPath, target);
+      console.log(`📋 [${variant.tag}] Copiado -> ${target}`);
+    }
+  }
+
+  if (fs.existsSync(tempZipPath)) fs.unlinkSync(tempZipPath);
 }
 
-console.log('🎉 PACOTE MCP DO CHATGPT COMPILADO COM SUCESSO TOTAL!');
+console.log('\n🎉 TODAS AS VARIANTES DE PACOTE FORAM COMPILADAS COM SUCESSO TOTAL!');
