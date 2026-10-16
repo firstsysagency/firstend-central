@@ -572,11 +572,11 @@ app.get('/api/skills/:id/files', (req, res) => {
   }
 });
 
-// 8. Obter arquivo individual da skill
-app.get('/api/skills/:id/files/*', (req, res) => {
+// 8. Obter arquivo individual da skill (Compatível com Express 5 e path-to-regexp v8)
+app.get(/^\/api\/skills\/([^/]+)\/files\/(.+)$/, (req, res) => {
   try {
-    const { id } = req.params;
-    const rawPath = req.params[0] || (req.query.path as string);
+    const id = req.params[0];
+    const rawPath = req.params[1] || (req.query.path as string);
     if (!rawPath) {
       return res.status(400).json({ error: 'Caminho do arquivo não fornecido.' });
     }
@@ -614,10 +614,10 @@ app.post('/api/skills/:id/files', (req, res) => {
 });
 
 // 10. Remover arquivo da skill (soft delete com proteção para SKILL.md)
-app.delete('/api/skills/:id/files/*', (req, res) => {
+app.delete(/^\/api\/skills\/([^/]+)\/files\/(.+)$/, (req, res) => {
   try {
-    const { id } = req.params;
-    const rawPath = req.params[0] || (req.query.path as string);
+    const id = req.params[0];
+    const rawPath = req.params[1] || (req.query.path as string);
     const permanent = req.query.permanent === 'true';
 
     if (!rawPath) {
@@ -633,10 +633,10 @@ app.delete('/api/skills/:id/files/*', (req, res) => {
 });
 
 // 11. Restaurar arquivo soft-deleted da skill
-app.post('/api/skills/:id/files/*/restore', (req, res) => {
+app.post(/^\/api\/skills\/([^/]+)\/files\/(.+)\/restore$/, (req, res) => {
   try {
-    const { id } = req.params;
-    const rawPath = req.params[0] || (req.query.path as string);
+    const id = req.params[0];
+    const rawPath = req.params[1] || (req.query.path as string);
 
     if (!rawPath) {
       return res.status(400).json({ error: 'Caminho do arquivo não fornecido.' });
