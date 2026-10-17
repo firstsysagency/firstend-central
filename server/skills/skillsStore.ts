@@ -896,7 +896,24 @@ export function deleteSkillInstallation(skillId: string, installationId: string,
 
 export function listSkillAuditLogs(skillId: string): SkillAuditLog[] {
   const db = readDb();
+  const skill = getSkill(skillId);
+  const targetIds = new Set<string>([skillId]);
+
+  if (skill) {
+    targetIds.add(skill.id);
+    targetIds.add(skill.slug);
+  }
+
+  // Aliases conhecidos para compatibilidade retroativa absoluta
+  if (skillId === 'find-skills-vercel' || skill?.slug === 'find-skills-vercel') {
+    targetIds.add('skill_curada_find_skills_vercel');
+    targetIds.add('descoberta-e-curadoria-de-skills');
+    targetIds.add('skill_find_skills_vercel');
+    targetIds.add('find-skills-vercel');
+  }
+
   return (db.skill_audit_logs || [])
-    .filter(l => l.skillId === skillId)
+    .filter(l => targetIds.has(l.skillId))
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
+
