@@ -1,6 +1,8 @@
-import fs from 'fs';
-import path from 'path';
-import crypto from 'crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import { Buffer } from 'node:buffer';
+import process from 'node:process';
 import {
   ALLOWED_TEXT_EXTENSIONS,
   BLOCKED_OR_SUSPICIOUS_EXTENSIONS,
@@ -272,7 +274,11 @@ export function getSkill(idOrSlug: string): Skill | null {
   }) || null;
 }
 
-export function createSkill(payload: Partial<Skill>, actor: string = 'admin'): Skill {
+export type CreateSkillPayload = Omit<Partial<Skill>, 'files'> & {
+  files?: Array<Partial<SkillFile> & { name?: string; path?: string; content?: string }>;
+};
+
+export function createSkill(payload: CreateSkillPayload, actor: string = 'admin'): Skill {
   const db = readDb();
   if (!db.skills) db.skills = [];
 
@@ -293,7 +299,7 @@ export function createSkill(payload: Partial<Skill>, actor: string = 'admin'): S
   const initialFiles: SkillFile[] = [];
   if (payload.files && Array.isArray(payload.files)) {
     for (const f of payload.files) {
-      const relPath = sanitizeRelativePath(f.path || f.name);
+      const relPath = sanitizeRelativePath(f.path || f.name || 'unnamed.txt');
       const content = f.content || '';
       SkillFileContentSchema.parse(content);
       const sizeBytes = Buffer.byteLength(content, 'utf8');
@@ -301,22 +307,22 @@ export function createSkill(payload: Partial<Skill>, actor: string = 'admin'): S
       const isExec = isExecutablePath(relPath);
 
       initialFiles.push({
-        id: `file_${crypto.randomUUID().replace(/-/g, '_').substring(0, 14)}`,
+        id: f.id || `file_${crypto.randomUUID().replace(/-/g, '_').substring(0, 14)}`,
         skillId: id,
         path: relPath,
-        name: path.basename(relPath),
-        extension: path.extname(relPath),
-        contentType: detectContentType(relPath),
+        name: f.name || path.basename(relPath),
+        extension: f.extension || path.extname(relPath),
+        contentType: f.contentType || detectContentType(relPath),
         sizeBytes,
         sha256,
         content,
-        origin: f.origin || 'local',
-        isExecutable: isExec,
-        requiresReview: isExec,
-        version,
-        createdAt: now,
-        updatedAt: now,
-        deletedAt: null
+        origin: (f.origin as any) || 'local',
+        isExecutable: f.isExecutable ?? isExec,
+        requiresReview: f.requiresReview ?? isExec,
+        version: f.version || version,
+        createdAt: f.createdAt || now,
+        updatedAt: f.updatedAt || now,
+        deletedAt: f.deletedAt || null
       });
     }
   }

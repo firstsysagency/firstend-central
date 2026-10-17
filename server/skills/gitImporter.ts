@@ -245,7 +245,7 @@ export async function previewGitRepository(repoUrl: string): Promise<GitImportPr
     throw new Error(`Falha ao consultar metadados do repositório: HTTP ${repoMetaRes.status}`);
   }
 
-  const repoMeta = await repoMetaRes.json();
+  const repoMeta: any = await repoMetaRes.json();
   const defaultBranch = branch || repoMeta.default_branch || 'main';
   const licenseName = repoMeta.license?.spdx_id || repoMeta.license?.name || 'Não especificada';
 
@@ -256,7 +256,7 @@ export async function previewGitRepository(repoUrl: string): Promise<GitImportPr
     throw new Error(`Não foi possível obter a árvore de arquivos do branch "${defaultBranch}".`);
   }
 
-  const treeData = await treeRes.json();
+  const treeData: any = await treeRes.json();
   const rawItems: GitHubTreeItem[] = treeData.tree || [];
 
   // Filtrar blobs (arquivos) dentro do subpath se especificado
@@ -356,7 +356,7 @@ export async function previewGitRepository(repoUrl: string): Promise<GitImportPr
           { headers: { 'User-Agent': 'Firstsys-Skill-Importer/1.0' } }
         );
         if (pkgRes.ok) {
-          const pkgJson = await pkgRes.json();
+          const pkgJson: any = await pkgRes.json();
           if (pkgJson.dependencies) {
             Object.keys(pkgJson.dependencies).slice(0, 15).forEach(dep => dependenciesDetected.add(dep));
           }

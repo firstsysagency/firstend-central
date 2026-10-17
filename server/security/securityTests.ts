@@ -51,8 +51,7 @@ console.log('4. Testando createSecurityItem()...');
 const testSlug = `teste-sec-${Date.now()}`;
 const createdItem = createSecurityItem({
   name: 'Controle de Acesso Baseado em Atributos (ABAC)',
-  description: 'Controle dinâmico de permissões por contexto e atributos do usuário.',
-  detailedDescription: 'Implementação de ABAC com políticas JSON avaliadas em tempo real.',
+  description: 'Controle dinâmico de permissões por contexto e atributos do usuário. Implementação com políticas JSON em tempo real.',
   category: 'autenticacao',
   severity: 'medio',
   complianceStandards: ['NIST SP 800-53', 'ISO 27001'],

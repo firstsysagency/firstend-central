@@ -110,7 +110,7 @@ export const SecurityItemZodSchema = z.object({
   name: z.string().min(2, 'O nome deve ter no mínimo 2 caracteres.').max(120),
   slug: z.string().min(2).max(100).regex(/^[a-z0-9-]+$/, 'Slug deve conter apenas letras minúsculas, números e hífens.'),
   description: z.string().min(5, 'A descrição deve ter no mínimo 5 caracteres.').max(1000),
-  category: z.enum(SECURITY_CATEGORIES).default('aplicacao'),
+  category: z.enum(SECURITY_CATEGORIES).default('hardening'),
   severity: z.enum(SECURITY_SEVERITIES).default('alto'),
   tags: z.array(SecurityTagSchema).default([]),
   status: z.enum(SECURITY_STATUSES).default('ativo'),

@@ -54,7 +54,7 @@ export const SkillFileZodSchema = z.object({
   sizeBytes: z.number().nonnegative(),
   sha256: z.string().length(64),
   content: SkillFileContentSchema,
-  origin: z.enum(['local', 'git']).default('local'),
+  origin: z.enum(['local', 'git', 'notion']).default('local'),
   isExecutable: z.boolean().default(false),
   requiresReview: z.boolean().default(false),
   version: z.string().default('1.0.0'),
@@ -119,7 +119,7 @@ export type SkillVersion = z.infer<typeof SkillVersionZodSchema>;
 // 5. SCHEMA PRINCIPAL DA SKILL
 // ==============================================================================
 
-export const SkillOriginSchema = z.enum(['propria', 'importada', 'clonada', 'curada']);
+export const SkillOriginSchema = z.enum(['propria', 'importada', 'clonada', 'curada', 'notion']);
 export const SkillStatusSchema = z.enum(['rascunho', 'ativa', 'arquivada', 'descontinuada', 'active', 'inactive']);
 export const SkillRiskLevelSchema = z.enum(['baixo', 'medio', 'alto']);
 
@@ -235,8 +235,13 @@ export const SkillAuditLogZodSchema = z.object({
     'skill.restored',
     'skill.installed',
     'skill.uninstalled',
+    'skill.tag_added',
+    'skill.tag_removed',
+    'skill.migrated_and_curated',
     'skill.imported_git',
     'skill.synced_git',
+    'imported_from_notion',
+    'security.scan_completed',
     'file.created',
     'file.updated',
     'file.deleted',

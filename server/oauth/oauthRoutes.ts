@@ -427,7 +427,7 @@ oauthRouter.post('/oauth/token', express.urlencoded({ extended: true }), express
     if (body.grant_type === 'refresh_token') {
       const rotationResult = oauthStore.rotateRefreshToken(body.refresh_token);
 
-      if (!rotationResult.valid) {
+      if (rotationResult.valid === false) {
         logAuditEvent({
           actor: body.client_id || 'oauth_client_unknown',
           action: 'oauth.token_reuse.detected',

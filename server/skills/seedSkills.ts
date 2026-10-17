@@ -1,5 +1,7 @@
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
+import { Buffer } from 'node:buffer';
+import process from 'node:process';
 import { Skill, SkillFile, SkillVersion, SkillInstallation, SkillAuditLog } from './skillTypes.js';
 import { computeSha256, isExecutablePath, detectContentType } from './skillsStore.js';
 import { seedCreativeSkills } from './seedCreativeSkills.js';

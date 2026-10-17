@@ -3303,7 +3303,7 @@ async function executeToolDirectly(name: string, rawArgs: any, user: OAuthJwtPay
           context_name: i.contextName,
           pinned_version: i.pinnedVersion,
           status: i.status,
-          created_at: i.createdAt
+          created_at: i.installedAt
         })),
         total: installs.length
       };
@@ -4004,7 +4004,7 @@ async function executeToolDirectly(name: string, rawArgs: any, user: OAuthJwtPay
           slug: item.slug,
           name: item.name,
           description: item.description,
-          detailed_description: item.detailedDescription,
+          detailed_description: item.description,
           category: item.category,
           severity: item.severity,
           compliance_standards: item.complianceStandards,
@@ -4041,12 +4041,12 @@ async function executeToolDirectly(name: string, rawArgs: any, user: OAuthJwtPay
 
       const created = createSecurityItem({
         name,
-        description,
-        detailedDescription: detailedDescription || '',
+        description: detailedDescription ? `${description}\n\n${detailedDescription}` : description,
         category: category as any,
         severity: severity as any,
         complianceStandards: complianceStandards || [],
         tags: tags || [],
+        initialContent,
         files: initialFiles
       }, user.sub || 'mcp-agent');
 

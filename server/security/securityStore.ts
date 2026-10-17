@@ -1,6 +1,8 @@
-import fs from 'fs';
-import path from 'path';
-import crypto from 'crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import { Buffer } from 'node:buffer';
+import process from 'node:process';
 import {
   ALLOWED_SECURITY_EXTENSIONS,
   BLOCKED_SECURITY_EXTENSIONS,
@@ -228,7 +230,12 @@ export function getSecurityItem(idOrSlug: string): SecurityItem | null {
   ) || null;
 }
 
-export function createSecurityItem(payload: Partial<SecurityItem>, actor: string = 'admin'): SecurityItem {
+export type CreateSecurityItemPayload = Omit<Partial<SecurityItem>, 'files'> & {
+  initialContent?: string;
+  files?: Array<Partial<SecurityFile> & { name?: string; path?: string; content?: string }>;
+};
+
+export function createSecurityItem(payload: CreateSecurityItemPayload, actor: string = 'admin'): SecurityItem {
   const db = readDb();
   if (!db.security_items) db.security_items = [];
 
@@ -246,12 +253,37 @@ export function createSecurityItem(payload: Partial<SecurityItem>, actor: string
     throw new Error(`Já existe um método/tecnologia de segurança com o identificador ou slug '${slug}'.`);
   }
 
+  // Normalizar arquivos iniciais
+  let normalizedFiles: SecurityFile[] = [];
+  if (payload.files && Array.isArray(payload.files)) {
+    for (const f of payload.files) {
+      const safePath = sanitizeSecurityPath(f.path || f.name || 'arquivo.txt');
+      const content = f.content || '';
+      SecurityFileContentSchema.parse(content);
+      const ext = path.extname(safePath).toLowerCase();
+      normalizedFiles.push({
+        id: f.id || `file_${crypto.randomUUID().replace(/-/g, '_').substring(0, 14)}`,
+        securityId: id,
+        path: safePath,
+        name: f.name || path.basename(safePath),
+        extension: f.extension || ext,
+        contentType: f.contentType || detectContentType(safePath),
+        sizeBytes: Buffer.byteLength(content, 'utf8'),
+        sha256: computeSha256(content),
+        content,
+        version: f.version || '1.0.0',
+        createdAt: f.createdAt || now,
+        updatedAt: f.updatedAt || now,
+        deletedAt: f.deletedAt || null
+      });
+    }
+  }
+
   // Garantir arquivo SECURITY.md obrigatório
-  let files = payload.files || [];
-  const hasSecurityMd = files.some(f => f.path.toLowerCase() === 'security.md' && !f.deletedAt);
+  const hasSecurityMd = normalizedFiles.some(f => f.path.toLowerCase() === 'security.md' && !f.deletedAt);
 
   if (!hasSecurityMd) {
-    const defaultContent = `# ${payload.name || 'Padrão de Segurança'}\n\n## Diretrizes e Requisitos\n${payload.description || ''}\n\n## Checklist de Implementação\n- [ ] Validação no código-fonte\n- [ ] Testes de conformidade\n`;
+    const defaultContent = payload.initialContent || `# ${payload.name || 'Padrão de Segurança'}\n\n## Diretrizes e Requisitos\n${payload.description || ''}\n\n## Checklist de Implementação\n- [ ] Validação no código-fonte\n- [ ] Testes de conformidade\n`;
     const secFile: SecurityFile = {
       id: `file_${id}_security_md`,
       securityId: id,
@@ -267,7 +299,7 @@ export function createSecurityItem(payload: Partial<SecurityItem>, actor: string
       updatedAt: now,
       deletedAt: null
     };
-    files = [secFile, ...files];
+    normalizedFiles = [secFile, ...normalizedFiles];
   }
 
   const newItem: SecurityItem = {
@@ -275,13 +307,13 @@ export function createSecurityItem(payload: Partial<SecurityItem>, actor: string
     name: payload.name || 'Nova Tecnologia de Segurança',
     slug,
     description: payload.description || 'Padrão de segurança corporativo Firstsys.',
-    category: payload.category || 'aplicacao',
+    category: payload.category || 'hardening',
     severity: payload.severity || 'alto',
     tags: Array.isArray(payload.tags) ? payload.tags.map(t => t.toLowerCase().trim()) : ['seguranca', 'firstsys'],
     status: payload.status || 'ativo',
     complianceStandards: payload.complianceStandards || ['OWASP Top 10'],
     mitigatedVulnerabilities: payload.mitigatedVulnerabilities || [],
-    files,
+    files: normalizedFiles,
     createdAt: now,
     updatedAt: now
   };
@@ -289,7 +321,7 @@ export function createSecurityItem(payload: Partial<SecurityItem>, actor: string
   db.security_items.push(newItem);
   writeDb(db);
 
-  logSecurityAudit(id, 'created', `Método de segurança '${newItem.name}' criado via Central`, actor, { slug, filesCount: files.length });
+  logSecurityAudit(id, 'created', `Método de segurança '${newItem.name}' criado via Central`, actor, { slug, filesCount: normalizedFiles.length });
   return newItem;
 }
 
@@ -335,7 +367,7 @@ export function updateSecurityItem(id: string, payload: Partial<SecurityItem>, a
   return updated;
 }
 
-export function deleteSecurityItem(id: string, actor: string = 'admin'): boolean {
+export function deleteSecurityItem(id: string, actor: string = 'admin', hardDelete: boolean = false): boolean {
   const db = readDb();
   if (!db.security_items) return false;
 
@@ -343,10 +375,15 @@ export function deleteSecurityItem(id: string, actor: string = 'admin'): boolean
   if (index === -1) return false;
 
   const item = db.security_items[index];
-  db.security_items.splice(index, 1);
+  if (hardDelete) {
+    db.security_items.splice(index, 1);
+  } else {
+    item.status = 'arquivado';
+    item.updatedAt = new Date().toISOString();
+  }
   writeDb(db);
 
-  logSecurityAudit(item.id, 'deleted', `Método de segurança '${item.name}' excluído`, actor);
+  logSecurityAudit(item.id, 'deleted', `Método de segurança '${item.name}' ${hardDelete ? 'removido permanentemente' : 'arquivado'}`, actor);
   return true;
 }
 
@@ -393,10 +430,10 @@ export function removeSecurityTag(idOrSlug: string, rawTag: string, actor: strin
 // 6. GESTÃO DE ARQUIVOS (MÚLTIPLOS ARQUIVOS)
 // ==============================================================================
 
-export function listSecurityFiles(securityId: string): SecurityFile[] {
+export function listSecurityFiles(securityId: string, includeDeleted: boolean = false): SecurityFile[] {
   const item = getSecurityItem(securityId);
   if (!item) return [];
-  return (item.files || []).filter(f => !f.deletedAt);
+  return (item.files || []).filter(f => includeDeleted ? true : !f.deletedAt);
 }
 
 export function getSecurityFile(securityId: string, rawPath: string): SecurityFile | null {
