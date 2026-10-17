@@ -181,7 +181,23 @@ export const OAUTH_SCOPES = [
   'firstsys_security_files_restore',
   'firstsys_security_audit_list',
 
-  // Prefixo tool: para ferramentas de segurança
+  // 15 Ferramentas de Controles de Segurança Corporativa (security_controls)
+  'firstsys_security_controls_list',
+  'firstsys_security_controls_get',
+  'firstsys_security_controls_import_preview',
+  'firstsys_security_controls_import_commit',
+  'firstsys_security_controls_create',
+  'firstsys_security_controls_update',
+  'firstsys_security_controls_bulk_update',
+  'firstsys_security_controls_evidence_create',
+  'firstsys_security_controls_evidence_list',
+  'firstsys_security_controls_assessment_run',
+  'firstsys_security_posture_get',
+  'firstsys_security_exceptions_create',
+  'firstsys_security_exceptions_list',
+  'firstsys_security_exceptions_resolve',
+
+  // Prefixo tool: para ferramentas de segurança e controles
   'tool:firstsys_security_list',
   'tool:firstsys_security_get',
   'tool:firstsys_security_create',
@@ -194,7 +210,21 @@ export const OAUTH_SCOPES = [
   'tool:firstsys_security_files_save',
   'tool:firstsys_security_files_delete',
   'tool:firstsys_security_files_restore',
-  'tool:firstsys_security_audit_list'
+  'tool:firstsys_security_audit_list',
+  'tool:firstsys_security_controls_list',
+  'tool:firstsys_security_controls_get',
+  'tool:firstsys_security_controls_import_preview',
+  'tool:firstsys_security_controls_import_commit',
+  'tool:firstsys_security_controls_create',
+  'tool:firstsys_security_controls_update',
+  'tool:firstsys_security_controls_bulk_update',
+  'tool:firstsys_security_controls_evidence_create',
+  'tool:firstsys_security_controls_evidence_list',
+  'tool:firstsys_security_controls_assessment_run',
+  'tool:firstsys_security_posture_get',
+  'tool:firstsys_security_exceptions_create',
+  'tool:firstsys_security_exceptions_list',
+  'tool:firstsys_security_exceptions_resolve'
 ] as const;
 
 export type OAuthScope = typeof OAUTH_SCOPES[number] | string;

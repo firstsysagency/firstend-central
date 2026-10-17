@@ -62,9 +62,29 @@ import {
   listSecurityAuditLogs
 } from './security/securityStore.js';
 import { seedInitialSecurity } from './security/seedSecurity.js';
+import {
+  seedInitial100ControlsIfEmpty,
+  listSecurityControls,
+  getSecurityControl,
+  createSecurityControl,
+  updateSecurityControl,
+  bulkUpdateSecurityControls,
+  importPreviewSecurityControls,
+  importCommitSecurityControls,
+  archiveSecurityControl,
+  deleteSecurityControl as deleteSecControl,
+  createSecurityControlEvidence,
+  listSecurityControlEvidence,
+  createSecurityControlException,
+  listSecurityControlExceptions,
+  resolveSecurityControlException,
+  runSecurityControlsAssessment,
+  getSecurityPostureSummary,
+  listSecurityAuditEvents
+} from './security/securityControlsStore.js';
 dotenv.config();
 
-// Inicialização e integridade do catálogo de skills e segurança
+// Inicialização e integridade do catálogo de skills, segurança e controles
 try {
   seedInitialSkills();
 } catch (e) {
@@ -75,6 +95,12 @@ try {
   seedInitialSecurity();
 } catch (e) {
   console.warn('Alerta na inicialização do seed de segurança:', e);
+}
+
+try {
+  seedInitial100ControlsIfEmpty();
+} catch (e) {
+  console.warn('Alerta na inicialização dos 100 controles de segurança:', e);
 }
 
 // Helper de Hashing PBKDF2 com Salt Individual (Padrão NIST SP 800-132)
@@ -1142,6 +1168,250 @@ app.get('/api/security/:id/audit', (req, res) => {
     res.json({ success: true, logs, total: logs.length });
   } catch (err: any) {
     res.status(404).json({ error: err.message });
+  }
+});
+
+// ==============================================================================
+// ROTAS REST DO MÓDULO DE CONTROLES DE SEGURANÇA CORPORATIVA (SECURITY CONTROLS)
+// ==============================================================================
+
+// 1. Postura de Segurança Agregada
+app.get('/api/security/posture', (_req, res) => {
+  try {
+    const posture = getSecurityPostureSummary();
+    res.json({ success: true, posture });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Erro ao carregar postura de segurança.' });
+  }
+});
+
+// 2. Listar controles de segurança
+app.get('/api/security/controls', (req, res) => {
+  try {
+    const category = req.query.category as any;
+    const status = req.query.status as any;
+    const severity = req.query.severity as any;
+    const owner = req.query.owner as string;
+    const search = req.query.search as string;
+    const include_archived = req.query.include_archived === 'true';
+    const limit = req.query.limit ? Number(req.query.limit) : 50;
+    const offset = req.query.offset ? Number(req.query.offset) : 0;
+
+    const result = listSecurityControls({
+      category,
+      status,
+      severity,
+      owner,
+      search,
+      include_archived,
+      limit,
+      offset
+    });
+
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Erro ao listar controles de segurança.' });
+  }
+});
+
+// 3. Obter controle individual
+app.get('/api/security/controls/:codeOrId', (req, res) => {
+  try {
+    const { codeOrId } = req.params;
+    const control = getSecurityControl(codeOrId);
+    if (!control) {
+      return res.status(404).json({ error: `Controle de segurança "${codeOrId}" não encontrado.` });
+    }
+    res.json({ success: true, control });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 4. Cadastrar controle individual
+app.post('/api/security/controls', (req, res) => {
+  try {
+    const control = createSecurityControl(req.body, req.ip || 'admin', req.ip || '127.0.0.1', req.headers['idempotency-key'] as string);
+    res.status(201).json({ success: true, control });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 5. Atualizar controle com concorrência otimista
+app.put('/api/security/controls/:codeOrId', (req, res) => {
+  try {
+    const { codeOrId } = req.params;
+    const control = updateSecurityControl(codeOrId, req.body, req.ip || 'admin', req.ip || '127.0.0.1', req.headers['idempotency-key'] as string);
+    res.json({ success: true, control });
+  } catch (err: any) {
+    const status = err.status === 409 ? 409 : 400;
+    res.status(status).json({
+      error: err.message,
+      code: err.code,
+      currentRevision: err.currentRevision,
+      expectedRevision: err.expectedRevision
+    });
+  }
+});
+
+// 6. Atualização em lote
+app.post('/api/security/controls/bulk-update', (req, res) => {
+  try {
+    const { control_codes, status, severity, owner } = req.body;
+    if (!Array.isArray(control_codes) || control_codes.length === 0) {
+      return res.status(400).json({ error: 'control_codes deve ser um array com ao menos 1 código.' });
+    }
+    const result = bulkUpdateSecurityControls({
+      control_codes,
+      status,
+      severity,
+      owner,
+      actor: req.ip || 'admin',
+      ip: req.ip || '127.0.0.1',
+      idempotency_key: req.headers['idempotency-key'] as string
+    });
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 7. Prévia de importação em lote
+app.post('/api/security/controls/import/preview', (req, res) => {
+  try {
+    const { controls } = req.body;
+    if (!Array.isArray(controls)) {
+      return res.status(400).json({ error: 'controls deve ser um array.' });
+    }
+    const preview = importPreviewSecurityControls(controls);
+    res.json({ success: true, preview });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 8. Confirmação de importação em lote
+app.post('/api/security/controls/import/commit', (req, res) => {
+  try {
+    const { controls, idempotency_key } = req.body;
+    if (!Array.isArray(controls) || !idempotency_key) {
+      return res.status(400).json({ error: 'controls e idempotency_key são obrigatórios.' });
+    }
+    const result = importCommitSecurityControls(controls, idempotency_key, req.ip || 'admin', req.ip || '127.0.0.1');
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 9. Arquivar controle
+app.post('/api/security/controls/:codeOrId/archive', (req, res) => {
+  try {
+    const { codeOrId } = req.params;
+    const control = archiveSecurityControl(codeOrId, req.ip || 'admin', req.ip || '127.0.0.1');
+    res.json({ success: true, message: `Controle "${control.control_code}" arquivado com sucesso.`, control });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 10. Excluir controle definitivamente
+app.delete('/api/security/controls/:codeOrId', (req, res) => {
+  try {
+    const { codeOrId } = req.params;
+    const confirm = req.query.confirm === 'true' || req.body?.confirm === true;
+    const result = deleteSecControl(codeOrId, confirm, true, req.ip || 'admin', req.ip || '127.0.0.1');
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 11. Evidências do controle
+app.post('/api/security/controls/:codeOrId/evidence', (req, res) => {
+  try {
+    const { codeOrId } = req.params;
+    const evidence = createSecurityControlEvidence(codeOrId, req.body, req.ip || 'admin', req.ip || '127.0.0.1');
+    res.status(201).json({ success: true, evidence });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/security/controls/:codeOrId/evidence', (req, res) => {
+  try {
+    const { codeOrId } = req.params;
+    const evidences = listSecurityControlEvidence(codeOrId);
+    res.json({ success: true, evidences, total: evidences.length });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 12. Exceções e Riscos Aceitos
+app.post('/api/security/controls/:codeOrId/exceptions', (req, res) => {
+  try {
+    const { codeOrId } = req.params;
+    const exception = createSecurityControlException(codeOrId, req.body, req.ip || 'admin', req.ip || '127.0.0.1');
+    res.status(201).json({ success: true, exception });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/security/exceptions', (req, res) => {
+  try {
+    const status = req.query.status as string;
+    const control_code = req.query.control_code as string;
+    const exceptions = listSecurityControlExceptions({ status, control_code });
+    res.json({ success: true, exceptions, total: exceptions.length });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/security/exceptions/:id/resolve', (req, res) => {
+  try {
+    const { id } = req.params;
+    const exception = resolveSecurityControlException(id, req.body, req.ip || 'admin', req.ip || '127.0.0.1');
+    res.json({ success: true, exception });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 13. Executar Avaliação de Conformidade
+app.post('/api/security/controls/assessment', (req, res) => {
+  try {
+    const { control_codes } = req.body;
+    const report = runSecurityControlsAssessment(control_codes || 'all', req.ip || 'admin', req.ip || '127.0.0.1');
+    res.json({ success: true, ...report });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 14. Trilha Imutável de Auditoria de Controles
+app.get('/api/security/audit-events', (req, res) => {
+  try {
+    const control_code = req.query.control_code as string;
+    const actor = req.query.actor as string;
+    const event_type = req.query.event_type as string;
+    const limit = req.query.limit ? Number(req.query.limit) : 50;
+    const offset = req.query.offset ? Number(req.query.offset) : 0;
+
+    const result = listSecurityAuditEvents({
+      control_code,
+      actor,
+      event_type,
+      limit,
+      offset
+    });
+
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
   }
 });
 

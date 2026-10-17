@@ -171,6 +171,17 @@ A Central Firstsys mantém uma base de conhecimento de segurança técnica e arq
 - **Consultar Diretrizes:** Use \`firstsys_security_list\` para listar ou pesquisar padrões por categoria ou termo.
 - **Obter Diretriz Completa:** Execute \`firstsys_security_get(security_id)\` para receber o texto explicativo da diretriz diretamente na propriedade \`content\` / \`document\`.
 - **Criar/Atualizar Diretriz:** Utilize \`firstsys_security_create\` ou \`firstsys_security_update\` fornecendo \`content\` com a documentação explicativa em Markdown.
+
+---
+
+## 4. Controles de Segurança Corporativa (security_controls)
+A Central mantém o catálogo oficial de 100 controles de segurança corporativos (SEC-001 a SEC-100) cobrindo 10 categorias essenciais (rede, tráfego, API, autenticação, dados, infraestrutura, aplicação, monitoramento, incidentes e governança).
+- **Métricas e Postura:** Use \`firstsys_security_posture_get\` para obter visão executiva e indicadores agregados de conformidade.
+- **Listar e Buscar Controles:** Use \`firstsys_security_controls_list\` com filtros por categoria, severidade ou status.
+- **Obter Controle Completo:** Use \`firstsys_security_controls_get(control_id_or_code)\` para detalhes de rationale, implementação técnica e validação.
+- **Criação e Atualização:** Use \`firstsys_security_controls_create\` e \`firstsys_security_controls_update\` (exige \`expected_revision\` para concorrência otimista).
+- **Importação em Lote:** Use \`firstsys_security_controls_import_preview\` para validar e inspecionar diff, seguido de \`firstsys_security_controls_import_commit\` com \`idempotency_key\`.
+- **Evidências e Exceções:** Gerencie provas técnicas com \`firstsys_security_controls_evidence_create\` e riscos aceitos com \`firstsys_security_exceptions_create\` / \`firstsys_security_exceptions_resolve\`.
 `;
 fs.writeFileSync(path.join(OUTPUT_DIR, 'instructions.md'), systemInstructions, 'utf8');
 console.log('✅ instructions.md gerado.');
@@ -200,9 +211,10 @@ Este pacote reúne todas as especificações e instruções necessárias para co
 5. \`.app.json\`: Configuração de aplicativo OpenAI com vínculo ao \`asdk_app_6acb2a1e159c8191a53f5f2b3da33e8c\`.
 6. \`skills/*/SKILL.md\`: Coleção de Skills e instruções operacionais da Central Firstsys com YAML frontmatter.
 7. \`security/*/SECURITY.md\`: Coleção de diretrizes explicativas e padrões técnicos de segurança corporativa.
-8. \`openapi.json\`: Especificação OpenAPI 3.1.0 completa das ferramentas.
-9. \`instructions.md\`: Prompt mestre de diretrizes operacionais.
-10. \`tools_reference.md\`: Guia resumido de cada ferramenta disponível.
+8. Controles de Segurança Corporativa: 100 controles independentes (SEC-001 a SEC-100) com 15 ferramentas MCP dedicadas.
+9. \`openapi.json\`: Especificação OpenAPI 3.1.0 completa das ferramentas.
+10. \`instructions.md\`: Prompt mestre de diretrizes operacionais.
+11. \`tools_reference.md\`: Guia resumido de cada ferramenta disponível.
 `;
 fs.writeFileSync(path.join(OUTPUT_DIR, 'README.md'), readmeContent, 'utf8');
 console.log('✅ README.md gerado.');

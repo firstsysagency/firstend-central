@@ -119,6 +119,40 @@ import {
   validateNoRedactedOrEmptySecrets,
   mergeTemplatePatch
 } from './templateSanitizer.js';
+import {
+  SecurityControlsListMcpSchema,
+  SecurityControlsGetMcpSchema,
+  SecurityControlsImportPreviewMcpSchema,
+  SecurityControlsImportCommitMcpSchema,
+  SecurityControlsCreateMcpSchema,
+  SecurityControlsUpdateMcpSchema,
+  SecurityControlsBulkUpdateMcpSchema,
+  SecurityControlsEvidenceCreateMcpSchema,
+  SecurityControlsEvidenceListMcpSchema,
+  SecurityControlsAssessmentRunMcpSchema,
+  SecurityPostureGetMcpSchema,
+  SecurityControlsAuditListMcpSchema,
+  SecurityControlsExceptionsCreateMcpSchema,
+  SecurityControlsExceptionsListMcpSchema,
+  SecurityControlsExceptionsResolveMcpSchema
+} from './securityControlsMcpSchemas.js';
+import {
+  listSecurityControls,
+  getSecurityControl,
+  createSecurityControl,
+  updateSecurityControl,
+  bulkUpdateSecurityControls,
+  importPreviewSecurityControls,
+  importCommitSecurityControls,
+  createSecurityControlEvidence,
+  listSecurityControlEvidence,
+  createSecurityControlException,
+  listSecurityControlExceptions,
+  resolveSecurityControlException,
+  runSecurityControlsAssessment,
+  getSecurityPostureSummary,
+  listSecurityAuditEvents
+} from '../security/securityControlsStore.js';
 
 
 export const mcpRouter = Router();
@@ -1912,6 +1946,304 @@ export const MCP_TOOLS_CATALOG = [
     ],
     annotations: { readOnlyHint: true, destructiveHint: false },
     tags: ['security', 'audit']
+  },
+
+  // ==============================================================================
+  // MÓDULO PRÓPRIO DE CONTROLES DE SEGURANÇA (SECURITY CONTROLS - 15 MÉTODOS)
+  // ==============================================================================
+  {
+    name: 'firstsys_security_controls_list',
+    title: 'Listar Controles de Segurança Corporativa',
+    description: 'Lista e pesquisa os controles de segurança corporativos (100 controles SEC-001 a SEC-100) com filtros de categoria, status, severidade e busca textual.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        category: { type: 'string', enum: ['rede', 'trafego', 'api', 'autenticacao', 'dados', 'infraestrutura', 'aplicacao', 'monitoramento', 'incidentes', 'governanca'], description: 'Categoria do controle' },
+        status: { type: 'string', enum: ['planned', 'in_progress', 'implemented', 'verified', 'not_applicable', 'exception'], description: 'Status operacional' },
+        severity: { type: 'string', enum: ['low', 'medium', 'high', 'critical'], description: 'Nível de severidade/impacto' },
+        owner: { type: 'string', description: 'Filtrar por responsável' },
+        search: { type: 'string', description: 'Busca textual em código, nome ou descrição' },
+        include_archived: { type: 'boolean', description: 'Se true, inclui controles arquivados' },
+        limit: { type: 'number', description: 'Limite de registros por página (máx 100)' },
+        offset: { type: 'number', description: 'Deslocamento para paginação' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['security:read', 'firstsys_security_controls_list', 'tool:firstsys_security_controls_list'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['security_controls', 'list']
+  },
+  {
+    name: 'firstsys_security_controls_get',
+    title: 'Obter Detalhes do Controle de Segurança',
+    description: 'Recupera o registro completo e independente de um controle de segurança por ID ou código (ex: SEC-001), incluindo rationale, implementação técnica, método de validação, evidências e revisão atual.',
+    inputSchema: {
+      type: 'object',
+      required: ['control_id_or_code'],
+      properties: {
+        control_id_or_code: { type: 'string', description: 'Código do controle (ex: "SEC-001") ou ID opaco.' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['security:read', 'firstsys_security_controls_get', 'tool:firstsys_security_controls_get'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['security_controls', 'get']
+  },
+  {
+    name: 'firstsys_security_controls_import_preview',
+    title: 'Prévia de Importação em Massa de Controles',
+    description: 'Valida um lote de até 200 controles de segurança (incluindo os 100 controles corporativos), checa erros de schema e gera o diff de novos versus existentes SEM salvar no banco de dados.',
+    inputSchema: {
+      type: 'object',
+      required: ['controls'],
+      properties: {
+        controls: {
+          type: 'array',
+          items: { type: 'object' },
+          description: 'Lista de controles de segurança para análise prévia.'
+        }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['security:write', 'firstsys_security_controls_import_preview', 'tool:firstsys_security_controls_import_preview'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['security_controls', 'import', 'preview']
+  },
+  {
+    name: 'firstsys_security_controls_import_commit',
+    title: 'Confirmar Gravação de Importação em Massa',
+    description: 'Grava atomicamente o lote de controles previamente validado no banco de dados de segurança com suporte a idempotência e geração de trilha de auditoria.',
+    inputSchema: {
+      type: 'object',
+      required: ['controls', 'idempotency_key'],
+      properties: {
+        controls: {
+          type: 'array',
+          items: { type: 'object' },
+          description: 'Lista de controles a serem gravados.'
+        },
+        idempotency_key: { type: 'string', description: 'Chave única de idempotência da operação.' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['security:write', 'firstsys_security_controls_import_commit', 'tool:firstsys_security_controls_import_commit'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    tags: ['security_controls', 'import', 'commit']
+  },
+  {
+    name: 'firstsys_security_controls_create',
+    title: 'Cadastrar Controle de Segurança Individual',
+    description: 'Cadastra um controle de segurança corporativo independente com código único (ex: SEC-042), justificativa, implementação técnica e severidade.',
+    inputSchema: {
+      type: 'object',
+      required: ['control_code', 'name', 'category', 'description', 'rationale', 'implementation', 'validation_method'],
+      properties: {
+        control_code: { type: 'string', description: 'Código único no padrão SEC-XXX (ex: SEC-042)' },
+        name: { type: 'string', description: 'Nome do controle de segurança' },
+        category: { type: 'string', enum: ['rede', 'trafego', 'api', 'autenticacao', 'dados', 'infraestrutura', 'aplicacao', 'monitoramento', 'incidentes', 'governanca'] },
+        description: { type: 'string', description: 'Descrição detalhada do controle' },
+        rationale: { type: 'string', description: 'Justificativa do controle e risco mitigado' },
+        implementation: { type: 'string', description: 'Detalhamento da implementação técnica' },
+        validation_method: { type: 'string', description: 'Método empírico de validação e teste' },
+        evidence: { type: 'string', description: 'Resumo ou referência de evidência' },
+        severity: { type: 'string', enum: ['low', 'medium', 'high', 'critical'] },
+        status: { type: 'string', enum: ['planned', 'in_progress', 'implemented', 'verified', 'not_applicable', 'exception'] },
+        owner: { type: 'string', description: 'Responsável pelo controle' },
+        last_verified_at: { type: 'string', description: 'Data da última verificação ISO' },
+        next_review_at: { type: 'string', description: 'Data da próxima revisão ISO' },
+        idempotency_key: { type: 'string', description: 'Chave de idempotência opcional' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['security:write', 'firstsys_security_controls_create', 'tool:firstsys_security_controls_create'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    tags: ['security_controls', 'create']
+  },
+  {
+    name: 'firstsys_security_controls_update',
+    title: 'Atualizar Controle de Segurança com Concorrência Otimista',
+    description: 'Atualiza propriedades de um controle de segurança exigindo expected_revision para garantir concorrência otimista e gravando auditoria com diff sem segredos.',
+    inputSchema: {
+      type: 'object',
+      required: ['control_id_or_code', 'expected_revision'],
+      properties: {
+        control_id_or_code: { type: 'string', description: 'Código (SEC-XXX) ou ID do controle' },
+        expected_revision: { type: 'number', description: 'Revisão esperada do controle para concorrência otimista (exige o valor atual de revision).' },
+        name: { type: 'string', description: 'Novo nome' },
+        category: { type: 'string', enum: ['rede', 'trafego', 'api', 'autenticacao', 'dados', 'infraestrutura', 'aplicacao', 'monitoramento', 'incidentes', 'governanca'] },
+        description: { type: 'string', description: 'Nova descrição' },
+        rationale: { type: 'string', description: 'Nova justificativa' },
+        implementation: { type: 'string', description: 'Nova implementação' },
+        validation_method: { type: 'string', description: 'Novo método de validação' },
+        evidence: { type: 'string', description: 'Nova evidência' },
+        severity: { type: 'string', enum: ['low', 'medium', 'high', 'critical'] },
+        status: { type: 'string', enum: ['planned', 'in_progress', 'implemented', 'verified', 'not_applicable', 'exception'] },
+        owner: { type: 'string', description: 'Novo responsável' },
+        last_verified_at: { type: 'string', description: 'Data da última verificação ISO' },
+        next_review_at: { type: 'string', description: 'Data da próxima revisão ISO' },
+        idempotency_key: { type: 'string', description: 'Chave de idempotência opcional' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['security:write', 'firstsys_security_controls_update', 'tool:firstsys_security_controls_update'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    tags: ['security_controls', 'update']
+  },
+  {
+    name: 'firstsys_security_controls_bulk_update',
+    title: 'Atualizar Controles de Segurança em Lote',
+    description: 'Atualiza status, severidade ou responsável de múltiplos controles de segurança simultaneamente através de seus códigos SEC-XXX.',
+    inputSchema: {
+      type: 'object',
+      required: ['control_codes'],
+      properties: {
+        control_codes: { type: 'array', items: { type: 'string' }, description: 'Lista de códigos SEC-XXX a atualizar' },
+        status: { type: 'string', enum: ['planned', 'in_progress', 'implemented', 'verified', 'not_applicable', 'exception'] },
+        severity: { type: 'string', enum: ['low', 'medium', 'high', 'critical'] },
+        owner: { type: 'string', description: 'Novo responsável' },
+        idempotency_key: { type: 'string', description: 'Chave de idempotência opcional' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['security:write', 'firstsys_security_controls_bulk_update', 'tool:firstsys_security_controls_bulk_update'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    tags: ['security_controls', 'bulk_update']
+  },
+  {
+    name: 'firstsys_security_controls_evidence_create',
+    title: 'Anexar Evidência de Conformidade ao Controle',
+    description: 'Anexa uma evidência técnica (log, métrica, relatório, teste ou prova) a um controle de segurança com geração de hash SHA-256 e auditoria.',
+    inputSchema: {
+      type: 'object',
+      required: ['control_id_or_code', 'title', 'description'],
+      properties: {
+        control_id_or_code: { type: 'string', description: 'Código (SEC-XXX) ou ID do controle' },
+        title: { type: 'string', description: 'Título da evidência' },
+        description: { type: 'string', description: 'Descrição detalhada do teste ou prova' },
+        evidence_type: { type: 'string', enum: ['log', 'metric', 'config', 'report', 'screenshot', 'code', 'other'] },
+        evidence_url: { type: 'string', description: 'URL segura opcional onde a prova completa está hospedada' },
+        evidence_data: { type: 'string', description: 'Dados técnicos sanitizados da prova (sem senhas/tokens)' },
+        idempotency_key: { type: 'string', description: 'Chave de idempotência opcional' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['security:write', 'firstsys_security_controls_evidence_create', 'tool:firstsys_security_controls_evidence_create'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    tags: ['security_controls', 'evidence', 'create']
+  },
+  {
+    name: 'firstsys_security_controls_evidence_list',
+    title: 'Listar Evidências Técnicas do Controle',
+    description: 'Lista todas as evidências de conformidade cadastradas para um controle de segurança específico, com seus respectivos hashes SHA-256.',
+    inputSchema: {
+      type: 'object',
+      required: ['control_id_or_code'],
+      properties: {
+        control_id_or_code: { type: 'string', description: 'Código (SEC-XXX) ou ID do controle' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['security:read', 'firstsys_security_controls_evidence_list', 'tool:firstsys_security_controls_evidence_list'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['security_controls', 'evidence', 'list']
+  },
+  {
+    name: 'firstsys_security_controls_assessment_run',
+    title: 'Executar Avaliação de Conformidade de Controles',
+    description: 'Dispara uma rotina de avaliação de conformidade em lote ou em controles específicos, atualizando a data de verificação e checando prazos de revisão.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        control_codes: { type: 'array', items: { type: 'string' }, description: 'Lista de códigos específicos ou omitir para avaliar todos os controles ativos' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['security:write', 'firstsys_security_controls_assessment_run', 'tool:firstsys_security_controls_assessment_run'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    tags: ['security_controls', 'assessment']
+  },
+  {
+    name: 'firstsys_security_posture_get',
+    title: 'Consultar Postura de Segurança Corporativa Agregada',
+    description: 'Retorna indicadores executivos agregados da postura de segurança corporativa (total de controles, contagens por status, severidade e categoria, percentual de conformidade e controles vencidos) sem expor segredos.',
+    inputSchema: {
+      type: 'object',
+      properties: {}
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['security:read', 'firstsys_security_posture_get', 'tool:firstsys_security_posture_get'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['security_controls', 'posture']
+  },
+  {
+    name: 'firstsys_security_exceptions_create',
+    title: 'Registrar Exceção ou Risco Aceito',
+    description: 'Registra formalmente uma exceção temporária para um controle de segurança com justificativa, aprovador e data de expiração, alterando o status do controle para "exception".',
+    inputSchema: {
+      type: 'object',
+      required: ['control_id_or_code', 'reason', 'approved_by', 'expires_at'],
+      properties: {
+        control_id_or_code: { type: 'string', description: 'Código (SEC-XXX) ou ID do controle' },
+        reason: { type: 'string', description: 'Justificativa técnica da exceção e risco aceito' },
+        approved_by: { type: 'string', description: 'Identificador do gestor que aprovou a exceção' },
+        risk_accepted: { type: 'boolean', description: 'Confirmação formal de aceite de risco' },
+        expires_at: { type: 'string', description: 'Data de expiração da exceção em formato ISO' },
+        idempotency_key: { type: 'string', description: 'Chave de idempotência opcional' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['security:write', 'firstsys_security_exceptions_create', 'tool:firstsys_security_exceptions_create'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    tags: ['security_controls', 'exceptions', 'create']
+  },
+  {
+    name: 'firstsys_security_exceptions_list',
+    title: 'Listar Exceções de Segurança',
+    description: 'Lista as exceções de segurança ativas ou históricas, com opção de filtro por status e código de controle.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', enum: ['active', 'resolved', 'expired', 'revoked'], description: 'Filtrar por status da exceção' },
+        control_code: { type: 'string', description: 'Filtrar por código SEC-XXX' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['security:read', 'firstsys_security_exceptions_list', 'tool:firstsys_security_exceptions_list'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['security_controls', 'exceptions', 'list']
+  },
+  {
+    name: 'firstsys_security_exceptions_resolve',
+    title: 'Resolver ou Revogar Exceção de Segurança',
+    description: 'Marca uma exceção como resolvida com notas explicativas e restaura o status do controle associado para o ciclo de conformidade.',
+    inputSchema: {
+      type: 'object',
+      required: ['exception_id', 'resolution_notes'],
+      properties: {
+        exception_id: { type: 'string', description: 'ID único da exceção' },
+        resolution_notes: { type: 'string', description: 'Explicação detalhada das medidas tomadas' },
+        resolved_by: { type: 'string', description: 'Nome do responsável pela resolução' },
+        idempotency_key: { type: 'string', description: 'Chave de idempotência opcional' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['security:write', 'firstsys_security_exceptions_resolve', 'tool:firstsys_security_exceptions_resolve'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    tags: ['security_controls', 'exceptions', 'resolve']
   }
 ];
 
@@ -4328,6 +4660,400 @@ async function executeToolDirectly(name: string, rawArgs: any, user: OAuthJwtPay
       };
     }
 
+    // ============================================================================
+    // CASOS DE EXECUÇÃO: CONTROLES DE SEGURANÇA (SECURITY CONTROLS - 15 MÉTODOS)
+    // ============================================================================
+
+    case 'firstsys_security_controls_list': {
+      const parseResult = SecurityControlsListMcpSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'Parâmetros de busca inválidos.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const result = listSecurityControls(parseResult.data);
+      return {
+        ok: true,
+        total: result.total,
+        offset: result.offset,
+        limit: result.limit,
+        controls: result.controls.map(c => ({
+          id: c.id,
+          control_code: c.control_code,
+          name: c.name,
+          category: c.category,
+          severity: c.severity,
+          status: c.status,
+          owner: c.owner,
+          revision: c.revision,
+          last_verified_at: c.last_verified_at,
+          next_review_at: c.next_review_at,
+          description: c.description
+        }))
+      };
+    }
+
+    case 'firstsys_security_controls_get': {
+      const parseResult = SecurityControlsGetMcpSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'control_id_or_code é obrigatório.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const control = getSecurityControl(parseResult.data.control_id_or_code);
+      if (!control) {
+        return formatMcpError({
+          code: 'NOT_FOUND',
+          message: `Controle de segurança "${parseResult.data.control_id_or_code}" não foi encontrado.`,
+          httpStatus: 404,
+          correlationId
+        });
+      }
+
+      return {
+        ok: true,
+        control
+      };
+    }
+
+    case 'firstsys_security_controls_import_preview': {
+      const parseResult = SecurityControlsImportPreviewMcpSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'Array controls é obrigatório.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const preview = importPreviewSecurityControls(parseResult.data.controls);
+      return {
+        ok: preview.ok,
+        ...preview
+      };
+    }
+
+    case 'firstsys_security_controls_import_commit': {
+      const parseResult = SecurityControlsImportCommitMcpSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'Lote de controles ou idempotency_key inválidos.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      try {
+        const result = importCommitSecurityControls(
+          parseResult.data.controls,
+          parseResult.data.idempotency_key,
+          user.sub || 'mcp-agent',
+          'mcp-client'
+        );
+        return {
+          ok: true,
+          ...result
+        };
+      } catch (err: any) {
+        return formatMcpError({
+          code: 'IMPORT_COMMIT_FAILED',
+          message: err.message || 'Falha ao executar commit da importação em massa.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+    }
+
+    case 'firstsys_security_controls_create': {
+      const parseResult = SecurityControlsCreateMcpSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'Campos obrigatórios do controle ausentes ou inválidos.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      try {
+        const control = createSecurityControl(
+          parseResult.data,
+          user.sub || 'mcp-agent',
+          'mcp-client',
+          parseResult.data.idempotency_key
+        );
+
+        return {
+          ok: true,
+          message: `Controle de segurança "${control.control_code}" criado com sucesso (revisão: ${control.revision}).`,
+          control
+        };
+      } catch (err: any) {
+        return formatMcpError({
+          code: 'CONTROL_CREATION_FAILED',
+          message: err.message || 'Falha ao criar controle de segurança.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+    }
+
+    case 'firstsys_security_controls_update': {
+      const parseResult = SecurityControlsUpdateMcpSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'expected_revision e control_id_or_code são obrigatórios.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      try {
+        const control = updateSecurityControl(
+          parseResult.data.control_id_or_code,
+          parseResult.data,
+          user.sub || 'mcp-agent',
+          'mcp-client',
+          parseResult.data.idempotency_key
+        );
+
+        return {
+          ok: true,
+          message: `Controle "${control.control_code}" atualizado com sucesso para a revisão ${control.revision}.`,
+          control
+        };
+      } catch (err: any) {
+        if (err.status === 409 || err.code === 'OPTIMISTIC_LOCK_CONFLICT') {
+          return formatMcpError({
+            code: 'OPTIMISTIC_LOCK_CONFLICT',
+            message: err.message,
+            httpStatus: 409,
+            correlationId,
+            details: {
+              currentRevision: err.currentRevision,
+              expectedRevision: err.expectedRevision
+            }
+          });
+        }
+        return formatMcpError({
+          code: 'CONTROL_UPDATE_FAILED',
+          message: err.message || 'Falha ao atualizar controle de segurança.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+    }
+
+    case 'firstsys_security_controls_bulk_update': {
+      const parseResult = SecurityControlsBulkUpdateMcpSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'control_codes é obrigatório.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const result = bulkUpdateSecurityControls({
+        control_codes: parseResult.data.control_codes,
+        status: parseResult.data.status,
+        severity: parseResult.data.severity,
+        owner: parseResult.data.owner,
+        actor: user.sub || 'mcp-agent',
+        ip: 'mcp-client',
+        idempotency_key: parseResult.data.idempotency_key
+      });
+
+      return {
+        ok: true,
+        message: `${result.updated_count} controles atualizados em lote com sucesso.`,
+        ...result
+      };
+    }
+
+    case 'firstsys_security_controls_evidence_create': {
+      const parseResult = SecurityControlsEvidenceCreateMcpSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'Título, descrição e controle são obrigatórios.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      try {
+        const evidence = createSecurityControlEvidence(
+          parseResult.data.control_id_or_code,
+          parseResult.data,
+          user.sub || 'mcp-agent',
+          'mcp-client'
+        );
+
+        return {
+          ok: true,
+          message: `Evidência anexada ao controle "${evidence.control_code}" com hash SHA-256 verificado.`,
+          evidence
+        };
+      } catch (err: any) {
+        return formatMcpError({
+          code: 'EVIDENCE_CREATION_FAILED',
+          message: err.message || 'Falha ao anexar evidência técnica.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+    }
+
+    case 'firstsys_security_controls_evidence_list': {
+      const parseResult = SecurityControlsEvidenceListMcpSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'control_id_or_code é obrigatório.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const evidences = listSecurityControlEvidence(parseResult.data.control_id_or_code);
+      return {
+        ok: true,
+        control_id_or_code: parseResult.data.control_id_or_code,
+        evidences,
+        total: evidences.length
+      };
+    }
+
+    case 'firstsys_security_controls_assessment_run': {
+      const parseResult = SecurityControlsAssessmentRunMcpSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'Parâmetros inválidos.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const report = runSecurityControlsAssessment(
+        parseResult.data.control_codes || 'all',
+        user.sub || 'mcp-agent',
+        'mcp-client'
+      );
+
+      return {
+        ok: true,
+        ...report
+      };
+    }
+
+    case 'firstsys_security_posture_get': {
+      const posture = getSecurityPostureSummary();
+      return {
+        ok: true,
+        posture
+      };
+    }
+
+    case 'firstsys_security_exceptions_create': {
+      const parseResult = SecurityControlsExceptionsCreateMcpSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'Campos obrigatórios da exceção ausentes.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      try {
+        const exception = createSecurityControlException(
+          parseResult.data.control_id_or_code,
+          parseResult.data,
+          user.sub || 'mcp-agent',
+          'mcp-client'
+        );
+
+        return {
+          ok: true,
+          message: `Exceção de segurança registrada para o controle "${exception.control_code}" (expira em ${exception.expires_at}).`,
+          exception
+        };
+      } catch (err: any) {
+        return formatMcpError({
+          code: 'EXCEPTION_CREATION_FAILED',
+          message: err.message || 'Falha ao registrar exceção de segurança.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+    }
+
+    case 'firstsys_security_exceptions_list': {
+      const parseResult = SecurityControlsExceptionsListMcpSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'Filtros inválidos.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const exceptions = listSecurityControlExceptions(parseResult.data);
+      return {
+        ok: true,
+        exceptions,
+        total: exceptions.length
+      };
+    }
+
+    case 'firstsys_security_exceptions_resolve': {
+      const parseResult = SecurityControlsExceptionsResolveMcpSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'exception_id e resolution_notes são obrigatórios.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      try {
+        const exception = resolveSecurityControlException(
+          parseResult.data.exception_id,
+          parseResult.data,
+          user.sub || 'mcp-agent',
+          'mcp-client'
+        );
+
+        return {
+          ok: true,
+          message: `Exceção "${exception.id}" marcada como resolvida com sucesso.`,
+          exception
+        };
+      } catch (err: any) {
+        return formatMcpError({
+          code: 'EXCEPTION_RESOLVE_FAILED',
+          message: err.message || 'Falha ao resolver exceção de segurança.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+    }
 
     default:
       throw new Error(`Ferramenta não encontrada: ${name}`);

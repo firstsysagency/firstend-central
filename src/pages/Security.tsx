@@ -5,8 +5,6 @@ import {
   ShieldAlert,
   Search,
   Plus,
-  FileText,
-  Trash2,
   Copy,
   Check,
   X,
@@ -14,1104 +12,1616 @@ import {
   LayoutGrid,
   Table as TableIcon,
   Eye,
-  Code2,
   AlertTriangle,
-  Info
+  Info,
+  Layers,
+  Clock,
+  UploadCloud,
+  Lock,
+  Network,
+  Cpu,
+  Database,
+  Key,
+  Radio,
+  FileCheck2,
+  RefreshCw
 } from 'lucide-react';
 import type {
-  SecurityItem,
-  SecurityCategory,
-  SecuritySeverity
+  SecurityControl,
+  SecurityControlCategory,
+  SecurityControlSeverity,
+  SecurityControlStatus,
+  SecurityControlEvidence,
+  SecurityControlException,
+  SecurityAuditEvent,
+  SecurityPostureSummary
 } from '../types/security';
 
-const CATEGORIES: { id: string; label: string }[] = [
-  { id: 'todas', label: 'Todos os Métodos' },
-  { id: 'hardening', label: 'Hardening & Headers' },
-  { id: 'autenticacao', label: 'Autenticação & MFA' },
-  { id: 'criptografia', label: 'Criptografia & Cofre' },
-  { id: 'banco_de_dados', label: 'Banco de Dados & RLS' },
-  { id: 'conformidade', label: 'Conformidade & LGPD' },
-  { id: 'rede_api', label: 'Rede & Anti-SSRF' },
-  { id: 'auditoria', label: 'Auditoria & Logs' }
+const CONTROL_CATEGORIES: { id: string; label: string; icon: any }[] = [
+  { id: 'todas', label: 'Todos os 100 Controles', icon: ShieldCheck },
+  { id: 'rede', label: 'Rede', icon: Network },
+  { id: 'trafego', label: 'Tráfego & TLS', icon: Radio },
+  { id: 'api', label: 'API & CORS', icon: Layers },
+  { id: 'autenticacao', label: 'Autenticação & MFA', icon: Key },
+  { id: 'dados', label: 'Dados & LGPD', icon: Database },
+  { id: 'infraestrutura', label: 'Infraestrutura & SO', icon: Cpu },
+  { id: 'aplicacao', label: 'Aplicação & AppSec', icon: Lock },
+  { id: 'monitoramento', label: 'Monitoramento & Logs', icon: Clock },
+  { id: 'incidentes', label: 'Incidentes & DR', icon: ShieldAlert },
+  { id: 'governanca', label: 'Governança & RBAC', icon: FileCheck2 }
 ];
 
-const SEVERITIES: { id: string; label: string; color: string }[] = [
-  { id: 'todas', label: 'Todas as Severidades', color: 'zinc' },
-  { id: 'critico', label: 'Crítico', color: 'rose' },
-  { id: 'alto', label: 'Alto', color: 'amber' },
-  { id: 'medio', label: 'Médio', color: 'blue' },
-  { id: 'baixo', label: 'Baixo', color: 'emerald' },
-  { id: 'informativo', label: 'Informativo', color: 'purple' }
-];
+const SEVERITY_CONFIG: Record<SecurityControlSeverity, { label: string; color: string; bg: string; border: string }> = {
+  critical: { label: 'Crítico', color: 'text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/30' },
+  high: { label: 'Alto', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/30' },
+  medium: { label: 'Médio', color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/30' },
+  low: { label: 'Baixo', color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30' }
+};
+
+const STATUS_CONFIG: Record<SecurityControlStatus, { label: string; color: string; bg: string; border: string }> = {
+  verified: { label: 'Verificado', color: 'text-emerald-300', bg: 'bg-emerald-500/15', border: 'border-emerald-500/30' },
+  implemented: { label: 'Implementado', color: 'text-teal-300', bg: 'bg-teal-500/15', border: 'border-teal-500/30' },
+  in_progress: { label: 'Em Progresso', color: 'text-amber-300', bg: 'bg-amber-500/15', border: 'border-amber-500/30' },
+  planned: { label: 'Planejado', color: 'text-zinc-400', bg: 'bg-zinc-800/60', border: 'border-zinc-700/50' },
+  exception: { label: 'Exceção / Risco', color: 'text-purple-300', bg: 'bg-purple-500/15', border: 'border-purple-500/30' },
+  not_applicable: { label: 'Não Aplicável', color: 'text-zinc-500', bg: 'bg-zinc-900', border: 'border-zinc-800' }
+};
 
 export default function Security() {
-  const [items, setItems] = useState<SecurityItem[]>([]);
+  const [controls, setControls] = useState<SecurityControl[]>([]);
+  const [posture, setPosture] = useState<SecurityPostureSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('todas');
+  const [selectedStatus, setSelectedStatus] = useState('todas');
   const [selectedSeverity, setSelectedSeverity] = useState('todas');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Gestão dinâmica de tags nos cards
-  const [addingTagItemId, setAddingTagItemId] = useState<string | null>(null);
-  const [newTagInput, setNewTagInput] = useState('');
+  // Modal de Detalhes do Controle
+  const [selectedControl, setSelectedControl] = useState<SecurityControl | null>(null);
+  const [activeModalTab, setActiveModalTab] = useState<'overview' | 'implementation' | 'evidence' | 'exceptions' | 'audit'>('overview');
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState<Partial<SecurityControl>>({});
+  const [isSaving, setIsSaving] = useState(false);
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
-  // Modal de Consulta e Edição do Documento Explicativo
-  const [selectedItem, setSelectedItem] = useState<SecurityItem | null>(null);
-  const [documentEditorContent, setDocumentEditorContent] = useState<string>('');
-  const [previewMode, setPreviewMode] = useState<'preview' | 'edit'>('preview');
-  const [isSavingDocument, setIsSavingDocument] = useState(false);
-  const [copiedDocument, setCopiedDocument] = useState(false);
-  const [copiedItemId, setCopiedItemId] = useState<string | null>(null);
+  // Evidências do Controle
+  const [controlEvidences, setControlEvidences] = useState<SecurityControlEvidence[]>([]);
+  const [isCreatingEvidence, setIsCreatingEvidence] = useState(false);
+  const [newEvidenceTitle, setNewEvidenceTitle] = useState('');
+  const [newEvidenceDesc, setNewEvidenceDesc] = useState('');
+  const [newEvidenceType, setNewEvidenceType] = useState<any>('report');
+  const [newEvidenceData, setNewEvidenceData] = useState('');
 
-  // Modal de Criação de Novo Padrão de Segurança
+  // Exceções do Controle
+  const [controlExceptions, setControlExceptions] = useState<SecurityControlException[]>([]);
+  const [isCreatingException, setIsCreatingException] = useState(false);
+  const [newExceptionReason, setNewExceptionReason] = useState('');
+  const [newExceptionApprover, setNewExceptionApprover] = useState('SecOps Lead');
+  const [newExceptionDays, setNewExceptionDays] = useState('30');
+  const [resolvingExceptionId, setResolvingExceptionId] = useState<string | null>(null);
+  const [resolutionNotes, setResolutionNotes] = useState('');
+
+  // Auditoria do Controle
+  const [controlAuditEvents, setControlAuditEvents] = useState<SecurityAuditEvent[]>([]);
+
+  // Modal de Novo Controle
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [newDesc, setNewDesc] = useState('');
-  const [newCategory, setNewCategory] = useState<SecurityCategory>('hardening');
-  const [newSeverity, setNewSeverity] = useState<SecuritySeverity>('alto');
-  const [newCompliance, setNewCompliance] = useState('LGPD, OWASP Top 10');
-  const [newTags, setNewTags] = useState('seguranca, hardening');
-  const [newDocumentContent, setNewDocumentContent] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createCode, setCreateCode] = useState('');
+  const [createName, setCreateName] = useState('');
+  const [createCategory, setCreateCategory] = useState<SecurityControlCategory>('rede');
+  const [createSeverity, setCreateSeverity] = useState<SecurityControlSeverity>('high');
+  const [createStatus, setCreateStatus] = useState<SecurityControlStatus>('planned');
+  const [createOwner, setCreateOwner] = useState('SecOps Team');
+  const [createDesc, setCreateDesc] = useState('');
+  const [createRationale, setCreateRationale] = useState('');
+  const [createImplementation, setCreateImplementation] = useState('');
+  const [createValidation, setCreateValidation] = useState('');
+  const [isCreatingControl, setIsCreatingControl] = useState(false);
+
+  // Modal de Importação em Massa (Preview & Commit)
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importJsonText, setImportJsonText] = useState('');
+  const [importPreviewResult, setImportPreviewResult] = useState<any | null>(null);
+  const [isProcessingImport, setIsProcessingImport] = useState(false);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Carregar catálogo de segurança do backend
-  const loadSecurityItems = async () => {
+  // Carregar lista de controles e postura
+  const loadData = async () => {
     try {
       setIsLoading(true);
-      const res = await fetch('/api/security');
-      if (res.ok) {
-        const data = await res.json();
-        setItems(data.items || []);
+      const [controlsRes, postureRes] = await Promise.all([
+        fetch('/api/security/controls?limit=150'),
+        fetch('/api/security/posture')
+      ]);
+
+      if (controlsRes.ok) {
+        const cData = await controlsRes.json();
+        setControls(cData.controls || []);
+      }
+      if (postureRes.ok) {
+        const pData = await postureRes.json();
+        setPosture(pData.posture || null);
       }
     } catch (err) {
-      console.error('Erro ao carregar catálogo de segurança:', err);
-      showToast('Falha na comunicação com o servidor de segurança.');
+      console.error('Erro ao carregar dados de segurança:', err);
+      showToast('Falha ao comunicar com o servidor de segurança.');
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    loadSecurityItems();
+    loadData();
   }, []);
 
-  // Filtragem de itens
-  const filteredItems = useMemo(() => {
-    return items.filter(item => {
-      const matchesCat = selectedCategory === 'todas' || item.category === selectedCategory;
-      const matchesSev = selectedSeverity === 'todas' || item.severity === selectedSeverity;
-      const q = searchTerm.toLowerCase().trim();
-      const matchesSearch =
-        !q ||
-        item.name.toLowerCase().includes(q) ||
-        item.description.toLowerCase().includes(q) ||
-        item.slug.toLowerCase().includes(q) ||
-        (item.content && item.content.toLowerCase().includes(q)) ||
-        (item.tags || []).some(t => t.toLowerCase().includes(q)) ||
-        (item.complianceStandards || []).some(c => c.toLowerCase().includes(q));
+  // Abrir modal de detalhes
+  const handleOpenControl = async (ctrl: SecurityControl) => {
+    setSelectedControl(ctrl);
+    setEditForm(ctrl);
+    setIsEditing(false);
+    setActiveModalTab('overview');
 
-      return matchesCat && matchesSev && matchesSearch;
-    });
-  }, [items, selectedCategory, selectedSeverity, searchTerm]);
-
-  // Adicionar Tag Dinâmica
-  const handleAddTag = async (itemId: string, rawTag: string) => {
-    const clean = rawTag.trim().replace(/^#/, '');
-    if (!clean) return;
-
+    // Carregar evidências, exceções e auditoria em paralelo
     try {
-      const res = await fetch(`/api/security/${itemId}/tags`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tag: clean })
-      });
+      const [evRes, exRes, audRes] = await Promise.all([
+        fetch(`/api/security/controls/${ctrl.id}/evidence`),
+        fetch(`/api/security/exceptions?control_code=${ctrl.control_code}`),
+        fetch(`/api/security/audit-events?control_code=${ctrl.control_code}`)
+      ]);
 
-      if (res.ok) {
-        const data = await res.json();
-        setItems(prev => prev.map(i => (i.id === itemId ? { ...i, tags: data.tags } : i)));
-        if (selectedItem?.id === itemId) {
-          setSelectedItem(prev => (prev ? { ...prev, tags: data.tags } : null));
-        }
-        showToast(`Tag "#${clean}" adicionada.`);
-      } else {
-        const err = await res.json();
-        showToast(err.error || 'Erro ao adicionar tag.');
+      if (evRes.ok) {
+        const evData = await evRes.json();
+        setControlEvidences(evData.evidences || []);
       }
-    } catch {
-      showToast('Erro de conexão ao adicionar tag.');
+      if (exRes.ok) {
+        const exData = await exRes.json();
+        setControlExceptions(exData.exceptions || []);
+      }
+      if (audRes.ok) {
+        const audData = await audRes.json();
+        setControlAuditEvents(audData.events || []);
+      }
+    } catch (e) {
+      console.warn('Erro ao carregar dados auxiliares do controle:', e);
     }
   };
 
-  // Remover Tag Dinâmica
-  const handleRemoveTag = async (itemId: string, tag: string) => {
-    try {
-      const res = await fetch(`/api/security/${itemId}/tags/${encodeURIComponent(tag)}`, {
-        method: 'DELETE'
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setItems(prev => prev.map(i => (i.id === itemId ? { ...i, tags: data.tags } : i)));
-        if (selectedItem?.id === itemId) {
-          setSelectedItem(prev => (prev ? { ...prev, tags: data.tags } : null));
-        }
-        showToast(`Tag "#${tag}" removida.`);
-      } else {
-        const err = await res.json();
-        showToast(err.error || 'Erro ao remover tag.');
-      }
-    } catch {
-      showToast('Erro de conexão ao remover tag.');
-    }
-  };
-
-  // Abrir Modal de Consulta do Documento
-  const handleOpenItemDetails = (item: SecurityItem, initialMode: 'preview' | 'edit' = 'preview') => {
-    setSelectedItem(item);
-    setPreviewMode(initialMode);
-    const content = item.content || (item.files?.[0]?.content) || item.description || `# ${item.name}\n\nDiretrizes de segurança.`;
-    setDocumentEditorContent(content);
-  };
-
-  // Salvar alterações no Documento Explicativo
-  const handleSaveDocumentContent = async () => {
-    if (!selectedItem) return;
+  // Salvar edições do controle com concorrência otimista
+  const handleSaveControl = async () => {
+    if (!selectedControl) return;
 
     try {
-      setIsSavingDocument(true);
-      const res = await fetch(`/api/security/${selectedItem.id}`, {
+      setIsSaving(true);
+      const res = await fetch(`/api/security/controls/${selectedControl.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          content: documentEditorContent
+          expected_revision: selectedControl.revision,
+          name: editForm.name,
+          category: editForm.category,
+          severity: editForm.severity,
+          status: editForm.status,
+          owner: editForm.owner,
+          description: editForm.description,
+          rationale: editForm.rationale,
+          implementation: editForm.implementation,
+          validation_method: editForm.validation_method,
+          evidence: editForm.evidence
         })
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        const updated = data.item;
-        setSelectedItem(updated);
-        setItems(prev => prev.map(i => (i.id === updated.id ? updated : i)));
-        setPreviewMode('preview');
-        showToast(`Documento de "${updated.name}" atualizado com sucesso!`);
-      } else {
-        const err = await res.json();
-        showToast(err.error || 'Erro ao salvar documento.');
-      }
-    } catch {
-      showToast('Erro de conexão ao salvar documento.');
-    } finally {
-      setIsSavingDocument(false);
-    }
-  };
-
-  // Copiar documento explicativo para o clipboard
-  const handleCopyDocument = (text: string, itemId?: string) => {
-    navigator.clipboard.writeText(text);
-    if (itemId) {
-      setCopiedItemId(itemId);
-      setTimeout(() => setCopiedItemId(null), 2000);
-    } else {
-      setCopiedDocument(true);
-      setTimeout(() => setCopiedDocument(false), 2000);
-    }
-    showToast('Documento copiado para a área de transferência.');
-  };
-
-  // Excluir método de segurança
-  const handleDeleteSecurityItem = async (itemId: string, itemName: string) => {
-    if (!window.confirm(`Tem certeza que deseja remover o padrão de segurança "${itemName}"?`)) {
-      return;
-    }
-
-    try {
-      const res = await fetch(`/api/security/${itemId}?hard=true`, { method: 'DELETE' });
-      if (res.ok) {
-        setItems(prev => prev.filter(i => i.id !== itemId));
-        if (selectedItem?.id === itemId) {
-          setSelectedItem(null);
+      const data = await res.json();
+      if (!res.ok) {
+        if (res.status === 409) {
+          showToast(`Conflito de concorrência: o controle foi modificado para a rev v${data.currentRevision}. Recarregue.`);
+        } else {
+          showToast(data.error || 'Erro ao atualizar controle.');
         }
-        showToast(`Padrão "${itemName}" excluído com sucesso.`);
-      } else {
-        const err = await res.json();
-        showToast(err.error || 'Erro ao excluir padrão.');
+        return;
       }
-    } catch {
-      showToast('Erro ao excluir padrão de segurança.');
+
+      showToast(`Controle ${data.control.control_code} atualizado com sucesso (rev v${data.control.revision})!`);
+      setSelectedControl(data.control);
+      setEditForm(data.control);
+      setIsEditing(false);
+      loadData();
+    } catch (err: any) {
+      showToast(err.message || 'Erro de rede ao salvar controle.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  // Cadastrar Novo Padrão de Segurança
-  const handleCreateSecuritySubmit = async (e: React.FormEvent) => {
+  // Anexar nova evidência
+  const handleCreateEvidence = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newName.trim()) {
-      showToast('Informe o nome da tecnologia/padrão de segurança.');
-      return;
-    }
+    if (!selectedControl || !newEvidenceTitle.trim() || !newEvidenceDesc.trim()) return;
 
     try {
-      setIsSubmitting(true);
-      const complianceList = newCompliance
-        .split(',')
-        .map(s => s.trim())
-        .filter(Boolean);
-
-      const tagList = newTags
-        .split(',')
-        .map(s => s.trim().toLowerCase().replace(/^#/, ''))
-        .filter(Boolean);
-
-      const initialDoc = newDocumentContent.trim() || `# ${newName.trim()}
-
-## 1. Visão Geral
-${newDesc.trim() || 'Descreva o propósito e regras deste método de segurança.'}
-
-## 2. Como Aplicar nos Projetos
-1. Inclua as validações necessárias nos endpoints e fluxos.
-2. Certifique-se de manter logs e testes de conformidade.
-
-## 3. Checklist de Implementação
-- [ ] Implementado no código-fonte
-- [ ] Testes de conformidade e segurança executados
-- [ ] Regras validadas em produção
-`;
-
-      const res = await fetch('/api/security', {
+      const res = await fetch(`/api/security/controls/${selectedControl.id}/evidence`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: newName.trim(),
-          description: newDesc.trim() || 'Diretriz técnica de segurança corporativa.',
-          category: newCategory,
-          severity: newSeverity,
-          complianceStandards: complianceList,
-          tags: tagList,
-          content: initialDoc
+          title: newEvidenceTitle,
+          description: newEvidenceDesc,
+          evidence_type: newEvidenceType,
+          evidence_data: newEvidenceData
         })
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        setItems(prev => [data.item, ...prev]);
-        setIsCreateModalOpen(false);
-        setNewName('');
-        setNewDesc('');
-        setNewDocumentContent('');
-        showToast(`Padrão "${data.item.name}" cadastrado com sucesso!`);
-      } else {
-        const err = await res.json();
-        showToast(err.error || 'Erro ao cadastrar padrão de segurança.');
+      if (!res.ok) {
+        const errData = await res.json();
+        showToast(errData.error || 'Erro ao registrar evidência.');
+        return;
       }
+
+      const data = await res.json();
+      setControlEvidences(prev => [data.evidence, ...prev]);
+      setIsCreatingEvidence(false);
+      setNewEvidenceTitle('');
+      setNewEvidenceDesc('');
+      setNewEvidenceData('');
+      showToast('Evidência anexada com hash SHA-256 verificado!');
+      loadData();
     } catch {
-      showToast('Erro de conexão ao criar método de segurança.');
-    } finally {
-      setIsSubmitting(false);
+      showToast('Erro de rede ao registrar evidência.');
     }
   };
 
-  // Renderizador seguro e de alta fidelidade de Markdown
-  const renderMarkdownPreview = (text: string) => {
-    const lines = text.split('\n');
-    return (
-      <div className="space-y-3 font-sans text-xs leading-relaxed text-zinc-300">
-        {lines.map((line, idx) => {
-          if (line.startsWith('### ')) {
-            return (
-              <h4 key={idx} className="text-sm font-bold text-foreground mt-4 mb-2 flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-                {line.replace('### ', '')}
-              </h4>
-            );
-          }
-          if (line.startsWith('## ')) {
-            return (
-              <h3 key={idx} className="text-base font-extrabold text-foreground mt-6 mb-2 pb-1.5 border-b border-zinc-800 flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-primary" />
-                {line.replace('## ', '')}
-              </h3>
-            );
-          }
-          if (line.startsWith('# ')) {
-            return (
-              <h2 key={idx} className="text-xl font-black text-primary mt-6 mb-3 pb-2 border-b border-primary/20">
-                {line.replace('# ', '')}
-              </h2>
-            );
-          }
-          if (line.startsWith('- [ ] ') || line.startsWith('- [x] ')) {
-            const isChecked = line.startsWith('- [x] ');
-            return (
-              <div key={idx} className="flex items-center gap-2 pl-2 py-0.5">
-                <input type="checkbox" readOnly checked={isChecked} className="rounded accent-primary cursor-default" />
-                <span className={isChecked ? 'line-through text-zinc-500 font-mono text-[11px]' : 'text-zinc-200 font-mono text-[11px]'}>
-                  {line.substring(6)}
-                </span>
-              </div>
-            );
-          }
-          if (line.startsWith('- ') || line.startsWith('* ')) {
-            return (
-              <div key={idx} className="flex items-start gap-2 pl-3">
-                <span className="text-primary mt-0.5">•</span>
-                <span>{line.substring(2)}</span>
-              </div>
-            );
-          }
-          if (/^\d+\.\s/.test(line)) {
-            const match = line.match(/^(\d+)\.\s(.*)/);
-            return (
-              <div key={idx} className="flex items-start gap-2 pl-3">
-                <span className="text-primary font-bold text-[11px]">{match ? match[1] + '.' : '•'}</span>
-                <span>{match ? match[2] : line}</span>
-              </div>
-            );
-          }
-          if (line.startsWith('```')) {
-            return (
-              <div key={idx} className="font-mono text-[11px] bg-zinc-950 p-3 rounded-xl border border-zinc-800 text-zinc-300 overflow-x-auto my-2">
-                {line}
-              </div>
-            );
-          }
-          if (line.trim() === '') {
-            return <div key={idx} className="h-2" />;
-          }
-          return <p key={idx} className="leading-relaxed">{line}</p>;
-        })}
-      </div>
-    );
+  // Registrar nova exceção
+  const handleCreateException = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedControl || !newExceptionReason.trim()) return;
+
+    try {
+      const expiresAt = new Date(Date.now() + Number(newExceptionDays) * 86400000).toISOString();
+      const res = await fetch(`/api/security/controls/${selectedControl.id}/exceptions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reason: newExceptionReason,
+          approved_by: newExceptionApprover,
+          risk_accepted: true,
+          expires_at: expiresAt
+        })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        showToast(errData.error || 'Erro ao registrar exceção.');
+        return;
+      }
+
+      const data = await res.json();
+      setControlExceptions(prev => [data.exception, ...prev]);
+      setIsCreatingException(false);
+      setNewExceptionReason('');
+      showToast('Exceção de segurança registrada e status atualizado!');
+      loadData();
+      if (selectedControl) {
+        setSelectedControl({ ...selectedControl, status: 'exception', revision: selectedControl.revision + 1 });
+      }
+    } catch {
+      showToast('Erro de rede ao registrar exceção.');
+    }
   };
 
+  // Resolver exceção
+  const handleResolveException = async (exceptionId: string) => {
+    if (!resolutionNotes.trim()) {
+      showToast('Informe as notas de resolução.');
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/security/exceptions/${exceptionId}/resolve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          resolution_notes: resolutionNotes
+        })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        showToast(errData.error || 'Erro ao resolver exceção.');
+        return;
+      }
+
+      const data = await res.json();
+      setControlExceptions(prev => prev.map(ex => ex.id === exceptionId ? data.exception : ex));
+      setResolvingExceptionId(null);
+      setResolutionNotes('');
+      showToast('Exceção resolvida e controle retornado ao ciclo de conformidade!');
+      loadData();
+    } catch {
+      showToast('Erro de rede ao resolver exceção.');
+    }
+  };
+
+  // Criar novo controle
+  const handleCreateNewControl = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!createCode.trim() || !createName.trim() || !createDesc.trim()) return;
+
+    try {
+      setIsCreatingControl(true);
+      const res = await fetch('/api/security/controls', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          control_code: createCode.toUpperCase().trim(),
+          name: createName.trim(),
+          category: createCategory,
+          severity: createSeverity,
+          status: createStatus,
+          owner: createOwner.trim(),
+          description: createDesc.trim(),
+          rationale: createRationale.trim(),
+          implementation: createImplementation.trim(),
+          validation_method: createValidation.trim()
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || 'Erro ao criar controle.');
+        return;
+      }
+
+      showToast(`Controle ${data.control.control_code} cadastrado com sucesso!`);
+      setIsCreateModalOpen(false);
+      setCreateCode('');
+      setCreateName('');
+      setCreateDesc('');
+      setCreateRationale('');
+      setCreateImplementation('');
+      setCreateValidation('');
+      loadData();
+    } catch (err: any) {
+      showToast(err.message || 'Erro ao cadastrar controle.');
+    } finally {
+      setIsCreatingControl(false);
+    }
+  };
+
+  // Prévia de Importação
+  const handleImportPreview = async () => {
+    try {
+      const parsed = JSON.parse(importJsonText);
+      const items = Array.isArray(parsed) ? parsed : [parsed];
+
+      setIsProcessingImport(true);
+      const res = await fetch('/api/security/controls/import/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ controls: items })
+      });
+
+      const data = await res.json();
+      setImportPreviewResult(data.preview || data);
+      showToast(data.preview?.ok ? 'Prévia gerada com sucesso!' : 'Erros detectados no lote.');
+    } catch {
+      showToast('JSON inválido. Certifique-se de colar um array JSON válido.');
+    } finally {
+      setIsProcessingImport(false);
+    }
+  };
+
+  // Confirmação de Importação
+  const handleImportCommit = async () => {
+    try {
+      const parsed = JSON.parse(importJsonText);
+      const items = Array.isArray(parsed) ? parsed : [parsed];
+
+      setIsProcessingImport(true);
+      const res = await fetch('/api/security/controls/import/commit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          controls: items,
+          idempotency_key: `import_ui_${Date.now()}`
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || 'Erro ao confirmar importação.');
+        return;
+      }
+
+      showToast(data.message || 'Importação gravada com sucesso!');
+      setIsImportModalOpen(false);
+      setImportJsonText('');
+      setImportPreviewResult(null);
+      loadData();
+    } catch {
+      showToast('Falha ao processar gravação da importação.');
+    } finally {
+      setIsProcessingImport(false);
+    }
+  };
+
+  // Copiar código ou diretriz
+  const copyToClipboard = (text: string, code: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedCode(code);
+    showToast(`Código ${code} copiado para a área de transferência!`);
+    setTimeout(() => setCopiedCode(null), 2500);
+  };
+
+  // Filtros combinados
+  const filteredControls = useMemo(() => {
+    return controls.filter(c => {
+      const matchesSearch =
+        searchTerm === '' ||
+        c.control_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c.rationale.toLowerCase().includes(searchTerm.toLowerCase());
+
+      const matchesCategory = selectedCategory === 'todas' || c.category === selectedCategory;
+      const matchesStatus = selectedStatus === 'todas' || c.status === selectedStatus;
+      const matchesSeverity = selectedSeverity === 'todas' || c.severity === selectedSeverity;
+
+      return matchesSearch && matchesCategory && matchesStatus && matchesSeverity;
+    });
+  }, [controls, searchTerm, selectedCategory, selectedStatus, selectedSeverity]);
+
   return (
-    <div className="space-y-8 max-w-7xl mx-auto pb-16">
-      {/* Toast Flutuante com Framer Motion */}
+    <div className="min-h-screen bg-[#090D16] text-zinc-100 font-sans pb-24">
+      {/* Toast Notification */}
       <AnimatePresence>
         {toastMessage && (
           <motion.div
-            initial={{ opacity: 0, y: -20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -20, scale: 0.95 }}
-            className="fixed top-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-xl bg-zinc-900 border border-primary/40 text-foreground shadow-2xl backdrop-blur-md"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-6 right-6 z-50 bg-zinc-900 border border-emerald-500/40 text-emerald-300 px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 backdrop-blur-md"
           >
-            <ShieldCheck className="text-primary w-5 h-5 flex-shrink-0 animate-pulse" />
+            <ShieldCheck className="w-5 h-5 text-emerald-400" />
             <span className="text-sm font-medium">{toastMessage}</span>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Hero Header Corporativo de Segurança */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-zinc-900/95 via-zinc-900/60 to-zinc-950 p-8 border border-zinc-800/80 shadow-2xl backdrop-blur-xl">
-        <div className="absolute -right-16 -top-16 w-80 h-80 bg-rose-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -left-16 -bottom-16 w-80 h-80 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+        {/* Cabeçalho da Seção */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-8 border-b border-zinc-800/80">
           <div>
-            <div className="flex items-center gap-3">
-              <span className="p-2.5 rounded-xl bg-primary/10 border border-primary/20 text-primary shadow-inner">
-                <ShieldCheck size={26} />
+            <div className="flex items-center gap-3 mb-2">
+              <span className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                <ShieldCheck className="w-6 h-6" />
               </span>
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
-                  Biblioteca de Segurança
-                </h1>
-                <p className="text-xs sm:text-sm text-zinc-400 mt-1">
-                  Catálogo de diretrizes, métodos e arquiteturas de proteção para consultar e aplicar nos projetos.
-                </p>
-              </div>
+              <span className="text-xs uppercase tracking-widest font-semibold text-emerald-400">
+                Segurança Corporativa & Postura MCP
+              </span>
             </div>
+            <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+              100 Controles de Segurança Corporativa
+            </h1>
+            <p className="mt-2 text-sm text-zinc-400 max-w-3xl leading-relaxed">
+              Catálogo formal de controles arquiteturais independentes expostos via protocolo MCP.
+              Governança contínua com concorrência otimista, hashes SHA-256 de evidências e trilha imutável.
+            </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <button
+              onClick={() => setIsImportModalOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700/80 hover:border-zinc-500 text-sm font-medium text-zinc-200 hover:text-white transition-all shadow-sm"
+            >
+              <UploadCloud className="w-4 h-4 text-zinc-400" />
+              Importar / Exportar Lote
+            </button>
             <button
               onClick={() => setIsCreateModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs transition-all shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-sm font-semibold text-white transition-all shadow-lg shadow-emerald-950/40"
             >
-              <Plus size={16} />
-              Nova Diretriz de Segurança
+              <Plus className="w-4 h-4" />
+              Novo Controle
             </button>
           </div>
         </div>
 
-        {/* Estatísticas Rápidas */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-8 pt-6 border-t border-zinc-800/60">
-          <div className="p-4 rounded-2xl bg-zinc-900/40 border border-zinc-800/60">
-            <div className="text-[10px] uppercase font-mono tracking-wider text-zinc-500">Padrões Cadastrados</div>
-            <div className="text-2xl font-bold text-foreground mt-1">{items.length}</div>
-          </div>
-          <div className="p-4 rounded-2xl bg-zinc-900/40 border border-zinc-800/60">
-            <div className="text-[10px] uppercase font-mono tracking-wider text-zinc-500">Crítico & Alto Impacto</div>
-            <div className="text-2xl font-bold text-rose-400 mt-1">
-              {items.filter(i => i.severity === 'critico' || i.severity === 'alto').length}
+        {/* KPIs / Cards de Postura de Segurança */}
+        {posture && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mt-8">
+            <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-4 flex flex-col justify-between backdrop-blur-sm">
+              <div className="flex items-center justify-between text-zinc-400 text-xs font-medium">
+                <span>Total de Controles</span>
+                <Layers className="w-4 h-4 text-zinc-500" />
+              </div>
+              <div className="mt-2">
+                <span className="text-3xl font-black text-white">{posture.total_controls}</span>
+                <span className="text-xs text-zinc-500 ml-2">ativos</span>
+              </div>
+              <div className="mt-2 text-[11px] text-zinc-500">10 categorias balanceadas</div>
             </div>
-          </div>
-          <div className="p-4 rounded-2xl bg-zinc-900/40 border border-zinc-800/60">
-            <div className="text-[10px] uppercase font-mono tracking-wider text-zinc-500">Categorias Ativas</div>
-            <div className="text-2xl font-bold text-primary mt-1">
-              {new Set(items.map(i => i.category)).size}
-            </div>
-          </div>
-          <div className="p-4 rounded-2xl bg-zinc-900/40 border border-zinc-800/60">
-            <div className="text-[10px] uppercase font-mono tracking-wider text-zinc-500">Conformidade</div>
-            <div className="text-2xl font-bold text-emerald-400 mt-1">OWASP & LGPD</div>
-          </div>
-        </div>
-      </div>
 
-      {/* Barra de Filtros e Busca */}
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-          {/* Campo de Busca */}
-          <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500" size={16} />
-            <input
-              type="text"
-              placeholder="Buscar por método de segurança, tag ou norma (ex: LGPD, OWASP, ABAC)..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-zinc-900/80 border border-zinc-800 text-xs text-foreground placeholder:text-zinc-500 focus:outline-none focus:border-primary/50 transition-colors shadow-inner"
-            />
-          </div>
-
-          {/* Filtro de Severidade e Modo de Visualização */}
-          <div className="flex items-center gap-2">
-            <select
-              value={selectedSeverity}
-              onChange={e => setSelectedSeverity(e.target.value)}
-              aria-label="Filtrar por severidade de segurança"
-              className="px-3 py-2.5 rounded-xl bg-zinc-900/80 border border-zinc-800 text-xs text-zinc-300 focus:outline-none focus:border-primary/50 cursor-pointer"
-            >
-              {SEVERITIES.map(s => (
-                <option key={s.id} value={s.id}>{s.label}</option>
-              ))}
-            </select>
-
-            <div className="flex items-center bg-zinc-900/80 border border-zinc-800 rounded-xl p-0.5">
-              <button
-                onClick={() => setViewMode('cards')}
-                className={`p-2 rounded-lg transition-colors cursor-pointer ${
-                  viewMode === 'cards' ? 'bg-zinc-800 text-primary' : 'text-zinc-500 hover:text-zinc-300'
-                }`}
-                title="Visualização em Cards"
-              >
-                <LayoutGrid size={15} />
-              </button>
-              <button
-                onClick={() => setViewMode('table')}
-                className={`p-2 rounded-lg transition-colors cursor-pointer ${
-                  viewMode === 'table' ? 'bg-zinc-800 text-primary' : 'text-zinc-500 hover:text-zinc-300'
-                }`}
-                title="Visualização em Tabela"
-              >
-                <TableIcon size={15} />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Abas de Categorias */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-          {CATEGORIES.map(cat => {
-            const isSelected = selectedCategory === cat.id;
-            const count = cat.id === 'todas'
-              ? items.length
-              : items.filter(i => i.category === cat.id).length;
-
-            return (
-              <button
-                key={cat.id}
-                onClick={() => setSelectedCategory(cat.id)}
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
-                  isSelected
-                    ? 'bg-zinc-800 text-primary border border-primary/30 shadow-sm'
-                    : 'bg-zinc-900/50 hover:bg-zinc-800/50 text-zinc-400 hover:text-zinc-200 border border-zinc-800/60'
-                }`}
-              >
-                <span>{cat.label}</span>
-                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                  isSelected ? 'bg-primary/20 text-primary' : 'bg-zinc-800 text-zinc-500'
-                }`}>
-                  {count}
+            <div className="bg-emerald-950/20 border border-emerald-500/20 rounded-2xl p-4 flex flex-col justify-between backdrop-blur-sm">
+              <div className="flex items-center justify-between text-emerald-400/80 text-xs font-medium">
+                <span>Implementados / Verificados</span>
+                <Check className="w-4 h-4 text-emerald-400" />
+              </div>
+              <div className="mt-2">
+                <span className="text-3xl font-black text-emerald-400">
+                  {posture.by_status.implemented + posture.by_status.verified}
                 </span>
-              </button>
-            );
-          })}
+                <span className="text-xs text-emerald-500/80 ml-2">controles</span>
+              </div>
+              <div className="mt-2 text-[11px] text-emerald-400/60">Efetividade comprovada</div>
+            </div>
+
+            <div className="bg-amber-950/20 border border-amber-500/20 rounded-2xl p-4 flex flex-col justify-between backdrop-blur-sm">
+              <div className="flex items-center justify-between text-amber-400/80 text-xs font-medium">
+                <span>Em Progresso / Planejados</span>
+                <Clock className="w-4 h-4 text-amber-400" />
+              </div>
+              <div className="mt-2">
+                <span className="text-3xl font-black text-amber-400">
+                  {posture.by_status.in_progress + posture.by_status.planned}
+                </span>
+                <span className="text-xs text-amber-500/80 ml-2">em pipeline</span>
+              </div>
+              <div className="mt-2 text-[11px] text-amber-400/60">Acompanhamento contínuo</div>
+            </div>
+
+            <div className="bg-purple-950/20 border border-purple-500/20 rounded-2xl p-4 flex flex-col justify-between backdrop-blur-sm">
+              <div className="flex items-center justify-between text-purple-400/80 text-xs font-medium">
+                <span>Exceções Ativas</span>
+                <AlertTriangle className="w-4 h-4 text-purple-400" />
+              </div>
+              <div className="mt-2">
+                <span className="text-3xl font-black text-purple-400">{posture.active_exceptions_count}</span>
+                <span className="text-xs text-purple-500/80 ml-2">riscos aceitos</span>
+              </div>
+              <div className="mt-2 text-[11px] text-purple-400/60">Com prazo e aprovador</div>
+            </div>
+
+            <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-4 flex flex-col justify-between backdrop-blur-sm">
+              <div className="flex items-center justify-between text-zinc-400 text-xs font-medium">
+                <span>Taxa de Conformidade</span>
+                <ShieldCheck className="w-4 h-4 text-teal-400" />
+              </div>
+              <div className="mt-2">
+                <span className="text-3xl font-black text-teal-400">{posture.compliance_rate_percent}%</span>
+              </div>
+              <div className="mt-2 text-[11px] text-zinc-500">
+                {posture.overdue_reviews_count > 0 ? (
+                  <span className="text-rose-400 font-medium">{posture.overdue_reviews_count} revisões vencidas</span>
+                ) : (
+                  'Todas as revisões em dia'
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Barra de Filtros e Categorias */}
+        <div className="mt-8 space-y-4">
+          {/* Seletor de Categoria em Pílulas */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+            {CONTROL_CATEGORIES.map(cat => {
+              const Icon = cat.icon;
+              const isSelected = selectedCategory === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.id)}
+                  className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all ${
+                    isSelected
+                      ? 'bg-emerald-500 text-zinc-950 font-bold shadow-lg shadow-emerald-500/20'
+                      : 'bg-zinc-900/80 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 border border-zinc-800/80'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  {cat.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Busca e Filtros de Status / Severidade / Visualização */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-zinc-900/40 p-3 rounded-2xl border border-zinc-800/60">
+            <div className="relative w-full sm:w-96">
+              <Search className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Buscar por código (SEC-001) ou palavra-chave..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500/60 transition-all"
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end flex-wrap">
+              <select
+                value={selectedStatus}
+                onChange={e => setSelectedStatus(e.target.value)}
+                className="px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-zinc-300 focus:outline-none focus:border-emerald-500/50"
+              >
+                <option value="todas">Todos os Status</option>
+                <option value="verified">Verificado</option>
+                <option value="implemented">Implementado</option>
+                <option value="in_progress">Em Progresso</option>
+                <option value="planned">Planejado</option>
+                <option value="exception">Exceção</option>
+              </select>
+
+              <select
+                value={selectedSeverity}
+                onChange={e => setSelectedSeverity(e.target.value)}
+                className="px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-zinc-300 focus:outline-none focus:border-emerald-500/50"
+              >
+                <option value="todas">Todas as Severidades</option>
+                <option value="critical">Crítica</option>
+                <option value="high">Alta</option>
+                <option value="medium">Média</option>
+                <option value="low">Baixa</option>
+              </select>
+
+              <div className="flex items-center bg-zinc-950 border border-zinc-800 rounded-xl p-1">
+                <button
+                  onClick={() => setViewMode('cards')}
+                  className={`p-1.5 rounded-lg text-xs transition-all ${
+                    viewMode === 'cards' ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                  title="Visualização em Cartões"
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('table')}
+                  className={`p-1.5 rounded-lg text-xs transition-all ${
+                    viewMode === 'table' ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                  title="Visualização em Tabela"
+                >
+                  <TableIcon className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
+
+        {/* Listagem de Controles */}
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-24 text-zinc-500">
+            <RefreshCw className="w-8 h-8 animate-spin text-emerald-500 mb-3" />
+            <p className="text-sm">Carregando os 100 controles de segurança...</p>
+          </div>
+        ) : filteredControls.length === 0 ? (
+          <div className="text-center py-20 bg-zinc-900/20 rounded-3xl border border-zinc-800/60 mt-8">
+            <ShieldAlert className="w-12 h-12 text-zinc-600 mx-auto mb-3" />
+            <h3 className="text-base font-semibold text-zinc-300">Nenhum controle encontrado</h3>
+            <p className="text-xs text-zinc-500 mt-1 max-w-sm mx-auto">
+              Nenhum controle corresponde aos filtros selecionados. Tente ajustar a busca ou categoria.
+            </p>
+          </div>
+        ) : viewMode === 'cards' ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mt-6">
+            {filteredControls.map(ctrl => {
+              const sev = SEVERITY_CONFIG[ctrl.severity] || SEVERITY_CONFIG.medium;
+              const st = STATUS_CONFIG[ctrl.status] || STATUS_CONFIG.planned;
+
+              return (
+                <div
+                  key={ctrl.id}
+                  className="bg-zinc-900/60 border border-zinc-800 hover:border-zinc-700/80 rounded-2xl p-5 flex flex-col justify-between transition-all hover:shadow-xl group backdrop-blur-sm"
+                >
+                  <div>
+                    {/* Topo do Card */}
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <span className="font-mono text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
+                        {ctrl.control_code}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${sev.bg} ${sev.color} ${sev.border}`}>
+                          {sev.label}
+                        </span>
+                        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${st.bg} ${st.color} ${st.border}`}>
+                          {st.label}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Título e Categoria */}
+                    <h3 className="text-base font-bold text-white group-hover:text-emerald-300 transition-colors line-clamp-2">
+                      {ctrl.name}
+                    </h3>
+                    <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-semibold mt-1">
+                      Categoria: {ctrl.category}
+                    </div>
+
+                    {/* Descrição resumida */}
+                    <p className="text-xs text-zinc-400 mt-2.5 line-clamp-3 leading-relaxed">
+                      {ctrl.description}
+                    </p>
+                  </div>
+
+                  {/* Rodapé do Card */}
+                  <div className="mt-5 pt-3.5 border-t border-zinc-800/80 flex items-center justify-between text-xs">
+                    <div className="text-[11px] text-zinc-500">
+                      <span>Rev v{ctrl.revision}</span>
+                      <span className="mx-1.5">•</span>
+                      <span>{ctrl.owner}</span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => copyToClipboard(ctrl.control_code, ctrl.control_code)}
+                        className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
+                        title="Copiar Código"
+                      >
+                        {copiedCode === ctrl.control_code ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                      <button
+                        onClick={() => handleOpenControl(ctrl)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-200 hover:text-white transition-all"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        Detalhes
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          /* Visualização em Tabela */
+          <div className="mt-6 bg-zinc-900/60 border border-zinc-800 rounded-2xl overflow-hidden backdrop-blur-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-zinc-950/80 border-b border-zinc-800 text-zinc-400 font-semibold uppercase tracking-wider text-[10px]">
+                  <tr>
+                    <th className="px-4 py-3.5">Código</th>
+                    <th className="px-4 py-3.5">Nome do Controle</th>
+                    <th className="px-4 py-3.5">Categoria</th>
+                    <th className="px-4 py-3.5">Severidade</th>
+                    <th className="px-4 py-3.5">Status</th>
+                    <th className="px-4 py-3.5">Responsável</th>
+                    <th className="px-4 py-3.5">Revisão</th>
+                    <th className="px-4 py-3.5 text-right">Ação</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-800/50 text-zinc-300">
+                  {filteredControls.map(ctrl => {
+                    const sev = SEVERITY_CONFIG[ctrl.severity] || SEVERITY_CONFIG.medium;
+                    const st = STATUS_CONFIG[ctrl.status] || STATUS_CONFIG.planned;
+                    return (
+                      <tr key={ctrl.id} className="hover:bg-zinc-800/40 transition-colors">
+                        <td className="px-4 py-3 font-mono font-bold text-emerald-400">{ctrl.control_code}</td>
+                        <td className="px-4 py-3 font-medium text-white max-w-xs truncate">{ctrl.name}</td>
+                        <td className="px-4 py-3 text-zinc-400 uppercase text-[10px] font-semibold">{ctrl.category}</td>
+                        <td className="px-4 py-3">
+                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${sev.bg} ${sev.color} ${sev.border}`}>
+                            {sev.label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${st.bg} ${st.color} ${st.border}`}>
+                            {st.label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-zinc-400">{ctrl.owner}</td>
+                        <td className="px-4 py-3 text-zinc-500 font-mono">v{ctrl.revision}</td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={() => handleOpenControl(ctrl)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            Ver
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Grid de Cards ou Tabela */}
-      {isLoading ? (
-        <div className="py-20 flex flex-col items-center justify-center gap-4 text-zinc-500">
-          <div className="w-10 h-10 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-          <p className="text-xs uppercase tracking-widest font-mono">Carregando Biblioteca de Segurança...</p>
-        </div>
-      ) : filteredItems.length === 0 ? (
-        <div className="py-16 text-center rounded-2xl border border-dashed border-zinc-800 bg-zinc-950/40 p-8">
-          <ShieldAlert size={40} className="mx-auto text-zinc-600 mb-3" />
-          <h3 className="text-base font-semibold text-foreground">Nenhuma diretriz de segurança encontrada</h3>
-          <p className="text-xs text-zinc-500 mt-1 max-w-md mx-auto">
-            Tente alterar o termo de pesquisa, o filtro de severidade ou cadastre uma nova diretriz.
-          </p>
-        </div>
-      ) : viewMode === 'cards' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredItems.map(item => {
-            const docContent = item.content || (item.files?.[0]?.content) || item.description || '';
-            const isCopied = copiedItemId === item.id;
-
-            return (
-              <motion.div
-                key={item.id}
-                layout
-                initial={{ opacity: 0, scale: 0.96 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.2 }}
-                className="group relative flex flex-col justify-between rounded-2xl bg-zinc-900/60 border border-zinc-800/80 hover:border-zinc-700/80 p-6 shadow-xl backdrop-blur-md transition-all duration-300 hover:shadow-2xl hover:-translate-y-1"
-              >
-                <div>
-                  {/* Badges Superiores */}
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700/60">
-                      {item.category}
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      {item.severity === 'critico' ? (
-                        <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-rose-950/60 text-rose-400 border border-rose-800/60 font-semibold">
-                          <AlertTriangle size={10} /> Crítico
-                        </span>
-                      ) : item.severity === 'alto' ? (
-                        <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-amber-950/60 text-amber-400 border border-amber-800/60 font-semibold">
-                          <ShieldAlert size={10} /> Alto
-                        </span>
-                      ) : item.severity === 'medio' ? (
-                        <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-blue-950/60 text-blue-400 border border-blue-800/60">
-                          <ShieldCheck size={10} /> Médio
-                        </span>
-                      ) : item.severity === 'baixo' ? (
-                        <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-emerald-950/60 text-emerald-400 border border-emerald-800/60">
-                          <Check size={10} /> Baixo
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-purple-950/60 text-purple-400 border border-purple-800/60">
-                          <Info size={10} /> Info
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Nome e Descrição */}
-                  <h3
-                    onClick={() => handleOpenItemDetails(item, 'preview')}
-                    className="text-lg font-bold text-foreground group-hover:text-primary transition-colors cursor-pointer"
-                  >
-                    {item.name}
-                  </h3>
-                  <p className="text-xs text-zinc-400 mt-2 line-clamp-3 leading-relaxed">
-                    {item.description}
-                  </p>
-
-                  {/* Badges de Normas de Conformidade */}
-                  {item.complianceStandards && item.complianceStandards.length > 0 && (
-                    <div className="flex flex-wrap items-center gap-1.5 mt-3.5">
-                      {item.complianceStandards.map(comp => (
-                        <span key={comp} className="text-[10px] px-2 py-0.5 rounded bg-emerald-950/40 text-emerald-400 border border-emerald-800/40 font-mono">
-                          {comp}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Tags Dinâmicas */}
-                  <div className="flex flex-wrap items-center gap-1.5 mt-3.5">
-                    {item.tags.map(tag => (
-                      <span
-                        key={tag}
-                        className="group/tag inline-flex items-center gap-1 text-[10px] pl-2 pr-1.5 py-0.5 rounded-md bg-zinc-800/80 text-zinc-300 font-mono border border-zinc-700/60 hover:border-zinc-500 transition-colors"
-                      >
-                        <span>#{tag}</span>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRemoveTag(item.id, tag);
-                          }}
-                          className="text-zinc-500 hover:text-rose-400 p-0.5 rounded transition-colors cursor-pointer"
-                          title={`Remover tag #${tag}`}
-                        >
-                          <X size={10} />
-                        </button>
-                      </span>
-                    ))}
-
-                    {addingTagItemId === item.id ? (
-                      <div className="inline-flex items-center gap-1 bg-zinc-800/90 rounded-md px-1.5 py-0.5 border border-primary/50 shadow-sm">
-                        <input
-                          type="text"
-                          autoFocus
-                          placeholder="nova-tag..."
-                          value={newTagInput}
-                          onChange={e => setNewTagInput(e.target.value)}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              handleAddTag(item.id, newTagInput);
-                              setNewTagInput('');
-                              setAddingTagItemId(null);
-                            } else if (e.key === 'Escape') {
-                              setAddingTagItemId(null);
-                              setNewTagInput('');
-                            }
-                          }}
-                          className="w-20 bg-transparent text-[10px] text-zinc-200 outline-none font-mono"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            handleAddTag(item.id, newTagInput);
-                            setNewTagInput('');
-                            setAddingTagItemId(null);
-                          }}
-                          className="text-emerald-400 hover:text-emerald-300 cursor-pointer"
-                          title="Confirmar"
-                        >
-                          <Check size={11} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setAddingTagItemId(null);
-                            setNewTagInput('');
-                          }}
-                          className="text-zinc-500 hover:text-zinc-400 cursor-pointer"
-                          title="Cancelar"
-                        >
-                          <X size={11} />
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAddingTagItemId(item.id);
-                          setNewTagInput('');
-                        }}
-                        className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-zinc-800/40 hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 font-mono border border-dashed border-zinc-700/80 cursor-pointer transition-colors"
-                        title="Adicionar tag"
-                      >
-                        <Plus size={10} /> Tag
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Footer do Card com Ações Diretas */}
-                <div className="mt-6 pt-4 border-t border-zinc-800/60 flex items-center justify-between gap-3">
-                  <button
-                    onClick={() => handleCopyDocument(docContent, item.id)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800/60 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 text-xs font-medium cursor-pointer transition-colors border border-zinc-700/40"
-                    title="Copiar diretriz para área de transferência"
-                  >
-                    {isCopied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
-                    <span>{isCopied ? 'Copiado!' : 'Copiar'}</span>
-                  </button>
-
-                  <button
-                    onClick={() => handleOpenItemDetails(item, 'preview')}
-                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 text-xs font-semibold cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]"
-                  >
-                    <FileText size={13} />
-                    Consultar Diretriz
-                  </button>
-                </div>
-              </motion.div>
-            );
-          })}
-        </div>
-      ) : (
-        /* Visualização em Tabela */
-        <div className="overflow-x-auto rounded-2xl border border-zinc-800 bg-zinc-900/60 backdrop-blur-md shadow-xl">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-zinc-900/90 text-zinc-400 uppercase text-[10px] tracking-wider border-b border-zinc-800">
-              <tr>
-                <th className="py-3 px-4">Método de Segurança</th>
-                <th className="py-3 px-4">Categoria</th>
-                <th className="py-3 px-4">Severidade</th>
-                <th className="py-3 px-4">Conformidade</th>
-                <th className="py-3 px-4">Tags</th>
-                <th className="py-3 px-4 text-right">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-800/60">
-              {filteredItems.map(item => {
-                const docContent = item.content || (item.files?.[0]?.content) || item.description || '';
-                const isCopied = copiedItemId === item.id;
-
-                return (
-                  <tr key={item.id} className="hover:bg-zinc-800/30 transition-colors">
-                    <td className="py-3 px-4">
-                      <div className="font-semibold text-foreground cursor-pointer hover:text-primary transition-colors" onClick={() => handleOpenItemDetails(item, 'preview')}>
-                        {item.name}
-                      </div>
-                      <div className="text-[10px] font-mono text-zinc-500">{item.slug}</div>
-                    </td>
-                    <td className="py-3 px-4 text-zinc-400 capitalize">{item.category}</td>
-                    <td className="py-3 px-4">
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium capitalize ${
-                        item.severity === 'critico' ? 'bg-rose-950 text-rose-400 border border-rose-800/60' :
-                        item.severity === 'alto' ? 'bg-amber-950 text-amber-400 border border-amber-800/60' :
-                        item.severity === 'medio' ? 'bg-blue-950 text-blue-400 border border-blue-800/60' :
-                        'bg-emerald-950 text-emerald-400 border border-emerald-800/60'
-                      }`}>
-                        {item.severity}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-zinc-400">
-                      {(item.complianceStandards || []).join(', ') || '-'}
-                    </td>
-                    <td className="py-3 px-4 text-zinc-400 font-mono text-[10px]">
-                      {item.tags.map(t => `#${t}`).join(' ')}
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleCopyDocument(docContent, item.id)}
-                          className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 cursor-pointer transition-colors"
-                          title="Copiar documento"
-                        >
-                          {isCopied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
-                        </button>
-                        <button
-                          onClick={() => handleOpenItemDetails(item, 'preview')}
-                          className="px-3 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 text-xs font-semibold cursor-pointer transition-colors"
-                        >
-                          Consultar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Modal de Detalhes e Documento Explicativo */}
+      {/* Modal Completo de Detalhes do Controle */}
       <AnimatePresence>
-        {selectedItem && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm">
+        {selectedControl && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-4xl max-h-[92vh] flex flex-col rounded-3xl bg-zinc-950 border border-zinc-800 shadow-2xl overflow-hidden"
+              className="bg-zinc-900 border border-zinc-800 rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
             >
               {/* Header do Modal */}
-              <div className="px-6 py-5 border-b border-zinc-800 flex items-start justify-between gap-4 bg-zinc-900/60">
-                <div className="flex items-start gap-3.5">
-                  <div className="w-11 h-11 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary flex-shrink-0 mt-0.5 shadow-inner">
-                    <ShieldCheck size={22} />
-                  </div>
+              <div className="p-6 border-b border-zinc-800 flex items-center justify-between bg-zinc-950/60">
+                <div className="flex items-center gap-3">
+                  <span className="font-mono text-sm font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 rounded-xl">
+                    {selectedControl.control_code}
+                  </span>
                   <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-lg sm:text-xl font-bold text-foreground">{selectedItem.name}</h2>
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700/60">
-                        {selectedItem.category}
-                      </span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full capitalize font-semibold ${
-                        selectedItem.severity === 'critico' ? 'bg-rose-950/80 text-rose-400 border border-rose-800/60' :
-                        selectedItem.severity === 'alto' ? 'bg-amber-950/80 text-amber-400 border border-amber-800/60' :
-                        selectedItem.severity === 'medio' ? 'bg-blue-950/80 text-blue-400 border border-blue-800/60' :
-                        'bg-emerald-950/80 text-emerald-400 border border-emerald-800/60'
-                      }`}>
-                        {selectedItem.severity}
-                      </span>
-                    </div>
-                    <p className="text-xs text-zinc-400 mt-1">{selectedItem.description}</p>
-
-                    {/* Normas e Tags */}
-                    <div className="flex flex-wrap items-center gap-2 mt-2">
-                      {selectedItem.complianceStandards && selectedItem.complianceStandards.length > 0 && (
-                        <div className="flex items-center gap-1">
-                          {selectedItem.complianceStandards.map(comp => (
-                            <span key={comp} className="text-[10px] px-2 py-0.2 rounded bg-emerald-950/40 text-emerald-400 border border-emerald-800/40 font-mono">
-                              {comp}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      <div className="flex items-center gap-1">
-                        {selectedItem.tags.map(t => (
-                          <span key={t} className="text-[10px] font-mono text-zinc-500">#{t}</span>
-                        ))}
-                      </div>
+                    <h2 className="text-lg font-bold text-white line-clamp-1">{selectedControl.name}</h2>
+                    <div className="flex items-center gap-2 text-xs text-zinc-400 mt-0.5">
+                      <span className="uppercase tracking-wider font-semibold text-emerald-400">{selectedControl.category}</span>
+                      <span>•</span>
+                      <span>Revisão: v{selectedControl.revision}</span>
+                      <span>•</span>
+                      <span>Responsável: {selectedControl.owner}</span>
                     </div>
                   </div>
                 </div>
 
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => copyToClipboard(
+                      `# ${selectedControl.control_code} - ${selectedControl.name}\n\n## Descrição\n${selectedControl.description}\n\n## Rationale\n${selectedControl.rationale}\n\n## Implementação\n${selectedControl.implementation}\n\n## Validação\n${selectedControl.validation_method}`,
+                      selectedControl.control_code
+                    )}
+                    className="p-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition-colors"
+                    title="Copiar Diretriz Completa em Markdown"
+                  >
+                    <Copy className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setSelectedControl(null)}
+                    className="p-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Abas do Modal */}
+              <div className="flex items-center gap-2 px-6 pt-3 border-b border-zinc-800/80 bg-zinc-950/30 text-xs overflow-x-auto">
                 <button
-                  onClick={() => setSelectedItem(null)}
-                  className="p-2 rounded-xl text-zinc-400 hover:text-foreground hover:bg-white/5 cursor-pointer transition-colors"
-                  title="Fechar modal"
+                  onClick={() => setActiveModalTab('overview')}
+                  className={`pb-3 px-3 font-semibold border-b-2 transition-all ${
+                    activeModalTab === 'overview'
+                      ? 'border-emerald-500 text-emerald-400'
+                      : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                  }`}
                 >
-                  <X size={18} />
+                  Visão Geral & Rationale
+                </button>
+                <button
+                  onClick={() => setActiveModalTab('implementation')}
+                  className={`pb-3 px-3 font-semibold border-b-2 transition-all ${
+                    activeModalTab === 'implementation'
+                      ? 'border-emerald-500 text-emerald-400'
+                      : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  Implementação & Validação
+                </button>
+                <button
+                  onClick={() => setActiveModalTab('evidence')}
+                  className={`pb-3 px-3 font-semibold border-b-2 transition-all flex items-center gap-1.5 ${
+                    activeModalTab === 'evidence'
+                      ? 'border-emerald-500 text-emerald-400'
+                      : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  Evidências Técnicas ({controlEvidences.length})
+                </button>
+                <button
+                  onClick={() => setActiveModalTab('exceptions')}
+                  className={`pb-3 px-3 font-semibold border-b-2 transition-all flex items-center gap-1.5 ${
+                    activeModalTab === 'exceptions'
+                      ? 'border-emerald-500 text-emerald-400'
+                      : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  Exceções & Riscos ({controlExceptions.length})
+                </button>
+                <button
+                  onClick={() => setActiveModalTab('audit')}
+                  className={`pb-3 px-3 font-semibold border-b-2 transition-all flex items-center gap-1.5 ${
+                    activeModalTab === 'audit'
+                      ? 'border-emerald-500 text-emerald-400'
+                      : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  Trilha de Auditoria ({controlAuditEvents.length})
                 </button>
               </div>
 
-              {/* Barra de Ferramentas do Documento Explicativo */}
-              <div className="px-6 py-3 border-b border-zinc-800/60 bg-zinc-900/40 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
-                    <FileText size={14} className="text-primary" />
-                    Documento Explicativo & Diretriz de Aplicação
-                  </span>
-                </div>
+              {/* Corpo do Modal */}
+              <div className="p-6 overflow-y-auto flex-1 space-y-6">
+                {activeModalTab === 'overview' && (
+                  <div className="space-y-6">
+                    {/* Metadados Rápidos */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 rounded-2xl bg-zinc-950 border border-zinc-800/80 text-xs">
+                      <div>
+                        <div className="text-zinc-500 font-medium">Severidade</div>
+                        <div className="mt-1 font-bold capitalize text-white">{selectedControl.severity}</div>
+                      </div>
+                      <div>
+                        <div className="text-zinc-500 font-medium">Status Operacional</div>
+                        <div className="mt-1 font-bold capitalize text-emerald-400">{selectedControl.status}</div>
+                      </div>
+                      <div>
+                        <div className="text-zinc-500 font-medium">Última Verificação</div>
+                        <div className="mt-1 text-zinc-300">
+                          {selectedControl.last_verified_at ? new Date(selectedControl.last_verified_at).toLocaleDateString('pt-BR') : 'Pendente'}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-zinc-500 font-medium">Próxima Revisão</div>
+                        <div className="mt-1 text-zinc-300">
+                          {selectedControl.next_review_at ? new Date(selectedControl.next_review_at).toLocaleDateString('pt-BR') : 'Não agendada'}
+                        </div>
+                      </div>
+                    </div>
 
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center bg-zinc-900 rounded-lg p-0.5 border border-zinc-800 text-xs">
-                    <button
-                      onClick={() => setPreviewMode('preview')}
-                      className={`flex items-center gap-1.5 px-3 py-1 rounded-md transition-colors cursor-pointer ${
-                        previewMode === 'preview' ? 'bg-zinc-800 text-primary font-semibold' : 'text-zinc-400 hover:text-zinc-200'
-                      }`}
-                    >
-                      <Eye size={13} />
-                      Visualizar
-                    </button>
-                    <button
-                      onClick={() => setPreviewMode('edit')}
-                      className={`flex items-center gap-1.5 px-3 py-1 rounded-md transition-colors cursor-pointer ${
-                        previewMode === 'edit' ? 'bg-zinc-800 text-primary font-semibold' : 'text-zinc-400 hover:text-zinc-200'
-                      }`}
-                    >
-                      <Code2 size={13} />
-                      Editar
-                    </button>
-                  </div>
+                    {/* Descrição */}
+                    <div>
+                      <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Descrição Completa</h4>
+                      <p className="text-sm text-zinc-200 leading-relaxed bg-zinc-950/60 p-4 rounded-2xl border border-zinc-800/60 whitespace-pre-wrap">
+                        {selectedControl.description}
+                      </p>
+                    </div>
 
-                  <button
-                    onClick={() => handleCopyDocument(documentEditorContent)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-zinc-100 text-xs font-medium cursor-pointer transition-colors"
-                    title="Copiar documento"
-                  >
-                    {copiedDocument ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
-                    <span>{copiedDocument ? 'Copiado!' : 'Copiar'}</span>
-                  </button>
-
-                  {previewMode === 'edit' && (
-                    <button
-                      onClick={handleSaveDocumentContent}
-                      disabled={isSavingDocument}
-                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold cursor-pointer transition-all shadow-md shadow-primary/20"
-                    >
-                      <Save size={13} />
-                      {isSavingDocument ? 'Salvando...' : 'Salvar Alterações'}
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Conteúdo do Documento */}
-              <div className="flex-1 overflow-y-auto p-6 sm:p-8 bg-zinc-950">
-                {previewMode === 'preview' ? (
-                  <div className="max-w-3xl mx-auto">
-                    {renderMarkdownPreview(documentEditorContent)}
-                  </div>
-                ) : (
-                  <div className="h-full flex flex-col">
-                    <textarea
-                      value={documentEditorContent}
-                      onChange={e => setDocumentEditorContent(e.target.value)}
-                      placeholder="Escreva a documentação explicativa e as diretrizes práticas de aplicação nos projetos..."
-                      rows={18}
-                      className="w-full h-full min-h-[420px] p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 text-xs text-foreground font-mono leading-relaxed focus:outline-none focus:border-primary/50 resize-y"
-                    />
+                    {/* Rationale / Justificativa */}
+                    <div>
+                      <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Justificativa & Risco Mitigado (Rationale)</h4>
+                      <div className="text-sm text-zinc-200 leading-relaxed bg-zinc-950/60 p-4 rounded-2xl border border-zinc-800/60 flex items-start gap-3">
+                        <Info className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                        <div>{selectedControl.rationale}</div>
+                      </div>
+                    </div>
                   </div>
                 )}
-              </div>
 
-              {/* Rodapé do Modal */}
-              <div className="px-6 py-3.5 border-t border-zinc-800 bg-zinc-900/60 flex items-center justify-between text-xs text-zinc-500">
-                <div className="flex items-center gap-2">
-                  <span>Atualizado em: {new Date(selectedItem.updatedAt).toLocaleDateString('pt-BR')}</span>
-                </div>
+                {activeModalTab === 'implementation' && (
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
+                      <span className="text-xs text-zinc-400">
+                        {isEditing ? 'Modo de Edição com Concorrência Otimista (expected_revision)' : 'Especificação Técnica'}
+                      </span>
+                      <button
+                        onClick={() => setIsEditing(!isEditing)}
+                        className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 underline"
+                      >
+                        {isEditing ? 'Cancelar Edição' : 'Editar Especificação'}
+                      </button>
+                    </div>
 
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => handleDeleteSecurityItem(selectedItem.id, selectedItem.name)}
-                    className="flex items-center gap-1 text-xs text-zinc-500 hover:text-rose-400 cursor-pointer transition-colors"
-                  >
-                    <Trash2 size={13} />
-                    Excluir Diretriz
-                  </button>
-                  <button
-                    onClick={() => setSelectedItem(null)}
-                    className="px-4 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium cursor-pointer transition-colors"
-                  >
-                    Fechar
-                  </button>
-                </div>
+                    {isEditing ? (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-xs font-medium text-zinc-400 mb-1">Implementação Técnica</label>
+                          <textarea
+                            rows={6}
+                            value={editForm.implementation || ''}
+                            onChange={e => setEditForm({ ...editForm, implementation: e.target.value })}
+                            className="w-full p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-white font-mono focus:border-emerald-500/60 focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-zinc-400 mb-1">Método Empírico de Validação</label>
+                          <textarea
+                            rows={4}
+                            value={editForm.validation_method || ''}
+                            onChange={e => setEditForm({ ...editForm, validation_method: e.target.value })}
+                            className="w-full p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-white font-mono focus:border-emerald-500/60 focus:outline-none"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-medium text-zinc-400 mb-1">Status</label>
+                            <select
+                              value={editForm.status}
+                              onChange={e => setEditForm({ ...editForm, status: e.target.value as any })}
+                              className="w-full p-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-white"
+                            >
+                              <option value="planned">Planejado</option>
+                              <option value="in_progress">Em Progresso</option>
+                              <option value="implemented">Implementado</option>
+                              <option value="verified">Verificado</option>
+                              <option value="exception">Exceção</option>
+                              <option value="not_applicable">Não Aplicável</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-zinc-400 mb-1">Responsável</label>
+                            <input
+                              type="text"
+                              value={editForm.owner || ''}
+                              onChange={e => setEditForm({ ...editForm, owner: e.target.value })}
+                              className="w-full p-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-white"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="pt-2 flex justify-end">
+                          <button
+                            onClick={handleSaveControl}
+                            disabled={isSaving}
+                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white shadow-lg shadow-emerald-950/40"
+                          >
+                            <Save className="w-4 h-4" />
+                            {isSaving ? 'Gravando...' : `Salvar Alterações (v${selectedControl.revision} -> v${selectedControl.revision + 1})`}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div>
+                          <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Detalhamento da Implementação Técnica</h4>
+                          <div className="text-xs text-zinc-200 font-mono leading-relaxed bg-zinc-950 p-4 rounded-2xl border border-zinc-800/80 whitespace-pre-wrap">
+                            {selectedControl.implementation}
+                          </div>
+                        </div>
+
+                        <div>
+                          <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Método de Teste e Validação</h4>
+                          <div className="text-xs text-zinc-200 font-mono leading-relaxed bg-zinc-950 p-4 rounded-2xl border border-zinc-800/80 whitespace-pre-wrap">
+                            {selectedControl.validation_method}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {activeModalTab === 'evidence' && (
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Evidências Registradas</h4>
+                      <button
+                        onClick={() => setIsCreatingEvidence(!isCreatingEvidence)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-emerald-400 transition-colors"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        Anexar Evidência
+                      </button>
+                    </div>
+
+                    {isCreatingEvidence && (
+                      <form onSubmit={handleCreateEvidence} className="p-4 rounded-2xl bg-zinc-950 border border-emerald-500/30 space-y-3">
+                        <h5 className="text-xs font-bold text-emerald-400">Nova Evidência de Conformidade</h5>
+                        <input
+                          type="text"
+                          placeholder="Título da evidência (ex: Relatório de Penetration Testing)"
+                          value={newEvidenceTitle}
+                          onChange={e => setNewEvidenceTitle(e.target.value)}
+                          className="w-full p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-white"
+                          required
+                        />
+                        <textarea
+                          placeholder="Descrição do teste realizado e resultados obtidos..."
+                          rows={3}
+                          value={newEvidenceDesc}
+                          onChange={e => setNewEvidenceDesc(e.target.value)}
+                          className="w-full p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-white"
+                          required
+                        />
+                        <div className="grid grid-cols-2 gap-3">
+                          <select
+                            value={newEvidenceType}
+                            onChange={e => setNewEvidenceType(e.target.value)}
+                            className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-white"
+                          >
+                            <option value="report">Relatório Técnico</option>
+                            <option value="log">Log de Execução</option>
+                            <option value="metric">Métrica / Telemetria</option>
+                            <option value="config">Arquivo de Configuração</option>
+                            <option value="screenshot">Captura / Comprovante</option>
+                            <option value="code">Código / Teste</option>
+                            <option value="other">Outro</option>
+                          </select>
+                          <input
+                            type="text"
+                            placeholder="Dados sanitizados ou resumo técnico..."
+                            value={newEvidenceData}
+                            onChange={e => setNewEvidenceData(e.target.value)}
+                            className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-white"
+                          />
+                        </div>
+                        <div className="flex justify-end gap-2 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => setIsCreatingEvidence(false)}
+                            className="px-3 py-1.5 rounded-xl text-xs text-zinc-400 hover:text-white"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            type="submit"
+                            className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white"
+                          >
+                            Gravar Evidência
+                          </button>
+                        </div>
+                      </form>
+                    )}
+
+                    {controlEvidences.length === 0 ? (
+                      <div className="text-center py-10 text-zinc-500 text-xs">
+                        Nenhuma evidência técnica anexada até o momento.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {controlEvidences.map(ev => (
+                          <div key={ev.id} className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800/80 text-xs space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-white text-sm">{ev.title}</span>
+                              <span className="font-mono text-[10px] text-zinc-500">
+                                {new Date(ev.created_at).toLocaleString('pt-BR')}
+                              </span>
+                            </div>
+                            <p className="text-zinc-300">{ev.description}</p>
+                            <div className="pt-2 flex items-center justify-between border-t border-zinc-900 text-[11px] text-zinc-500">
+                              <span>Tipo: {ev.evidence_type}</span>
+                              <span className="font-mono text-emerald-400/80">SHA-256: {ev.hash.slice(0, 16)}...</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {activeModalTab === 'exceptions' && (
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Histórico de Exceções & Riscos</h4>
+                      <button
+                        onClick={() => setIsCreatingException(!isCreatingException)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-purple-400 transition-colors"
+                      >
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        Registrar Exceção
+                      </button>
+                    </div>
+
+                    {isCreatingException && (
+                      <form onSubmit={handleCreateException} className="p-4 rounded-2xl bg-zinc-950 border border-purple-500/30 space-y-3">
+                        <h5 className="text-xs font-bold text-purple-400">Nova Exceção de Segurança / Risco Aceito</h5>
+                        <textarea
+                          placeholder="Justificativa técnica detalhada e impacto de risco aceito..."
+                          rows={3}
+                          value={newExceptionReason}
+                          onChange={e => setNewExceptionReason(e.target.value)}
+                          className="w-full p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-white"
+                          required
+                        />
+                        <div className="grid grid-cols-2 gap-3">
+                          <input
+                            type="text"
+                            placeholder="Aprovador (ex: Diretor de Segurança)"
+                            value={newExceptionApprover}
+                            onChange={e => setNewExceptionApprover(e.target.value)}
+                            className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-white"
+                            required
+                          />
+                          <select
+                            value={newExceptionDays}
+                            onChange={e => setNewExceptionDays(e.target.value)}
+                            className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-white"
+                          >
+                            <option value="15">Expira em 15 dias</option>
+                            <option value="30">Expira em 30 dias</option>
+                            <option value="60">Expira em 60 dias</option>
+                            <option value="90">Expira em 90 dias (máximo)</option>
+                          </select>
+                        </div>
+                        <div className="flex justify-end gap-2 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => setIsCreatingException(false)}
+                            className="px-3 py-1.5 rounded-xl text-xs text-zinc-400 hover:text-white"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            type="submit"
+                            className="px-4 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-xs font-semibold text-white"
+                          >
+                            Aprovar Exceção
+                          </button>
+                        </div>
+                      </form>
+                    )}
+
+                    {controlExceptions.length === 0 ? (
+                      <div className="text-center py-10 text-zinc-500 text-xs">
+                        Nenhuma exceção registrada para este controle.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {controlExceptions.map(ex => (
+                          <div key={ex.id} className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800/80 text-xs space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-purple-300">Aprovado por: {ex.approved_by}</span>
+                              <span className={`px-2 py-0.5 rounded-full font-semibold text-[10px] ${
+                                ex.status === 'active' ? 'bg-purple-500/20 text-purple-300' : 'bg-emerald-500/20 text-emerald-300'
+                              }`}>
+                                {ex.status === 'active' ? 'Ativa' : 'Resolvida'}
+                              </span>
+                            </div>
+                            <p className="text-zinc-300">{ex.reason}</p>
+                            <div className="pt-2 flex items-center justify-between border-t border-zinc-900 text-[11px] text-zinc-500">
+                              <span>Vence em: {new Date(ex.expires_at).toLocaleDateString('pt-BR')}</span>
+                              {ex.status === 'active' && (
+                                <button
+                                  onClick={() => setResolvingExceptionId(ex.id)}
+                                  className="text-xs text-emerald-400 hover:underline font-semibold"
+                                >
+                                  Resolver Exceção
+                                </button>
+                              )}
+                            </div>
+
+                            {resolvingExceptionId === ex.id && (
+                              <div className="mt-3 pt-3 border-t border-zinc-800 space-y-2">
+                                <input
+                                  type="text"
+                                  placeholder="Notas da resolução / medidas adotadas..."
+                                  value={resolutionNotes}
+                                  onChange={e => setResolutionNotes(e.target.value)}
+                                  className="w-full p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-white"
+                                />
+                                <div className="flex justify-end gap-2">
+                                  <button
+                                    onClick={() => setResolvingExceptionId(null)}
+                                    className="px-2.5 py-1 text-xs text-zinc-400"
+                                  >
+                                    Cancelar
+                                  </button>
+                                  <button
+                                    onClick={() => handleResolveException(ex.id)}
+                                    className="px-3 py-1 rounded-lg bg-emerald-600 text-xs font-semibold text-white"
+                                  >
+                                    Confirmar Resolução
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {activeModalTab === 'audit' && (
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Trilha Imutável de Auditoria (Append-Only)</h4>
+                    {controlAuditEvents.length === 0 ? (
+                      <div className="text-center py-10 text-zinc-500 text-xs">
+                        Nenhum evento registrado nesta sessão.
+                      </div>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {controlAuditEvents.map(evt => (
+                          <div key={evt.id} className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800/60 text-xs flex flex-col gap-1">
+                            <div className="flex items-center justify-between">
+                              <span className="font-mono text-emerald-400 font-bold">{evt.event_type}</span>
+                              <span className="text-[10px] text-zinc-500 font-mono">
+                                {new Date(evt.created_at).toLocaleString('pt-BR')}
+                              </span>
+                            </div>
+                            <div className="text-zinc-400 text-[11px]">
+                              Ator: <span className="text-zinc-200">{evt.actor}</span> • Origem: <span className="text-zinc-200">{evt.ip_origin}</span>
+                            </div>
+                            {evt.diff && (
+                              <pre className="mt-1 p-2 rounded-lg bg-zinc-900 text-[10px] text-zinc-400 font-mono overflow-x-auto">
+                                {JSON.stringify(evt.diff, null, 2)}
+                              </pre>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* Modal de Cadastrar Nova Diretriz de Segurança (Sem Arquivos) */}
+      {/* Modal de Criação de Novo Controle */}
       <AnimatePresence>
         {isCreateModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl bg-zinc-950 border border-zinc-800 p-6 sm:p-8 shadow-2xl space-y-6"
+              className="bg-zinc-900 border border-zinc-800 rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
             >
-              <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
+              <div className="p-6 border-b border-zinc-800 flex items-center justify-between bg-zinc-950/60">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
-                    <ShieldCheck size={20} />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-foreground">Nova Diretriz de Segurança</h3>
-                    <p className="text-xs text-zinc-400">Cadastre um documento explicativo para consulta e aplicação nos projetos.</p>
-                  </div>
+                  <span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
+                    <Plus className="w-5 h-5" />
+                  </span>
+                  <h3 className="text-base font-bold text-white">Novo Controle de Segurança Corporativa</h3>
                 </div>
-                <button
-                  onClick={() => setIsCreateModalOpen(false)}
-                  className="p-1 rounded-lg text-zinc-400 hover:text-foreground cursor-pointer"
-                >
-                  <X size={18} />
+                <button onClick={() => setIsCreateModalOpen(false)} className="text-zinc-500 hover:text-white">
+                  <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <form onSubmit={handleCreateSecuritySubmit} className="space-y-4">
+              <form onSubmit={handleCreateNewControl} className="p-6 overflow-y-auto space-y-4 text-xs">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block font-medium text-zinc-400 mb-1">Código do Controle (SEC-XXX)</label>
+                    <input
+                      type="text"
+                      placeholder="ex: SEC-101"
+                      value={createCode}
+                      onChange={e => setCreateCode(e.target.value)}
+                      className="w-full p-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-white font-mono"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-medium text-zinc-400 mb-1">Categoria</label>
+                    <select
+                      value={createCategory}
+                      onChange={e => setCreateCategory(e.target.value as any)}
+                      className="w-full p-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-white"
+                    >
+                      <option value="rede">Rede</option>
+                      <option value="trafego">Tráfego & TLS</option>
+                      <option value="api">API & CORS</option>
+                      <option value="autenticacao">Autenticação & MFA</option>
+                      <option value="dados">Dados & LGPD</option>
+                      <option value="infraestrutura">Infraestrutura</option>
+                      <option value="aplicacao">Aplicação</option>
+                      <option value="monitoramento">Monitoramento</option>
+                      <option value="incidentes">Incidentes & DR</option>
+                      <option value="governanca">Governança</option>
+                    </select>
+                  </div>
+                </div>
+
                 <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1">
-                    Nome da Diretriz / Método de Segurança
-                  </label>
+                  <label className="block font-medium text-zinc-400 mb-1">Nome do Controle</label>
                   <input
                     type="text"
+                    placeholder="ex: Rotação Automatizada de Certificados SSL"
+                    value={createName}
+                    onChange={e => setCreateName(e.target.value)}
+                    className="w-full p-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-white"
                     required
-                    placeholder="Ex: Proteção contra Injeção de SQL e Sanitização Zod"
-                    value={newName}
-                    onChange={e => setNewName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-foreground focus:outline-none focus:border-primary/50"
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs font-medium text-zinc-400 mb-1">Categoria Técnica</label>
+                    <label className="block font-medium text-zinc-400 mb-1">Severidade</label>
                     <select
-                      value={newCategory}
-                      onChange={e => setNewCategory(e.target.value as any)}
-                      aria-label="Categoria técnica de segurança"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-foreground focus:outline-none focus:border-primary/50"
+                      value={createSeverity}
+                      onChange={e => setCreateSeverity(e.target.value as any)}
+                      className="w-full p-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-white"
                     >
-                      <option value="hardening">Hardening & Headers</option>
-                      <option value="autenticacao">Autenticação & MFA</option>
-                      <option value="criptografia">Criptografia & Cofre</option>
-                      <option value="banco_de_dados">Banco de Dados & RLS</option>
-                      <option value="conformidade">Conformidade & LGPD</option>
-                      <option value="rede_api">Rede & Anti-SSRF</option>
-                      <option value="auditoria">Auditoria & Logs</option>
+                      <option value="critical">Crítico</option>
+                      <option value="high">Alto</option>
+                      <option value="medium">Médio</option>
+                      <option value="low">Baixo</option>
                     </select>
                   </div>
-
                   <div>
-                    <label className="block text-xs font-medium text-zinc-400 mb-1">Nível de Severidade / Impacto</label>
+                    <label className="block font-medium text-zinc-400 mb-1">Status</label>
                     <select
-                      value={newSeverity}
-                      onChange={e => setNewSeverity(e.target.value as any)}
-                      aria-label="Nível de severidade ou impacto de segurança"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-foreground focus:outline-none focus:border-primary/50"
+                      value={createStatus}
+                      onChange={e => setCreateStatus(e.target.value as any)}
+                      className="w-full p-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-white"
                     >
-                      <option value="critico">Crítico</option>
-                      <option value="alto">Alto</option>
-                      <option value="medio">Médio</option>
-                      <option value="baixo">Baixo</option>
-                      <option value="informativo">Informativo</option>
+                      <option value="planned">Planejado</option>
+                      <option value="in_progress">Em Progresso</option>
+                      <option value="implemented">Implementado</option>
+                      <option value="verified">Verificado</option>
+                      <option value="exception">Exceção</option>
                     </select>
+                  </div>
+                  <div>
+                    <label className="block font-medium text-zinc-400 mb-1">Responsável</label>
+                    <input
+                      type="text"
+                      value={createOwner}
+                      onChange={e => setCreateOwner(e.target.value)}
+                      className="w-full p-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-white"
+                    />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1">Resumo Conciso</label>
+                  <label className="block font-medium text-zinc-400 mb-1">Descrição</label>
+                  <textarea
+                    rows={3}
+                    placeholder="Descreva o que o controle realiza..."
+                    value={createDesc}
+                    onChange={e => setCreateDesc(e.target.value)}
+                    className="w-full p-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-white"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-medium text-zinc-400 mb-1">Justificativa & Risco Mitigado (Rationale)</label>
                   <textarea
                     rows={2}
+                    placeholder="Por que este controle é essencial..."
+                    value={createRationale}
+                    onChange={e => setCreateRationale(e.target.value)}
+                    className="w-full p-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-white"
                     required
-                    placeholder="Explicação rápida do objetivo desta diretriz..."
-                    value={newDesc}
-                    onChange={e => setNewDesc(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-foreground focus:outline-none focus:border-primary/50"
                   />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium text-zinc-400 mb-1">
-                      Normas de Conformidade (separadas por vírgula)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="LGPD, OWASP Top 10, NIST SP 800-53"
-                      value={newCompliance}
-                      onChange={e => setNewCompliance(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-foreground focus:outline-none focus:border-primary/50"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-zinc-400 mb-1">
-                      Tags de Indexação (separadas por vírgula)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="sql, sanitizacao, prisma, zod"
-                      value={newTags}
-                      onChange={e => setNewTags(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-foreground focus:outline-none focus:border-primary/50"
-                    />
-                  </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1">
-                    Documento Explicativo (Como funciona e como aplicar nos projetos)
-                  </label>
+                  <label className="block font-medium text-zinc-400 mb-1">Implementação Técnica</label>
                   <textarea
-                    rows={8}
-                    placeholder={`# Nome da Diretriz\n\n## 1. Visão Geral\nExplicação de como funciona o método...\n\n## 2. Como Aplicar nos Projetos\nInstruções práticas de implementação...`}
-                    value={newDocumentContent}
-                    onChange={e => setNewDocumentContent(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-foreground font-mono focus:outline-none focus:border-primary/50 leading-relaxed"
+                    rows={3}
+                    placeholder="Instruções de como aplicar no projeto/código..."
+                    value={createImplementation}
+                    onChange={e => setCreateImplementation(e.target.value)}
+                    className="w-full p-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-white font-mono"
+                    required
                   />
                 </div>
 
-                <div className="flex items-center justify-end gap-3 pt-4 border-t border-zinc-800">
+                <div>
+                  <label className="block font-medium text-zinc-400 mb-1">Método de Validação e Teste</label>
+                  <input
+                    type="text"
+                    placeholder="Como comprovar que o controle funciona (ex: comando curl, teste unitário)"
+                    value={createValidation}
+                    onChange={e => setCreateValidation(e.target.value)}
+                    className="w-full p-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-white font-mono"
+                    required
+                  />
+                </div>
+
+                <div className="pt-4 flex justify-end gap-3 border-t border-zinc-800">
                   <button
                     type="button"
                     onClick={() => setIsCreateModalOpen(false)}
-                    className="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold cursor-pointer"
+                    className="px-4 py-2 rounded-xl text-zinc-400 hover:text-white"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
-                    disabled={isSubmitting}
-                    className="px-5 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold shadow-lg shadow-primary/20 cursor-pointer"
+                    disabled={isCreatingControl}
+                    className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 font-semibold text-white shadow-lg shadow-emerald-950/40"
                   >
-                    {isSubmitting ? 'Cadastrando...' : 'Cadastrar Diretriz'}
+                    {isCreatingControl ? 'Cadastrando...' : 'Criar Controle'}
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal de Importação em Massa (Preview & Commit) */}
+      <AnimatePresence>
+        {isImportModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-zinc-900 border border-zinc-800 rounded-3xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
+            >
+              <div className="p-6 border-b border-zinc-800 flex items-center justify-between bg-zinc-950/60">
+                <div className="flex items-center gap-3">
+                  <span className="p-2 rounded-xl bg-zinc-800 text-zinc-300">
+                    <UploadCloud className="w-5 h-5 text-emerald-400" />
+                  </span>
+                  <div>
+                    <h3 className="text-base font-bold text-white">Importação em Massa (Preview & Commit)</h3>
+                    <p className="text-xs text-zinc-400">Validação em duas etapas: análise prévia com diff sem gravação, commit sob confirmação.</p>
+                  </div>
+                </div>
+                <button onClick={() => { setIsImportModalOpen(false); setImportPreviewResult(null); }} className="text-zinc-500 hover:text-white">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-6 overflow-y-auto space-y-4 text-xs">
+                <div>
+                  <label className="block font-medium text-zinc-400 mb-1">
+                    Cole o JSON com a lista de controles (Array de objetos):
+                  </label>
+                  <textarea
+                    rows={8}
+                    placeholder='[{"control_code": "SEC-001", "name": "...", "category": "rede", "description": "...", "rationale": "...", "implementation": "...", "validation_method": "..."}]'
+                    value={importJsonText}
+                    onChange={e => setImportJsonText(e.target.value)}
+                    className="w-full p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-white font-mono focus:border-emerald-500/50 focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <button
+                    onClick={handleImportPreview}
+                    disabled={isProcessingImport || !importJsonText.trim()}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-semibold transition-all"
+                  >
+                    <Eye className="w-4 h-4 text-emerald-400" />
+                    {isProcessingImport ? 'Analisando...' : '1. Gerar Prévia (Preview)'}
+                  </button>
+
+                  {importPreviewResult?.ok && (
+                    <button
+                      onClick={handleImportCommit}
+                      disabled={isProcessingImport}
+                      className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-lg shadow-emerald-950/40 transition-all"
+                    >
+                      <Check className="w-4 h-4" />
+                      2. Confirmar Gravação (Commit)
+                    </button>
+                  )}
+                </div>
+
+                {/* Exibição do Resultado da Prévia */}
+                {importPreviewResult && (
+                  <div className={`p-4 rounded-2xl border text-xs space-y-3 ${
+                    importPreviewResult.ok
+                      ? 'bg-emerald-950/20 border-emerald-500/30'
+                      : 'bg-rose-950/20 border-rose-500/30'
+                  }`}>
+                    <div className="font-bold text-sm flex items-center justify-between">
+                      <span className={importPreviewResult.ok ? 'text-emerald-300' : 'text-rose-300'}>
+                        {importPreviewResult.ok ? 'Prévia Aprovada com Sucesso' : 'Falha na Validação do Lote'}
+                      </span>
+                      <span className="text-zinc-400 font-normal">
+                        Total: {importPreviewResult.total_items} controles
+                      </span>
+                    </div>
+                    <p className="text-zinc-300">{importPreviewResult.summary}</p>
+
+                    {importPreviewResult.ok ? (
+                      <div className="grid grid-cols-3 gap-2 pt-2 border-t border-zinc-800 text-center font-semibold">
+                        <div className="bg-zinc-900/60 p-2 rounded-lg text-emerald-400">
+                          {importPreviewResult.to_create_count} Novos
+                        </div>
+                        <div className="bg-zinc-900/60 p-2 rounded-lg text-amber-400">
+                          {importPreviewResult.to_update_count} Atualizações
+                        </div>
+                        <div className="bg-zinc-900/60 p-2 rounded-lg text-zinc-400">
+                          {importPreviewResult.unchanged_count} Inalterados
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5 pt-2 border-t border-rose-500/20">
+                        {importPreviewResult.validation_errors.map((err: any, i: number) => (
+                          <div key={i} className="text-rose-400 font-mono text-[11px]">
+                            Item #{err.index + 1} ({err.control_code || 'sem código'}): {err.errors.join(', ')}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </motion.div>
           </div>
         )}
