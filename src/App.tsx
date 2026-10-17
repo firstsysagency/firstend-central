@@ -9,13 +9,15 @@ import {
   PanelLeftClose, 
   PanelLeftOpen,
   Bot,
-  Sparkles
+  Sparkles,
+  ShieldCheck
 } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import NewConnection from './pages/NewConnection';
 import Settings from './pages/Settings';
 import McpZatten from './pages/McpZatten';
 import Skills from './pages/Skills';
+import Security from './pages/Security';
 import Login from './pages/Login';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Navigate } from 'react-router-dom';
@@ -81,6 +83,13 @@ function Layout() {
               icon={<Sparkles size={18} />} 
               label="Skills" 
               active={location.pathname === '/skills'} 
+              isCollapsed={isCollapsed}
+            />
+            <NavLink 
+              to="/security" 
+              icon={<ShieldCheck size={18} />} 
+              label="Segurança" 
+              active={location.pathname === '/security'} 
               isCollapsed={isCollapsed}
             />
             <NavLink 
@@ -174,6 +183,7 @@ function App() {
             <Route path="new" element={<NewConnection />} />
             <Route path="mcp" element={<McpZatten />} />
             <Route path="skills" element={<Skills />} />
+            <Route path="security" element={<Security />} />
             <Route path="settings" element={<Settings />} />
           </Route>
         </Routes>

@@ -161,7 +161,40 @@ export const OAUTH_SCOPES = [
   'tool:firstsys_skills_audit_list',
   'tool:firstsys_skills_dependencies_list',
   'tool:firstsys_skills_permissions_get',
-  'tool:firstsys_skills_permissions_update'
+  'tool:firstsys_skills_permissions_update',
+
+  // Escopos de Segurança Corporativa Firstsys
+  'security:read',
+  'security:write',
+  'security:manage',
+  'firstsys_security_list',
+  'firstsys_security_get',
+  'firstsys_security_create',
+  'firstsys_security_update',
+  'firstsys_security_delete',
+  'firstsys_security_tag_add',
+  'firstsys_security_tag_remove',
+  'firstsys_security_files_list',
+  'firstsys_security_files_get',
+  'firstsys_security_files_save',
+  'firstsys_security_files_delete',
+  'firstsys_security_files_restore',
+  'firstsys_security_audit_list',
+
+  // Prefixo tool: para ferramentas de segurança
+  'tool:firstsys_security_list',
+  'tool:firstsys_security_get',
+  'tool:firstsys_security_create',
+  'tool:firstsys_security_update',
+  'tool:firstsys_security_delete',
+  'tool:firstsys_security_tag_add',
+  'tool:firstsys_security_tag_remove',
+  'tool:firstsys_security_files_list',
+  'tool:firstsys_security_files_get',
+  'tool:firstsys_security_files_save',
+  'tool:firstsys_security_files_delete',
+  'tool:firstsys_security_files_restore',
+  'tool:firstsys_security_audit_list'
 ] as const;
 
 export type OAuthScope = typeof OAUTH_SCOPES[number] | string;

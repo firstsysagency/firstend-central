@@ -108,6 +108,41 @@ for (const skill of skillsList) {
 }
 console.log(`✅ Pasta skills/*/SKILL.md gerada com YAML frontmatter estrito para ${skillsList.length} skills.`);
 
+// 3.1 ESTRUTURA DE MÉTODOS DE SEGURANÇA CORPORATIVA (security/*/SECURITY.md)
+let securityList: any[] = [];
+if (fs.existsSync(dbPath)) {
+  try {
+    const db = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+    securityList = db.security_items || [];
+  } catch (e) {
+    console.error('Erro ao ler security_items do db.json', e);
+  }
+}
+
+const securityBaseDir = path.join(OUTPUT_DIR, 'security');
+fs.mkdirSync(securityBaseDir, { recursive: true });
+
+for (const sec of securityList) {
+  const canonicalSlug = (sec.slug || sec.id || '')
+    .toLowerCase()
+    .replace(/^sec_/, '')
+    .replace(/_/g, '-')
+    .trim();
+
+  if (!canonicalSlug) continue;
+
+  const secFolder = path.join(securityBaseDir, canonicalSlug);
+  fs.mkdirSync(secFolder, { recursive: true });
+
+  for (const file of sec.files || []) {
+    if (file.deletedAt) continue;
+    const fileName = file.name.startsWith('/') ? file.name.substring(1) : file.name;
+    const fileContent = file.content || '';
+    fs.writeFileSync(path.join(secFolder, fileName), fileContent, 'utf8');
+  }
+}
+console.log(`✅ Pasta security/*/SECURITY.md gerada para ${securityList.length} tecnologias e métodos de segurança.`);
+
 // 4. INSTRUCTIONS.MD
 const systemInstructions = `# Diretrizes Mestras do ChatGPT — Firstsys Zatten Central & Skills
 

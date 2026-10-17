@@ -24,6 +24,8 @@ import {
   updateSkill,
   deleteSkill,
   toggleInstallSkill,
+  addSkillTag,
+  removeSkillTag,
   listSkillFiles,
   getSkillFile,
   saveSkillFile,
@@ -44,13 +46,35 @@ import {
   fetchSelectedGitFiles
 } from './skills/gitImporter.js';
 import { seedInitialSkills } from './skills/seedSkills.js';
+import {
+  listSecurityItems,
+  getSecurityItem,
+  createSecurityItem,
+  updateSecurityItem,
+  deleteSecurityItem,
+  addSecurityTag,
+  removeSecurityTag,
+  listSecurityFiles,
+  getSecurityFile,
+  saveSecurityFile,
+  deleteSecurityFile,
+  restoreSecurityFile,
+  listSecurityAuditLogs
+} from './security/securityStore.js';
+import { seedInitialSecurity } from './security/seedSecurity.js';
 dotenv.config();
 
-// Inicialização e integridade do catálogo de skills
+// Inicialização e integridade do catálogo de skills e segurança
 try {
   seedInitialSkills();
 } catch (e) {
   console.warn('Alerta na inicialização do seed de skills:', e);
+}
+
+try {
+  seedInitialSecurity();
+} catch (e) {
+  console.warn('Alerta na inicialização do seed de segurança:', e);
 }
 
 // Helper de Hashing PBKDF2 com Salt Individual (Padrão NIST SP 800-132)
@@ -833,6 +857,286 @@ app.get('/api/skills/:id/audit', (req, res) => {
   try {
     const { id } = req.params;
     const logs = listSkillAuditLogs(id);
+    res.json({ success: true, logs, total: logs.length });
+  } catch (err: any) {
+    res.status(404).json({ error: err.message });
+  }
+});
+
+// 22. Adicionar Tag à Skill
+app.post('/api/skills/:id/tags', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { tag } = req.body;
+    if (!tag || typeof tag !== 'string') {
+      return res.status(400).json({ error: 'Tag inválida.' });
+    }
+    const updated = addSkillTag(id, tag, req.ip || 'admin');
+    res.json({ success: true, tags: updated.tags, skill: updated });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 23. Remover Tag da Skill
+app.delete('/api/skills/:id/tags/:tag', (req, res) => {
+  try {
+    const { id, tag } = req.params;
+    const updated = removeSkillTag(id, tag, req.ip || 'admin');
+    res.json({ success: true, tags: updated.tags, skill: updated });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ==============================================================================
+// === ROTAS REST DA BIBLIOTECA DE SEGURANÇA CORPORATIVA FIRSTSYS ===
+// ==============================================================================
+
+// 1. Listar tecnologias e métodos de segurança
+app.get('/api/security', (req, res) => {
+  try {
+    const { category, severity, status, q, tag } = req.query;
+    const items = listSecurityItems({
+      category: typeof category === 'string' ? category : undefined,
+      severity: typeof severity === 'string' ? severity : undefined,
+      status: typeof status === 'string' ? status : undefined,
+      query: typeof q === 'string' ? q : undefined,
+      tag: typeof tag === 'string' ? tag : undefined
+    });
+    res.json({ success: true, items, total: items.length });
+  } catch (err: any) {
+    console.error('Erro ao listar itens de segurança:', err);
+    res.status(500).json({ error: 'Erro ao carregar catálogo de segurança.', details: err.message });
+  }
+});
+
+// 2. Obter método de segurança por ID ou Slug
+app.get('/api/security/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const item = getSecurityItem(id);
+    if (!item) {
+      return res.status(404).json({ error: 'Método de segurança não encontrado.' });
+    }
+    const auditLogs = listSecurityAuditLogs(item.id);
+    res.json({ success: true, item, auditLogs });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 3. Cadastrar nova tecnologia / padrão de segurança
+app.post('/api/security', (req, res) => {
+  try {
+    const { name, description, detailedDescription, category, severity, complianceStandards, tags, initialContent, files } = req.body;
+    if (!name || typeof name !== 'string' || name.trim().length < 2) {
+      return res.status(400).json({ error: 'Nome do método de segurança é obrigatório (mínimo 2 caracteres).' });
+    }
+
+    const payload: any = {
+      name: name.trim(),
+      description: (description || '').trim(),
+      detailedDescription: (detailedDescription || '').trim(),
+      category: category || 'hardening',
+      severity: severity || 'medio',
+      complianceStandards: Array.isArray(complianceStandards) ? complianceStandards : [],
+      tags: Array.isArray(tags) ? tags : [],
+      files: []
+    };
+
+    if (Array.isArray(files) && files.length > 0) {
+      payload.files = files;
+    } else if (initialContent && typeof initialContent === 'string' && initialContent.trim().length > 0) {
+      payload.files = [
+        {
+          name: 'SECURITY.md',
+          path: 'SECURITY.md',
+          content: initialContent.trim()
+        }
+      ];
+    }
+
+    const newItem = createSecurityItem(payload, req.ip || 'admin');
+
+    logAuditEvent({
+      actor: 'usuario',
+      action: 'security.item.created',
+      category: 'security',
+      severity: 'info',
+      description: `Novo método de segurança '${newItem.name}' (${newItem.id}) cadastrado no catálogo.`,
+      ipAddress: req.ip || '127.0.0.1'
+    });
+
+    res.status(201).json({ success: true, item: newItem });
+  } catch (err: any) {
+    console.error('Erro ao criar item de segurança:', err);
+    res.status(400).json({ error: err.message || 'Erro ao cadastrar novo método de segurança.' });
+  }
+});
+
+// 4. Atualizar item de segurança
+app.put('/api/security/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description, detailedDescription, category, severity, complianceStandards, status } = req.body;
+
+    const patch: any = {};
+    if (name !== undefined) patch.name = String(name).trim();
+    if (description !== undefined) patch.description = String(description).trim();
+    if (detailedDescription !== undefined) patch.detailedDescription = String(detailedDescription).trim();
+    if (category !== undefined) patch.category = category;
+    if (severity !== undefined) patch.severity = severity;
+    if (complianceStandards !== undefined) patch.complianceStandards = Array.isArray(complianceStandards) ? complianceStandards : [];
+    if (status !== undefined) patch.status = status;
+
+    const updated = updateSecurityItem(id, patch, req.ip || 'admin');
+    res.json({ success: true, item: updated });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 5. Excluir item de segurança
+app.delete('/api/security/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const hardDelete = req.query.hard === 'true';
+    deleteSecurityItem(id, req.ip || 'admin', hardDelete);
+
+    logAuditEvent({
+      actor: 'usuario',
+      action: 'security.item.deleted',
+      category: 'security',
+      severity: 'warning',
+      description: `Método de segurança '${id}' ${hardDelete ? 'removido permanentemente' : 'arquivado'}.`,
+      ipAddress: req.ip || '127.0.0.1'
+    });
+
+    res.json({ success: true, message: `Item de segurança ${hardDelete ? 'removido permanentemente' : 'arquivado'} com sucesso.` });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 6. Adicionar Tag ao Item de Segurança
+app.post('/api/security/:id/tags', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { tag } = req.body;
+    if (!tag || typeof tag !== 'string') {
+      return res.status(400).json({ error: 'Tag inválida.' });
+    }
+    const updated = addSecurityTag(id, tag, req.ip || 'admin');
+    res.json({ success: true, tags: updated.tags, item: updated });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 7. Remover Tag do Item de Segurança
+app.delete('/api/security/:id/tags/:tag', (req, res) => {
+  try {
+    const { id, tag } = req.params;
+    const updated = removeSecurityTag(id, tag, req.ip || 'admin');
+    res.json({ success: true, tags: updated.tags, item: updated });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 8. Listar arquivos de um método de segurança
+app.get('/api/security/:id/files', (req, res) => {
+  try {
+    const { id } = req.params;
+    const includeDeleted = req.query.includeDeleted === 'true';
+    const files = listSecurityFiles(id, includeDeleted);
+    res.json({ success: true, files, total: files.length });
+  } catch (err: any) {
+    res.status(404).json({ error: err.message });
+  }
+});
+
+// 9. Obter arquivo individual de segurança (RegExp compatível com Express 5)
+app.get(/^\/api\/security\/([^/]+)\/files\/(.+)$/, (req, res) => {
+  try {
+    const id = req.params[0];
+    const rawPath = req.params[1] || (req.query.path as string);
+    if (!rawPath) {
+      return res.status(400).json({ error: 'Caminho do arquivo não fornecido.' });
+    }
+    const file = getSecurityFile(id, rawPath);
+    if (!file) {
+      return res.status(404).json({ error: 'Arquivo de segurança não encontrado.' });
+    }
+    res.json({ success: true, file });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 10. Salvar ou criar arquivo de segurança
+app.post('/api/security/:id/files', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, path: reqPath, content } = req.body;
+    const targetPath = reqPath || name;
+
+    if (!targetPath || typeof targetPath !== 'string') {
+      return res.status(400).json({ error: 'Nome ou caminho do arquivo é obrigatório.' });
+    }
+
+    if (content === undefined || content === null) {
+      return res.status(400).json({ error: 'Conteúdo do arquivo não pode ser nulo.' });
+    }
+
+    const { securityItem, file } = saveSecurityFile(id, targetPath, String(content), req.ip || 'admin');
+    res.json({ success: true, file, securityItem });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Erro ao salvar arquivo de segurança.' });
+  }
+});
+
+// 11. Excluir arquivo de segurança (com proteção para SECURITY.md)
+app.delete(/^\/api\/security\/([^/]+)\/files\/(.+)$/, (req, res) => {
+  try {
+    const id = req.params[0];
+    const rawPath = req.params[1] || (req.query.path as string);
+    const permanent = req.query.permanent === 'true';
+
+    if (!rawPath) {
+      return res.status(400).json({ error: 'Caminho do arquivo não fornecido.' });
+    }
+
+    const { securityItem } = deleteSecurityFile(id, rawPath, req.ip || 'admin', permanent);
+    res.json({ success: true, message: `Arquivo '${rawPath}' ${permanent ? 'excluído permanentemente' : 'movido para a lixeira'}.`, securityItem });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 12. Restaurar arquivo de segurança soft-deleted
+app.post(/^\/api\/security\/([^/]+)\/files\/(.+)\/restore$/, (req, res) => {
+  try {
+    const id = req.params[0];
+    const rawPath = req.params[1] || (req.query.path as string);
+
+    if (!rawPath) {
+      return res.status(400).json({ error: 'Caminho do arquivo não fornecido.' });
+    }
+
+    const { securityItem, file } = restoreSecurityFile(id, rawPath, req.ip || 'admin');
+    res.json({ success: true, message: `Arquivo '${rawPath}' restaurado com sucesso.`, file, securityItem });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 13. Auditoria do método de segurança
+app.get('/api/security/:id/audit', (req, res) => {
+  try {
+    const { id } = req.params;
+    const logs = listSecurityAuditLogs(id);
     res.json({ success: true, logs, total: logs.length });
   } catch (err: any) {
     res.status(404).json({ error: err.message });

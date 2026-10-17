@@ -407,3 +407,103 @@ export const SkillVersionsRollbackSchema = SkillVersionsRestoreSchema;
 export const SkillImportInspectSchema = SkillImportPreviewSchema;
 export const SkillImportCommitSchema = SkillImportFromGitSchema;
 
+// ==============================================================================
+// 12. FERRAMENTAS MCP DE SEGURANÇA CORPORATIVA FIRSTSYS (firstsys_security_*)
+// ==============================================================================
+
+// 12.1 firstsys_security_list
+export const SecurityListSchema = z.object({
+  category: z.enum(['todos', 'hardening', 'autenticacao', 'criptografia', 'banco_de_dados', 'conformidade', 'rede_api', 'auditoria']).optional(),
+  severity: z.enum(['todas', 'critico', 'alto', 'medio', 'baixo', 'informativo']).optional(),
+  status: z.enum(['todos', 'ativo', 'rascunho', 'arquivado', 'obsoleto']).optional(),
+  query: z.string().max(100).optional(),
+  q: z.string().max(100).optional(),
+  tag: z.string().max(50).optional(),
+  limit: z.number().int().min(1).max(100).default(50).optional()
+}).strict();
+
+// 12.2 firstsys_security_get
+export const SecurityGetSchema = z.object({
+  security_id: z.string().min(1, 'security_id é obrigatório').max(100)
+}).strict();
+
+// 12.3 firstsys_security_create
+export const SecurityCreateSchema = z.object({
+  name: z.string().min(2, 'Nome é obrigatório').max(120),
+  description: z.string().min(5, 'Descrição é obrigatória').max(1000),
+  detailedDescription: z.string().max(10000).optional(),
+  category: z.enum(['hardening', 'autenticacao', 'criptografia', 'banco_de_dados', 'conformidade', 'rede_api', 'auditoria']).default('hardening'),
+  severity: z.enum(['critico', 'alto', 'medio', 'baixo', 'informativo']).default('medio'),
+  complianceStandards: z.array(z.string().max(50)).default([]),
+  tags: z.array(z.string().max(50)).default([]),
+  initialContent: z.string().max(1000000).optional()
+}).strict();
+
+// 12.4 firstsys_security_update
+export const SecurityUpdateSchema = z.object({
+  security_id: z.string().min(1, 'security_id é obrigatório').max(100),
+  name: z.string().min(2).max(120).optional(),
+  description: z.string().min(5).max(1000).optional(),
+  detailedDescription: z.string().max(10000).optional(),
+  category: z.enum(['hardening', 'autenticacao', 'criptografia', 'banco_de_dados', 'conformidade', 'rede_api', 'auditoria']).optional(),
+  severity: z.enum(['critico', 'alto', 'medio', 'baixo', 'informativo']).optional(),
+  complianceStandards: z.array(z.string().max(50)).optional(),
+  status: z.enum(['ativo', 'rascunho', 'arquivado', 'obsoleto']).optional()
+}).strict();
+
+// 12.5 firstsys_security_delete
+export const SecurityDeleteSchema = z.object({
+  security_id: z.string().min(1, 'security_id é obrigatório').max(100),
+  hard: z.boolean().default(false).optional()
+}).strict();
+
+// 12.6 firstsys_security_tag_add
+export const SecurityTagAddSchema = z.object({
+  security_id: z.string().min(1, 'security_id é obrigatório').max(100),
+  tag: z.string().min(1, 'tag é obrigatória').max(50)
+}).strict();
+
+// 12.7 firstsys_security_tag_remove
+export const SecurityTagRemoveSchema = z.object({
+  security_id: z.string().min(1, 'security_id é obrigatório').max(100),
+  tag: z.string().min(1, 'tag é obrigatória').max(50)
+}).strict();
+
+// 12.8 firstsys_security_files_list
+export const SecurityFilesListSchema = z.object({
+  security_id: z.string().min(1, 'security_id é obrigatório').max(100),
+  include_deleted: z.boolean().default(false).optional()
+}).strict();
+
+// 12.9 firstsys_security_files_get
+export const SecurityFilesGetSchema = z.object({
+  security_id: z.string().min(1, 'security_id é obrigatório').max(100),
+  path: z.string().min(1, 'path é obrigatório').max(255)
+}).strict();
+
+// 12.10 firstsys_security_files_save
+export const SecurityFilesSaveSchema = z.object({
+  security_id: z.string().min(1, 'security_id é obrigatório').max(100),
+  path: z.string().min(1, 'path é obrigatório').max(255),
+  content: z.string().max(1000000, 'Arquivo excede 1MB')
+}).strict();
+
+// 12.11 firstsys_security_files_delete
+export const SecurityFilesDeleteSchema = z.object({
+  security_id: z.string().min(1, 'security_id é obrigatório').max(100),
+  path: z.string().min(1, 'path é obrigatório').max(255),
+  permanent: z.boolean().default(false).optional()
+}).strict();
+
+// 12.12 firstsys_security_files_restore
+export const SecurityFilesRestoreSchema = z.object({
+  security_id: z.string().min(1, 'security_id é obrigatório').max(100),
+  path: z.string().min(1, 'path é obrigatório').max(255)
+}).strict();
+
+// 12.13 firstsys_security_audit_list
+export const SecurityAuditListSchema = z.object({
+  security_id: z.string().min(1, 'security_id é obrigatório').max(100),
+  limit: z.number().int().min(1).max(100).default(50).optional()
+}).strict();
+

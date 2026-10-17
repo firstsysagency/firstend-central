@@ -73,6 +73,10 @@ export default function Skills() {
   const [isSavingFile, setIsSavingFile] = useState(false);
   const [copiedFile, setCopiedFile] = useState(false);
 
+  // Gestão Dinâmica de Tags
+  const [addingTagSkillId, setAddingTagSkillId] = useState<string | null>(null);
+  const [newTagInput, setNewTagInput] = useState('');
+
   // Sub-abas do Modal de Detalhes
   const [versionsList, setVersionsList] = useState<SkillVersion[]>([]);
   const [installationsList, setInstallationsList] = useState<SkillInstallation[]>([]);
@@ -298,20 +302,54 @@ export default function Skills() {
     }
   };
 
-  // Alternar instalação Zatten rápida
-  const handleToggleInstall = async (skillId: string) => {
+  // Adicionar Tag Dinâmica
+  const handleAddTag = async (skillId: string, tag: string) => {
+    const clean = tag.trim().replace(/^#/, '');
+    if (!clean) return;
+
     try {
-      const res = await fetch(`/api/skills/${skillId}/toggle-install`, { method: 'POST' });
+      const res = await fetch(`/api/skills/${skillId}/tags`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tag: clean })
+      });
+
       if (res.ok) {
         const data = await res.json();
-        setSkills(prev => prev.map(s => s.id === skillId ? { ...s, installed: data.installed, status: data.skill.status } : s));
+        setSkills(prev => prev.map(s => s.id === skillId ? { ...s, tags: data.tags } : s));
         if (selectedSkill?.id === skillId) {
-          setSelectedSkill(prev => prev ? { ...prev, installed: data.installed, status: data.skill.status } : null);
+          setSelectedSkill(prev => prev ? { ...prev, tags: data.tags } : null);
         }
-        showToast(data.installed ? 'Skill ativada para consumo imediato!' : 'Skill desativada.');
+        showToast(`Tag "#${clean}" adicionada com sucesso.`);
+      } else {
+        const err = await res.json();
+        showToast(err.error || 'Erro ao adicionar tag.');
       }
     } catch {
-      showToast('Erro ao alternar status da skill.');
+      showToast('Erro de conexão ao adicionar tag.');
+    }
+  };
+
+  // Remover Tag Dinâmica
+  const handleRemoveTag = async (skillId: string, tag: string) => {
+    try {
+      const res = await fetch(`/api/skills/${skillId}/tags/${encodeURIComponent(tag)}`, {
+        method: 'DELETE'
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setSkills(prev => prev.map(s => s.id === skillId ? { ...s, tags: data.tags } : s));
+        if (selectedSkill?.id === skillId) {
+          setSelectedSkill(prev => prev ? { ...prev, tags: data.tags } : null);
+        }
+        showToast(`Tag "#${tag}" removida.`);
+      } else {
+        const err = await res.json();
+        showToast(err.error || 'Erro ao remover tag.');
+      }
+    } catch {
+      showToast('Erro de conexão ao remover tag.');
     }
   };
 
@@ -541,9 +579,9 @@ export default function Skills() {
               Skills Firstsys & Agentes
             </h1>
             <p className="text-sm md:text-base text-zinc-400 max-w-2xl leading-relaxed">
-              Repositório central e versionado de capacidades de inteligência artificial. Crie pacotes multi-arquivos, 
-              importe repositórios Git públicos com varredura de segurança e instale cada skill separadamente por agente, 
-              conexão Zatten ou projeto de engenharia.
+              Repositório corporativo universal de capacidades e procedimentos de inteligência artificial para agentes autônomos 
+              e projetos de engenharia. Crie pacotes multi-arquivos, importe repositórios Git públicos com varredura de segurança 
+              e gerencie tags dinâmicas para segmentação por projeto ou tecnologia.
             </p>
           </div>
 
@@ -580,8 +618,8 @@ export default function Skills() {
             <p className="text-2xl font-bold text-foreground">{skills.length}</p>
           </div>
           <div className="space-y-1">
-            <span className="text-xs text-zinc-500 uppercase tracking-wider font-medium">Ativas / Zatten</span>
-            <p className="text-2xl font-bold text-emerald-400">{skills.filter(s => s.installed).length}</p>
+            <span className="text-xs text-zinc-500 uppercase tracking-wider font-medium">Ativas / Habilitadas</span>
+            <p className="text-2xl font-bold text-emerald-400">{skills.filter(s => s.status === 'ativa' || s.installed).length}</p>
           </div>
           <div className="space-y-1">
             <span className="text-xs text-zinc-500 uppercase tracking-wider font-medium">Curadas / Git</span>
@@ -591,7 +629,7 @@ export default function Skills() {
             <span className="text-xs text-zinc-500 uppercase tracking-wider font-medium">Protocolo MCP</span>
             <p className="text-2xl font-bold text-primary flex items-center gap-1.5">
               <CheckCircle2 size={18} className="text-emerald-400" />
-              26 Ferramentas
+              Catálogo Ativo
             </p>
           </div>
         </div>
@@ -757,15 +795,85 @@ export default function Skills() {
                     {skill.description}
                   </p>
 
-                  {/* Tags */}
+                  {/* Tags Dinâmicas com Adição e Remoção */}
                   <div className="flex flex-wrap items-center gap-1.5 mt-4">
-                    {skill.tags.slice(0, 4).map(tag => (
-                      <span key={tag} className="text-[10px] px-2 py-0.5 rounded-md bg-zinc-800/60 text-zinc-400 font-mono">
-                        #{tag}
+                    {skill.tags.map(tag => (
+                      <span
+                        key={tag}
+                        className="group/tag inline-flex items-center gap-1 text-[10px] pl-2 pr-1.5 py-0.5 rounded-md bg-zinc-800/80 text-zinc-300 font-mono border border-zinc-700/60 hover:border-zinc-500 transition-colors"
+                      >
+                        <span>#{tag}</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveTag(skill.id, tag);
+                          }}
+                          className="text-zinc-500 hover:text-rose-400 p-0.5 rounded transition-colors cursor-pointer"
+                          title={`Remover tag #${tag}`}
+                        >
+                          <X size={10} />
+                        </button>
                       </span>
                     ))}
-                    {skill.tags.length > 4 && (
-                      <span className="text-[10px] text-zinc-500">+{skill.tags.length - 4}</span>
+
+                    {addingTagSkillId === skill.id ? (
+                      <div className="inline-flex items-center gap-1 bg-zinc-800/90 rounded-md px-1.5 py-0.5 border border-primary/50 shadow-sm">
+                        <input
+                          type="text"
+                          autoFocus
+                          placeholder="nova-tag..."
+                          value={newTagInput}
+                          onChange={e => setNewTagInput(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddTag(skill.id, newTagInput);
+                              setNewTagInput('');
+                              setAddingTagSkillId(null);
+                            } else if (e.key === 'Escape') {
+                              setAddingTagSkillId(null);
+                              setNewTagInput('');
+                            }
+                          }}
+                          className="w-20 bg-transparent text-[10px] text-zinc-200 outline-none font-mono"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleAddTag(skill.id, newTagInput);
+                            setNewTagInput('');
+                            setAddingTagSkillId(null);
+                          }}
+                          className="text-emerald-400 hover:text-emerald-300 cursor-pointer"
+                          title="Confirmar"
+                        >
+                          <Check size={11} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAddingTagSkillId(null);
+                            setNewTagInput('');
+                          }}
+                          className="text-zinc-500 hover:text-zinc-400 cursor-pointer"
+                          title="Cancelar"
+                        >
+                          <X size={11} />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAddingTagSkillId(skill.id);
+                          setNewTagInput('');
+                        }}
+                        className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-zinc-800/40 hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 font-mono border border-dashed border-zinc-700/80 cursor-pointer transition-colors"
+                        title="Adicionar tag"
+                      >
+                        <Plus size={10} /> Tag
+                      </button>
                     )}
                   </div>
                 </div>
@@ -787,20 +895,9 @@ export default function Skills() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleOpenSkillDetails(skill)}
-                      className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium cursor-pointer transition-colors"
+                      className="px-3.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium cursor-pointer transition-colors"
                     >
                       Abrir Arquivos
-                    </button>
-                    <button
-                      onClick={() => handleToggleInstall(skill.id)}
-                      className={`p-1.5 rounded-lg text-xs cursor-pointer transition-colors ${
-                        skill.installed
-                          ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'
-                          : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200'
-                      }`}
-                      title={skill.installed ? 'Desativar na Zatten' : 'Ativar na Zatten'}
-                    >
-                      <Bot size={15} />
                     </button>
                   </div>
                 </div>

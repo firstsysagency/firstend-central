@@ -59,7 +59,20 @@ import {
   SkillAuditListSchema,
   SkillDependenciesListSchema,
   SkillPermissionsGetSchema,
-  SkillPermissionsUpdateSchema
+  SkillPermissionsUpdateSchema,
+  SecurityListSchema,
+  SecurityGetSchema,
+  SecurityCreateSchema,
+  SecurityUpdateSchema,
+  SecurityDeleteSchema,
+  SecurityTagAddSchema,
+  SecurityTagRemoveSchema,
+  SecurityFilesListSchema,
+  SecurityFilesGetSchema,
+  SecurityFilesSaveSchema,
+  SecurityFilesDeleteSchema,
+  SecurityFilesRestoreSchema,
+  SecurityAuditListSchema
 } from './mcpSchemas.js';
 import {
   listSkills,
@@ -82,6 +95,21 @@ import {
   deleteSkillInstallation,
   listSkillAuditLogs
 } from '../skills/skillsStore.js';
+import {
+  listSecurityItems,
+  getSecurityItem,
+  createSecurityItem,
+  updateSecurityItem,
+  deleteSecurityItem,
+  addSecurityTag,
+  removeSecurityTag,
+  listSecurityFiles,
+  getSecurityFile,
+  saveSecurityFile,
+  deleteSecurityFile,
+  restoreSecurityFile,
+  listSecurityAuditLogs
+} from '../security/securityStore.js';
 import {
   previewGitRepository,
   fetchSelectedGitFiles
@@ -1630,6 +1658,258 @@ export const MCP_TOOLS_CATALOG = [
     ],
     annotations: { readOnlyHint: false, destructiveHint: false },
     tags: ['skills', 'permissions']
+  },
+
+  // --- MÉTODOS E PADRÕES DE SEGURANÇA CORPORATIVA FIRSTSYS ---
+  {
+    name: 'firstsys_security_list',
+    title: 'Listar Tecnologias e Métodos de Segurança',
+    description: 'Lista padrões, métodos, diretrizes e checklists de segurança corporativa Firstsys para projetos de software e IA.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        category: { type: 'string', enum: ['todos', 'hardening', 'autenticacao', 'criptografia', 'banco_de_dados', 'conformidade', 'rede_api', 'auditoria'], description: 'Filtrar por categoria técnica' },
+        severity: { type: 'string', enum: ['todas', 'critico', 'alto', 'medio', 'baixo', 'informativo'], description: 'Filtrar por nível de risco/severidade' },
+        status: { type: 'string', enum: ['todos', 'ativo', 'rascunho', 'arquivado', 'obsoleto'], description: 'Status operacional' },
+        q: { type: 'string', description: 'Termo de busca textual' },
+        tag: { type: 'string', description: 'Filtrar por tag específica' },
+        limit: { type: 'number', description: 'Limite de itens retornados' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['security:read', 'zatten:read', 'firstsys_security_list', 'tool:firstsys_security_list'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['security', 'governance', 'list']
+  },
+  {
+    name: 'firstsys_security_get',
+    title: 'Consultar Método de Segurança',
+    description: 'Retorna a especificação completa de segurança, checklists, regras técnicas, conformidade e arquivos vinculados.',
+    inputSchema: {
+      type: 'object',
+      required: ['security_id'],
+      properties: {
+        security_id: { type: 'string', description: 'ID ou slug do padrão de segurança' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['security:read', 'zatten:read', 'firstsys_security_get', 'tool:firstsys_security_get'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['security', 'details', 'get']
+  },
+  {
+    name: 'firstsys_security_create',
+    title: 'Cadastrar Tecnologia de Segurança',
+    description: 'Cadastra um novo método, diretriz técnica ou padrão de segurança corporativa com arquivos e normas de conformidade.',
+    inputSchema: {
+      type: 'object',
+      required: ['name', 'description'],
+      properties: {
+        name: { type: 'string', description: 'Nome do padrão de segurança' },
+        description: { type: 'string', description: 'Resumo executivo do padrão' },
+        detailedDescription: { type: 'string', description: 'Detalhamento arquitetural' },
+        category: { type: 'string', enum: ['hardening', 'autenticacao', 'criptografia', 'banco_de_dados', 'conformidade', 'rede_api', 'auditoria'], description: 'Categoria' },
+        severity: { type: 'string', enum: ['critico', 'alto', 'medio', 'baixo', 'informativo'], description: 'Nível de severidade/risco' },
+        complianceStandards: { type: 'array', items: { type: 'string' }, description: 'Normas de conformidade (LGPD, OWASP, NIST, etc.)' },
+        tags: { type: 'array', items: { type: 'string' }, description: 'Tags de indexação' },
+        initialContent: { type: 'string', description: 'Conteúdo markdown inicial do SECURITY.md' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['security:write', 'zatten:write', 'firstsys_security_create', 'tool:firstsys_security_create'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    tags: ['security', 'create']
+  },
+  {
+    name: 'firstsys_security_update',
+    title: 'Atualizar Método de Segurança',
+    description: 'Atualiza metadados, categoria, nível de severidade ou normas de conformidade de uma diretriz de segurança.',
+    inputSchema: {
+      type: 'object',
+      required: ['security_id'],
+      properties: {
+        security_id: { type: 'string', description: 'ID ou slug do item de segurança' },
+        name: { type: 'string', description: 'Novo nome' },
+        description: { type: 'string', description: 'Nova descrição' },
+        detailedDescription: { type: 'string', description: 'Novo detalhamento' },
+        category: { type: 'string', description: 'Nova categoria' },
+        severity: { type: 'string', description: 'Novo nível de severidade' },
+        complianceStandards: { type: 'array', items: { type: 'string' }, description: 'Normas de conformidade' },
+        status: { type: 'string', description: 'Status operacional' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['security:write', 'zatten:write', 'firstsys_security_update', 'tool:firstsys_security_update'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    tags: ['security', 'update']
+  },
+  {
+    name: 'firstsys_security_delete',
+    title: 'Excluir Método de Segurança',
+    description: 'Arquiva ou remove permanentemente um padrão de segurança do catálogo corporativo.',
+    inputSchema: {
+      type: 'object',
+      required: ['security_id'],
+      properties: {
+        security_id: { type: 'string', description: 'ID ou slug do item de segurança' },
+        hard: { type: 'boolean', description: 'Exclusão definitiva permanente' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['security:manage', 'zatten:write', 'firstsys_security_delete', 'tool:firstsys_security_delete'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: true },
+    tags: ['security', 'delete']
+  },
+  {
+    name: 'firstsys_security_tag_add',
+    title: 'Adicionar Tag ao Item de Segurança',
+    description: 'Adiciona uma tag dinâmica a uma tecnologia ou diretriz de segurança para categorização livre.',
+    inputSchema: {
+      type: 'object',
+      required: ['security_id', 'tag'],
+      properties: {
+        security_id: { type: 'string', description: 'ID ou slug do item' },
+        tag: { type: 'string', description: 'Tag a ser adicionada (ex: lgpd, express, node)' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['security:write', 'zatten:write', 'firstsys_security_tag_add', 'tool:firstsys_security_tag_add'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    tags: ['security', 'tags', 'add']
+  },
+  {
+    name: 'firstsys_security_tag_remove',
+    title: 'Remover Tag do Item de Segurança',
+    description: 'Remove uma tag de uma tecnologia ou diretriz de segurança.',
+    inputSchema: {
+      type: 'object',
+      required: ['security_id', 'tag'],
+      properties: {
+        security_id: { type: 'string', description: 'ID ou slug do item' },
+        tag: { type: 'string', description: 'Tag a ser removida' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['security:write', 'zatten:write', 'firstsys_security_tag_remove', 'tool:firstsys_security_tag_remove'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    tags: ['security', 'tags', 'remove']
+  },
+  {
+    name: 'firstsys_security_files_list',
+    title: 'Listar Arquivos de Segurança',
+    description: 'Lista todos os arquivos técnicos (SECURITY.md, rules.json, checklist.md) vinculados ao método de segurança.',
+    inputSchema: {
+      type: 'object',
+      required: ['security_id'],
+      properties: {
+        security_id: { type: 'string', description: 'ID ou slug do padrão de segurança' },
+        include_deleted: { type: 'boolean', description: 'Incluir arquivos na lixeira (soft delete)' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['security:read', 'zatten:read', 'firstsys_security_files_list', 'tool:firstsys_security_files_list'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['security', 'files', 'list']
+  },
+  {
+    name: 'firstsys_security_files_get',
+    title: 'Obter Arquivo de Segurança',
+    description: 'Lê o conteúdo textual de um arquivo específico de uma diretriz de segurança (ex: checklist.md, rules.json).',
+    inputSchema: {
+      type: 'object',
+      required: ['security_id', 'path'],
+      properties: {
+        security_id: { type: 'string', description: 'ID ou slug do item de segurança' },
+        path: { type: 'string', description: 'Caminho relativo do arquivo (ex: rules.json, checklist.md)' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['security:read', 'zatten:read', 'firstsys_security_files_get', 'tool:firstsys_security_files_get'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['security', 'files', 'get']
+  },
+  {
+    name: 'firstsys_security_files_save',
+    title: 'Salvar Arquivo de Segurança',
+    description: 'Cria ou atualiza um arquivo textual na pasta da diretriz de segurança com validação estrita anti-traversal e hash SHA-256.',
+    inputSchema: {
+      type: 'object',
+      required: ['security_id', 'path', 'content'],
+      properties: {
+        security_id: { type: 'string', description: 'ID ou slug do item de segurança' },
+        path: { type: 'string', description: 'Caminho relativo do arquivo (ex: checklist.md, rules.json)' },
+        content: { type: 'string', description: 'Conteúdo textual completo do arquivo' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['security:write', 'zatten:write', 'firstsys_security_files_save', 'tool:firstsys_security_files_save'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    tags: ['security', 'files', 'save']
+  },
+  {
+    name: 'firstsys_security_files_delete',
+    title: 'Excluir Arquivo de Segurança',
+    description: 'Exclui um arquivo da pasta de segurança (SECURITY.md mestre é protegido contra exclusão).',
+    inputSchema: {
+      type: 'object',
+      required: ['security_id', 'path'],
+      properties: {
+        security_id: { type: 'string', description: 'ID ou slug do item' },
+        path: { type: 'string', description: 'Caminho relativo do arquivo' },
+        permanent: { type: 'boolean', description: 'Exclusão definitiva permanente' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['security:write', 'zatten:write', 'firstsys_security_files_delete', 'tool:firstsys_security_files_delete'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: true },
+    tags: ['security', 'files', 'delete']
+  },
+  {
+    name: 'firstsys_security_files_restore',
+    title: 'Restaurar Arquivo de Segurança',
+    description: 'Restaura um arquivo da diretriz de segurança que foi movido para a lixeira.',
+    inputSchema: {
+      type: 'object',
+      required: ['security_id', 'path'],
+      properties: {
+        security_id: { type: 'string', description: 'ID ou slug do item' },
+        path: { type: 'string', description: 'Caminho relativo do arquivo a restaurar' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['security:write', 'zatten:write', 'firstsys_security_files_restore', 'tool:firstsys_security_files_restore'] }
+    ],
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    tags: ['security', 'files', 'restore']
+  },
+  {
+    name: 'firstsys_security_audit_list',
+    title: 'Consultar Auditoria de Segurança',
+    description: 'Consulta o histórico cronológico de criações, edições e alterações nos métodos e arquivos de segurança.',
+    inputSchema: {
+      type: 'object',
+      required: ['security_id'],
+      properties: {
+        security_id: { type: 'string', description: 'ID ou slug do item de segurança' },
+        limit: { type: 'number', description: 'Quantidade máxima de registros' }
+      }
+    },
+    securitySchemes: [
+      { type: 'oauth2', scopes: ['security:read', 'zatten:read', 'firstsys_security_audit_list', 'tool:firstsys_security_audit_list'] }
+    ],
+    annotations: { readOnlyHint: true, destructiveHint: false },
+    tags: ['security', 'audit']
   }
 ];
 
@@ -3648,6 +3928,394 @@ async function executeToolDirectly(name: string, rawArgs: any, user: OAuthJwtPay
         ok: true,
         message: 'Permissões atualizadas com sucesso.',
         permissions: updated.permissions
+      };
+    }
+
+    // ==============================================================================
+    // FERRAMENTAS DE SEGURANÇA CORPORATIVA FIRSTSYS (firstsys_security_*)
+    // ==============================================================================
+    case 'firstsys_security_list': {
+      const parseResult = SecurityListSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'Parâmetros inválidos.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { category, severity, status, query, q, tag, limit = 50 } = parseResult.data;
+      const items = listSecurityItems({
+        category,
+        severity,
+        status,
+        query: query || q,
+        tag
+      }).slice(0, limit);
+
+      return {
+        ok: true,
+        items: items.map(item => ({
+          id: item.id,
+          slug: item.slug,
+          name: item.name,
+          description: item.description,
+          category: item.category,
+          severity: item.severity,
+          status: item.status,
+          compliance_standards: item.complianceStandards,
+          tags: item.tags,
+          files_count: (item.files || []).filter(f => !f.deletedAt).length,
+          updated_at: item.updatedAt
+        })),
+        total: items.length
+      };
+    }
+
+    case 'firstsys_security_get': {
+      const parseResult = SecurityGetSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'security_id é obrigatório.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { security_id } = parseResult.data;
+      const item = getSecurityItem(security_id);
+      if (!item) {
+        return formatMcpError({
+          code: 'SECURITY_ITEM_NOT_FOUND',
+          message: `Nenhum método de segurança encontrado com o identificador '${security_id}'.`,
+          httpStatus: 404,
+          correlationId
+        });
+      }
+
+      const auditLogs = listSecurityAuditLogs(item.id);
+
+      return {
+        ok: true,
+        item: {
+          id: item.id,
+          slug: item.slug,
+          name: item.name,
+          description: item.description,
+          detailed_description: item.detailedDescription,
+          category: item.category,
+          severity: item.severity,
+          compliance_standards: item.complianceStandards,
+          tags: item.tags,
+          status: item.status,
+          files: (item.files || []).filter(f => !f.deletedAt).map(f => ({
+            path: f.path,
+            name: f.name,
+            extension: f.extension,
+            size_bytes: f.sizeBytes,
+            sha256: f.sha256,
+            content: f.content
+          })),
+          audit_count: auditLogs.length,
+          created_at: item.createdAt,
+          updated_at: item.updatedAt
+        }
+      };
+    }
+
+    case 'firstsys_security_create': {
+      const parseResult = SecurityCreateSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'Parâmetros inválidos.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { name, description, detailedDescription, category, severity, complianceStandards, tags, initialContent } = parseResult.data;
+      const initialFiles = initialContent ? [{ name: 'SECURITY.md', path: 'SECURITY.md', content: initialContent }] : [];
+
+      const created = createSecurityItem({
+        name,
+        description,
+        detailedDescription: detailedDescription || '',
+        category: category as any,
+        severity: severity as any,
+        complianceStandards: complianceStandards || [],
+        tags: tags || [],
+        files: initialFiles
+      }, user.sub || 'mcp-agent');
+
+      return {
+        ok: true,
+        message: `Método de segurança '${created.name}' cadastrado com sucesso.`,
+        item: {
+          id: created.id,
+          slug: created.slug,
+          name: created.name,
+          category: created.category,
+          severity: created.severity
+        }
+      };
+    }
+
+    case 'firstsys_security_update': {
+      const parseResult = SecurityUpdateSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'Parâmetros inválidos.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { security_id, name, description, detailedDescription, category, severity, complianceStandards, status } = parseResult.data;
+      const patch: any = {};
+      if (name !== undefined) patch.name = name;
+      if (description !== undefined) patch.description = description;
+      if (detailedDescription !== undefined) patch.detailedDescription = detailedDescription;
+      if (category !== undefined) patch.category = category;
+      if (severity !== undefined) patch.severity = severity;
+      if (complianceStandards !== undefined) patch.complianceStandards = complianceStandards;
+      if (status !== undefined) patch.status = status;
+
+      const updated = updateSecurityItem(security_id, patch, user.sub || 'mcp-agent');
+      return {
+        ok: true,
+        message: `Item de segurança '${updated.name}' atualizado com sucesso.`,
+        item: {
+          id: updated.id,
+          slug: updated.slug,
+          name: updated.name,
+          category: updated.category,
+          severity: updated.severity,
+          status: updated.status
+        }
+      };
+    }
+
+    case 'firstsys_security_delete': {
+      const parseResult = SecurityDeleteSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'security_id é obrigatório.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { security_id, hard = false } = parseResult.data;
+      deleteSecurityItem(security_id, user.sub || 'mcp-agent', hard);
+
+      return {
+        ok: true,
+        message: `Método de segurança '${security_id}' ${hard ? 'excluído permanentemente' : 'arquivado'} com sucesso.`
+      };
+    }
+
+    case 'firstsys_security_tag_add': {
+      const parseResult = SecurityTagAddSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'security_id e tag são obrigatórios.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { security_id, tag } = parseResult.data;
+      const updated = addSecurityTag(security_id, tag, user.sub || 'mcp-agent');
+
+      return {
+        ok: true,
+        message: `Tag '#${tag}' adicionada com sucesso.`,
+        tags: updated.tags
+      };
+    }
+
+    case 'firstsys_security_tag_remove': {
+      const parseResult = SecurityTagRemoveSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'security_id e tag são obrigatórios.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { security_id, tag } = parseResult.data;
+      const updated = removeSecurityTag(security_id, tag, user.sub || 'mcp-agent');
+
+      return {
+        ok: true,
+        message: `Tag '#${tag}' removida com sucesso.`,
+        tags: updated.tags
+      };
+    }
+
+    case 'firstsys_security_files_list': {
+      const parseResult = SecurityFilesListSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'security_id é obrigatório.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { security_id, include_deleted = false } = parseResult.data;
+      const files = listSecurityFiles(security_id, include_deleted);
+
+      return {
+        ok: true,
+        security_id,
+        files: files.map(f => ({
+          path: f.path,
+          name: f.name,
+          extension: f.extension,
+          size_bytes: f.sizeBytes,
+          sha256: f.sha256,
+          deleted: !!f.deletedAt
+        })),
+        total: files.length
+      };
+    }
+
+    case 'firstsys_security_files_get': {
+      const parseResult = SecurityFilesGetSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'security_id e path são obrigatórios.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { security_id, path: filePath } = parseResult.data;
+      const file = getSecurityFile(security_id, filePath);
+
+      if (!file) {
+        return formatMcpError({
+          code: 'FILE_NOT_FOUND',
+          message: `Arquivo '${filePath}' não encontrado no item de segurança '${security_id}'.`,
+          httpStatus: 404,
+          correlationId
+        });
+      }
+
+      return {
+        ok: true,
+        file: {
+          path: file.path,
+          name: file.name,
+          extension: file.extension,
+          content: file.content,
+          sha256: file.sha256,
+          size_bytes: file.sizeBytes
+        }
+      };
+    }
+
+    case 'firstsys_security_files_save': {
+      const parseResult = SecurityFilesSaveSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'Parâmetros inválidos.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { security_id, path: filePath, content } = parseResult.data;
+      const { file } = saveSecurityFile(security_id, filePath, content, user.sub || 'mcp-agent');
+
+      return {
+        ok: true,
+        message: `Arquivo de segurança '${file.path}' salvo com sucesso.`,
+        file: {
+          path: file.path,
+          sha256: file.sha256,
+          size_bytes: file.sizeBytes
+        }
+      };
+    }
+
+    case 'firstsys_security_files_delete': {
+      const parseResult = SecurityFilesDeleteSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'Parâmetros inválidos.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { security_id, path: filePath, permanent = false } = parseResult.data;
+      deleteSecurityFile(security_id, filePath, user.sub || 'mcp-agent', permanent);
+
+      return {
+        ok: true,
+        message: `Arquivo '${filePath}' removido (${permanent ? 'permanentemente' : 'soft delete'}).`
+      };
+    }
+
+    case 'firstsys_security_files_restore': {
+      const parseResult = SecurityFilesRestoreSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'Parâmetros inválidos.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { security_id, path: filePath } = parseResult.data;
+      const { file } = restoreSecurityFile(security_id, filePath, user.sub || 'mcp-agent');
+
+      return {
+        ok: true,
+        message: `Arquivo de segurança '${file.path}' restaurado com sucesso.`
+      };
+    }
+
+    case 'firstsys_security_audit_list': {
+      const parseResult = SecurityAuditListSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return formatMcpError({
+          code: 'INVALID_ARGUMENTS',
+          message: parseResult.error.issues[0]?.message || 'security_id é obrigatório.',
+          httpStatus: 400,
+          correlationId
+        });
+      }
+
+      const { security_id, limit = 50 } = parseResult.data;
+      const logs = listSecurityAuditLogs(security_id).slice(0, limit);
+
+      return {
+        ok: true,
+        security_id,
+        logs: logs.map(l => ({
+          id: l.id,
+          actor: l.actor,
+          action: l.action,
+          details: l.details,
+          created_at: l.createdAt
+        })),
+        total: logs.length
       };
     }
 

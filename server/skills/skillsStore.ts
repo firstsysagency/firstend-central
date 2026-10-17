@@ -473,6 +473,48 @@ export function toggleInstallSkill(id: string, installed?: boolean, actor: strin
   return { skill, installed: newStatus };
 }
 
+export function addSkillTag(id: string, rawTag: string, actor: string = 'admin'): Skill {
+  const db = readDb();
+  if (!db.skills) db.skills = [];
+
+  const skill = db.skills.find(s => s.id === id || s.slug === id);
+  if (!skill) {
+    throw new Error(`Skill com identificador "${id}" não encontrada.`);
+  }
+
+  const cleanTag = rawTag.toLowerCase().trim().replace(/^#/, '').replace(/[^a-z0-9_-]/g, '');
+  if (!cleanTag) {
+    throw new Error('Nome da tag inválido.');
+  }
+
+  if (!skill.tags.includes(cleanTag)) {
+    skill.tags.push(cleanTag);
+    skill.updatedAt = new Date().toISOString();
+    writeDb(db);
+    logSkillAudit(skill.id, 'skill.tag_added', `Tag "#${cleanTag}" adicionada à skill`, actor);
+  }
+
+  return skill;
+}
+
+export function removeSkillTag(id: string, rawTag: string, actor: string = 'admin'): Skill {
+  const db = readDb();
+  if (!db.skills) db.skills = [];
+
+  const skill = db.skills.find(s => s.id === id || s.slug === id);
+  if (!skill) {
+    throw new Error(`Skill com identificador "${id}" não encontrada.`);
+  }
+
+  const cleanTag = rawTag.toLowerCase().trim().replace(/^#/, '');
+  skill.tags = skill.tags.filter(t => t !== cleanTag);
+  skill.updatedAt = new Date().toISOString();
+  writeDb(db);
+  logSkillAudit(skill.id, 'skill.tag_removed', `Tag "#${cleanTag}" removida da skill`, actor);
+
+  return skill;
+}
+
 // ==============================================================================
 // 5. GERENCIAMENTO DE ARQUIVOS (MULTI-ARQUIVOS EM ÁRVORE)
 // ==============================================================================

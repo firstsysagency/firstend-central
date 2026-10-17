@@ -354,6 +354,9 @@ oauthRouter.post('/oauth/token', express.urlencoded({ extended: true }), express
         grantedScopeSet.add('skills:read');
         grantedScopeSet.add('skills:write');
         grantedScopeSet.add('skills:manage');
+        grantedScopeSet.add('security:read');
+        grantedScopeSet.add('security:write');
+        grantedScopeSet.add('security:manage');
       }
       const finalScopeStr = Array.from(grantedScopeSet).join(' ');
 
@@ -461,6 +464,9 @@ oauthRouter.post('/oauth/token', express.urlencoded({ extended: true }), express
         refreshScopeSet.add('skills:read');
         refreshScopeSet.add('skills:write');
         refreshScopeSet.add('skills:manage');
+        refreshScopeSet.add('security:read');
+        refreshScopeSet.add('security:write');
+        refreshScopeSet.add('security:manage');
       }
       const finalRefreshScopeStr = Array.from(refreshScopeSet).join(' ');
 
@@ -634,9 +640,11 @@ export function generateOpenApiSpec(issuer: string) {
           if (isWrite) {
             alternativeScopeSet.add('zatten:write');
             alternativeScopeSet.add('skills:write');
+            alternativeScopeSet.add('security:write');
           } else {
             alternativeScopeSet.add('zatten:read');
             alternativeScopeSet.add('skills:read');
+            alternativeScopeSet.add('security:read');
           }
 
           return Array.from(alternativeScopeSet).map(scopeName => ({
@@ -651,8 +659,8 @@ export function generateOpenApiSpec(issuer: string) {
     openapi: '3.1.0',
     info: {
       title: 'Firstsys Zatten Central MCP API',
-      description: 'API e Servidor MCP remoto para integração segura do ChatGPT com a Zatten e Skills via Firstsys OAuth 2.1.',
-      version: '1.2.0'
+      description: 'API e Servidor MCP remoto para integração segura do ChatGPT com a Zatten, Skills e Segurança via Firstsys OAuth 2.1.',
+      version: '1.3.0'
     },
     servers: [
       {
@@ -678,7 +686,10 @@ export function generateOpenApiSpec(issuer: string) {
                 'zatten:messages': 'Disparar mensagens via Zatten',
                 'skills:read': 'Consultar biblioteca de skills, personas e arquivos de IA',
                 'skills:write': 'Criar, versionar, editar e instalar skills de IA',
-                'skills:manage': 'Gerenciamento completo do ecossistema de skills'
+                'skills:manage': 'Gerenciamento completo do ecossistema de skills',
+                'security:read': 'Consultar diretrizes, padrões e checklists de segurança de IA',
+                'security:write': 'Criar e editar métodos e arquivos de segurança corporativa',
+                'security:manage': 'Gerenciamento completo da governança e padrões de segurança'
               }
             }
           }
