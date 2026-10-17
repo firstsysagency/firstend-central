@@ -67,8 +67,9 @@ export interface SecurityItem {
   complianceStandards: SecurityComplianceStandard[];
   tags: string[];
   status: SecurityStatus;
-  author: string;
-  files: SecurityFile[];
+  author?: string;
+  content?: string;
+  files?: SecurityFile[];
   createdAt: string;
   updatedAt: string;
 }

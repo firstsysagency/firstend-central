@@ -929,7 +929,7 @@ app.get('/api/security/:id', (req, res) => {
 // 3. Cadastrar nova tecnologia / padrão de segurança
 app.post('/api/security', (req, res) => {
   try {
-    const { name, description, detailedDescription, category, severity, complianceStandards, tags, initialContent, files } = req.body;
+    const { name, description, detailedDescription, category, severity, complianceStandards, tags, initialContent, content, files } = req.body;
     if (!name || typeof name !== 'string' || name.trim().length < 2) {
       return res.status(400).json({ error: 'Nome do método de segurança é obrigatório (mínimo 2 caracteres).' });
     }
@@ -942,17 +942,18 @@ app.post('/api/security', (req, res) => {
       severity: severity || 'medio',
       complianceStandards: Array.isArray(complianceStandards) ? complianceStandards : [],
       tags: Array.isArray(tags) ? tags : [],
+      content: content !== undefined ? String(content) : (initialContent !== undefined ? String(initialContent) : ''),
       files: []
     };
 
     if (Array.isArray(files) && files.length > 0) {
       payload.files = files;
-    } else if (initialContent && typeof initialContent === 'string' && initialContent.trim().length > 0) {
+    } else if (payload.content && payload.content.length > 0) {
       payload.files = [
         {
           name: 'SECURITY.md',
           path: 'SECURITY.md',
-          content: initialContent.trim()
+          content: payload.content
         }
       ];
     }
@@ -979,7 +980,7 @@ app.post('/api/security', (req, res) => {
 app.put('/api/security/:id', (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, detailedDescription, category, severity, complianceStandards, status } = req.body;
+    const { name, description, detailedDescription, category, severity, complianceStandards, status, content } = req.body;
 
     const patch: any = {};
     if (name !== undefined) patch.name = String(name).trim();
@@ -989,6 +990,7 @@ app.put('/api/security/:id', (req, res) => {
     if (severity !== undefined) patch.severity = severity;
     if (complianceStandards !== undefined) patch.complianceStandards = Array.isArray(complianceStandards) ? complianceStandards : [];
     if (status !== undefined) patch.status = status;
+    if (content !== undefined) patch.content = String(content);
 
     const updated = updateSecurityItem(id, patch, req.ip || 'admin');
     res.json({ success: true, item: updated });

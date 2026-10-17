@@ -116,6 +116,7 @@ export const SecurityItemZodSchema = z.object({
   status: z.enum(SECURITY_STATUSES).default('ativo'),
   complianceStandards: z.array(z.string()).default([]),
   mitigatedVulnerabilities: z.array(z.string()).default([]),
+  content: z.string().default(''),
   files: z.array(SecurityFileZodSchema).default([]),
   createdAt: z.string(),
   updatedAt: z.string()

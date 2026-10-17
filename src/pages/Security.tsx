@@ -5,29 +5,21 @@ import {
   ShieldAlert,
   Search,
   Plus,
-  FileCode,
   FileText,
-  CheckCircle2,
   Trash2,
   Copy,
   Check,
   X,
-  FolderOpen,
   Save,
-  History,
   LayoutGrid,
   Table as TableIcon,
   Eye,
   Code2,
-  Lock,
-  FileCheck,
   AlertTriangle,
   Info
 } from 'lucide-react';
 import type {
   SecurityItem,
-  SecurityFile,
-  SecurityAuditLog,
   SecurityCategory,
   SecuritySeverity
 } from '../types/security';
@@ -65,31 +57,23 @@ export default function Security() {
   const [addingTagItemId, setAddingTagItemId] = useState<string | null>(null);
   const [newTagInput, setNewTagInput] = useState('');
 
-  // Modal de Detalhes do Método de Segurança
+  // Modal de Consulta e Edição do Documento Explicativo
   const [selectedItem, setSelectedItem] = useState<SecurityItem | null>(null);
-  const [activeModalTab, setActiveModalTab] = useState<'files' | 'audit'>('files');
-  const [activeFilePath, setActiveFilePath] = useState<string>('SECURITY.md');
-  const [fileContentEditor, setFileContentEditor] = useState<string>('');
-  const [previewMode, setPreviewMode] = useState<'edit' | 'preview'>('edit');
-  const [isSavingFile, setIsSavingFile] = useState(false);
-  const [copiedFile, setCopiedFile] = useState(false);
-  const [auditLogsList, setAuditLogsList] = useState<SecurityAuditLog[]>([]);
+  const [documentEditorContent, setDocumentEditorContent] = useState<string>('');
+  const [previewMode, setPreviewMode] = useState<'preview' | 'edit'>('preview');
+  const [isSavingDocument, setIsSavingDocument] = useState(false);
+  const [copiedDocument, setCopiedDocument] = useState(false);
+  const [copiedItemId, setCopiedItemId] = useState<string | null>(null);
 
-  // Modal de Novo Arquivo Técnico
-  const [isAddFileModalOpen, setIsAddFileModalOpen] = useState(false);
-  const [newFilePath, setNewFilePath] = useState('');
-  const [newFileContent, setNewFileContent] = useState('');
-
-  // Modal de Cadastro de Nova Tecnologia de Segurança
+  // Modal de Criação de Novo Padrão de Segurança
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newName, setNewName] = useState('');
   const [newDesc, setNewDesc] = useState('');
-  const [newDetailedDesc, setNewDetailedDesc] = useState('');
   const [newCategory, setNewCategory] = useState<SecurityCategory>('hardening');
   const [newSeverity, setNewSeverity] = useState<SecuritySeverity>('alto');
   const [newCompliance, setNewCompliance] = useState('LGPD, OWASP Top 10');
   const [newTags, setNewTags] = useState('seguranca, hardening');
-  const [newContent, setNewContent] = useState('');
+  const [newDocumentContent, setNewDocumentContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const showToast = (msg: string) => {
@@ -129,6 +113,7 @@ export default function Security() {
         item.name.toLowerCase().includes(q) ||
         item.description.toLowerCase().includes(q) ||
         item.slug.toLowerCase().includes(q) ||
+        (item.content && item.content.toLowerCase().includes(q)) ||
         (item.tags || []).some(t => t.toLowerCase().includes(q)) ||
         (item.complianceStandards || []).some(c => c.toLowerCase().includes(q));
 
@@ -154,7 +139,7 @@ export default function Security() {
         if (selectedItem?.id === itemId) {
           setSelectedItem(prev => (prev ? { ...prev, tags: data.tags } : null));
         }
-        showToast(`Tag "#${clean}" adicionada com sucesso.`);
+        showToast(`Tag "#${clean}" adicionada.`);
       } else {
         const err = await res.json();
         showToast(err.error || 'Erro ao adicionar tag.');
@@ -187,143 +172,87 @@ export default function Security() {
     }
   };
 
-  // Abrir Modal de Detalhes
-  const handleOpenItemDetails = async (item: SecurityItem) => {
+  // Abrir Modal de Consulta do Documento
+  const handleOpenItemDetails = (item: SecurityItem, initialMode: 'preview' | 'edit' = 'preview') => {
     setSelectedItem(item);
-    setActiveModalTab('files');
-    setActiveFilePath('SECURITY.md');
-    setPreviewMode('edit');
-
-    const secFile = (item.files || []).find(f => f.path.toLowerCase() === 'security.md' && !f.deletedAt) || item.files?.[0];
-    if (secFile) {
-      setActiveFilePath(secFile.path);
-      setFileContentEditor(secFile.content || '');
-    } else {
-      setFileContentEditor('# ' + item.name + '\n\nDiretrizes de segurança corporativa.');
-    }
-
-    try {
-      const res = await fetch(`/api/security/${item.id}`);
-      if (res.ok) {
-        const data = await res.json();
-        setSelectedItem(data.item);
-        setAuditLogsList(data.auditLogs || []);
-      }
-    } catch (e) {
-      console.warn('Erro ao carregar auditoria detalhada:', e);
-    }
+    setPreviewMode(initialMode);
+    const content = item.content || (item.files?.[0]?.content) || item.description || `# ${item.name}\n\nDiretrizes de segurança.`;
+    setDocumentEditorContent(content);
   };
 
-  // Selecionar arquivo para edição/visualização
-  const handleSelectFile = (file: SecurityFile) => {
-    setActiveFilePath(file.path);
-    setFileContentEditor(file.content || '');
-  };
-
-  // Salvar alterações no arquivo
-  const handleSaveFileContent = async () => {
-    if (!selectedItem || !activeFilePath) return;
-
-    try {
-      setIsSavingFile(true);
-      const res = await fetch(`/api/security/${selectedItem.id}/files`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          path: activeFilePath,
-          content: fileContentEditor
-        })
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setSelectedItem(data.securityItem);
-        setItems(prev => prev.map(i => (i.id === data.securityItem.id ? data.securityItem : i)));
-        showToast(`Arquivo "${activeFilePath}" salvo com sucesso!`);
-      } else {
-        const err = await res.json();
-        showToast(err.error || 'Erro ao salvar arquivo.');
-      }
-    } catch {
-      showToast('Erro de conexão ao salvar arquivo.');
-    } finally {
-      setIsSavingFile(false);
-    }
-  };
-
-  // Criar Novo Arquivo Técnico
-  const handleCreateFileSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedItem || !newFilePath.trim()) return;
-
-    try {
-      const res = await fetch(`/api/security/${selectedItem.id}/files`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          path: newFilePath.trim(),
-          content: newFileContent.trim() || `# ${newFilePath.trim()}\n\nConteúdo técnico.`
-        })
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setSelectedItem(data.securityItem);
-        setItems(prev => prev.map(i => (i.id === data.securityItem.id ? data.securityItem : i)));
-        setActiveFilePath(newFilePath.trim());
-        setFileContentEditor(newFileContent.trim() || `# ${newFilePath.trim()}\n\nConteúdo técnico.`);
-        setNewFilePath('');
-        setNewFileContent('');
-        setIsAddFileModalOpen(false);
-        showToast(`Arquivo "${newFilePath.trim()}" criado com sucesso!`);
-      } else {
-        const err = await res.json();
-        showToast(err.error || 'Erro ao adicionar arquivo.');
-      }
-    } catch {
-      showToast('Erro de conexão ao criar arquivo.');
-    }
-  };
-
-  // Excluir Arquivo Técnico
-  const handleDeleteFile = async (filePath: string) => {
+  // Salvar alterações no Documento Explicativo
+  const handleSaveDocumentContent = async () => {
     if (!selectedItem) return;
-    if (filePath.toLowerCase() === 'security.md') {
-      showToast('O arquivo mestre "SECURITY.md" não pode ser excluído.');
+
+    try {
+      setIsSavingDocument(true);
+      const res = await fetch(`/api/security/${selectedItem.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: documentEditorContent
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const updated = data.item;
+        setSelectedItem(updated);
+        setItems(prev => prev.map(i => (i.id === updated.id ? updated : i)));
+        setPreviewMode('preview');
+        showToast(`Documento de "${updated.name}" atualizado com sucesso!`);
+      } else {
+        const err = await res.json();
+        showToast(err.error || 'Erro ao salvar documento.');
+      }
+    } catch {
+      showToast('Erro de conexão ao salvar documento.');
+    } finally {
+      setIsSavingDocument(false);
+    }
+  };
+
+  // Copiar documento explicativo para o clipboard
+  const handleCopyDocument = (text: string, itemId?: string) => {
+    navigator.clipboard.writeText(text);
+    if (itemId) {
+      setCopiedItemId(itemId);
+      setTimeout(() => setCopiedItemId(null), 2000);
+    } else {
+      setCopiedDocument(true);
+      setTimeout(() => setCopiedDocument(false), 2000);
+    }
+    showToast('Documento copiado para a área de transferência.');
+  };
+
+  // Excluir método de segurança
+  const handleDeleteSecurityItem = async (itemId: string, itemName: string) => {
+    if (!window.confirm(`Tem certeza que deseja remover o padrão de segurança "${itemName}"?`)) {
       return;
     }
 
-    if (!window.confirm(`Deseja realmente remover o arquivo "${filePath}"?`)) return;
-
     try {
-      const res = await fetch(`/api/security/${selectedItem.id}/files/${encodeURIComponent(filePath)}`, {
-        method: 'DELETE'
-      });
-
+      const res = await fetch(`/api/security/${itemId}?hard=true`, { method: 'DELETE' });
       if (res.ok) {
-        const data = await res.json();
-        setSelectedItem(data.securityItem);
-        setItems(prev => prev.map(i => (i.id === data.securityItem.id ? data.securityItem : i)));
-        const fallback = (data.securityItem.files || []).find((f: any) => !f.deletedAt);
-        if (fallback) {
-          setActiveFilePath(fallback.path);
-          setFileContentEditor(fallback.content || '');
+        setItems(prev => prev.filter(i => i.id !== itemId));
+        if (selectedItem?.id === itemId) {
+          setSelectedItem(null);
         }
-        showToast(`Arquivo "${filePath}" removido com sucesso.`);
+        showToast(`Padrão "${itemName}" excluído com sucesso.`);
       } else {
         const err = await res.json();
-        showToast(err.error || 'Erro ao excluir arquivo.');
+        showToast(err.error || 'Erro ao excluir padrão.');
       }
     } catch {
-      showToast('Erro ao excluir arquivo.');
+      showToast('Erro ao excluir padrão de segurança.');
     }
   };
 
-  // Submeter cadastro de nova tecnologia de segurança
+  // Cadastrar Novo Padrão de Segurança
   const handleCreateSecuritySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim()) {
-      showToast('Informe o nome da tecnologia de segurança.');
+      showToast('Informe o nome da tecnologia/padrão de segurança.');
       return;
     }
 
@@ -339,18 +268,32 @@ export default function Security() {
         .map(s => s.trim().toLowerCase().replace(/^#/, ''))
         .filter(Boolean);
 
+      const initialDoc = newDocumentContent.trim() || `# ${newName.trim()}
+
+## 1. Visão Geral
+${newDesc.trim() || 'Descreva o propósito e regras deste método de segurança.'}
+
+## 2. Como Aplicar nos Projetos
+1. Inclua as validações necessárias nos endpoints e fluxos.
+2. Certifique-se de manter logs e testes de conformidade.
+
+## 3. Checklist de Implementação
+- [ ] Implementado no código-fonte
+- [ ] Testes de conformidade e segurança executados
+- [ ] Regras validadas em produção
+`;
+
       const res = await fetch('/api/security', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: newName.trim(),
           description: newDesc.trim() || 'Diretriz técnica de segurança corporativa.',
-          detailedDescription: newDetailedDesc.trim(),
           category: newCategory,
           severity: newSeverity,
           complianceStandards: complianceList,
           tags: tagList,
-          initialContent: newContent.trim() || `# ${newName.trim()}\n\n## 1. Visão Geral e Arquitetura\nDescreva os requisitos técnicos de segurança.\n\n## 2. Regras e Controles\n- Defina as políticas obrigatórias.`
+          content: initialDoc
         })
       });
 
@@ -360,8 +303,7 @@ export default function Security() {
         setIsCreateModalOpen(false);
         setNewName('');
         setNewDesc('');
-        setNewDetailedDesc('');
-        setNewContent('');
+        setNewDocumentContent('');
         showToast(`Padrão "${data.item.name}" cadastrado com sucesso!`);
       } else {
         const err = await res.json();
@@ -374,48 +316,69 @@ export default function Security() {
     }
   };
 
-  // Copiar conteúdo para o clipboard
-  const handleCopyFileContent = () => {
-    navigator.clipboard.writeText(fileContentEditor);
-    setCopiedFile(true);
-    setTimeout(() => setCopiedFile(false), 2000);
-    showToast('Conteúdo copiado para a área de transferência.');
-  };
-
-  // Renderizador seguro e leve de Markdown
+  // Renderizador seguro e de alta fidelidade de Markdown
   const renderMarkdownPreview = (text: string) => {
     const lines = text.split('\n');
     return (
       <div className="space-y-3 font-sans text-xs leading-relaxed text-zinc-300">
         {lines.map((line, idx) => {
           if (line.startsWith('### ')) {
-            return <h4 key={idx} className="text-sm font-bold text-foreground mt-4 mb-2">{line.replace('### ', '')}</h4>;
+            return (
+              <h4 key={idx} className="text-sm font-bold text-foreground mt-4 mb-2 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                {line.replace('### ', '')}
+              </h4>
+            );
           }
           if (line.startsWith('## ')) {
-            return <h3 key={idx} className="text-base font-extrabold text-foreground mt-6 mb-2 pb-1 border-b border-zinc-800">{line.replace('## ', '')}</h3>;
+            return (
+              <h3 key={idx} className="text-base font-extrabold text-foreground mt-6 mb-2 pb-1.5 border-b border-zinc-800 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-primary" />
+                {line.replace('## ', '')}
+              </h3>
+            );
           }
           if (line.startsWith('# ')) {
-            return <h2 key={idx} className="text-lg font-black text-primary mt-6 mb-3 pb-2 border-b border-primary/20">{line.replace('# ', '')}</h2>;
+            return (
+              <h2 key={idx} className="text-xl font-black text-primary mt-6 mb-3 pb-2 border-b border-primary/20">
+                {line.replace('# ', '')}
+              </h2>
+            );
           }
           if (line.startsWith('- [ ] ') || line.startsWith('- [x] ')) {
             const isChecked = line.startsWith('- [x] ');
             return (
               <div key={idx} className="flex items-center gap-2 pl-2 py-0.5">
-                <input type="checkbox" readOnly checked={isChecked} className="rounded accent-primary" />
-                <span className={isChecked ? 'line-through text-zinc-500' : 'text-zinc-300'}>{line.substring(6)}</span>
+                <input type="checkbox" readOnly checked={isChecked} className="rounded accent-primary cursor-default" />
+                <span className={isChecked ? 'line-through text-zinc-500 font-mono text-[11px]' : 'text-zinc-200 font-mono text-[11px]'}>
+                  {line.substring(6)}
+                </span>
               </div>
             );
           }
           if (line.startsWith('- ') || line.startsWith('* ')) {
             return (
               <div key={idx} className="flex items-start gap-2 pl-3">
-                <span className="text-primary mt-1">•</span>
+                <span className="text-primary mt-0.5">•</span>
                 <span>{line.substring(2)}</span>
               </div>
             );
           }
+          if (/^\d+\.\s/.test(line)) {
+            const match = line.match(/^(\d+)\.\s(.*)/);
+            return (
+              <div key={idx} className="flex items-start gap-2 pl-3">
+                <span className="text-primary font-bold text-[11px]">{match ? match[1] + '.' : '•'}</span>
+                <span>{match ? match[2] : line}</span>
+              </div>
+            );
+          }
           if (line.startsWith('```')) {
-            return <div key={idx} className="font-mono text-[11px] bg-zinc-950 p-2.5 rounded-lg border border-zinc-800 text-zinc-400 overflow-x-auto my-2">{line}</div>;
+            return (
+              <div key={idx} className="font-mono text-[11px] bg-zinc-950 p-3 rounded-xl border border-zinc-800 text-zinc-300 overflow-x-auto my-2">
+                {line}
+              </div>
+            );
           }
           if (line.trim() === '') {
             return <div key={idx} className="h-2" />;
@@ -449,151 +412,136 @@ export default function Security() {
         <div className="absolute -left-16 -bottom-16 w-80 h-80 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-semibold tracking-wide">
-              <ShieldCheck size={14} />
-              Biblioteca Corporativa de Segurança, Hardening & IA Firstsys
+          <div>
+            <div className="flex items-center gap-3">
+              <span className="p-2.5 rounded-xl bg-primary/10 border border-primary/20 text-primary shadow-inner">
+                <ShieldCheck size={26} />
+              </span>
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
+                  Biblioteca de Segurança
+                </h1>
+                <p className="text-xs sm:text-sm text-zinc-400 mt-1">
+                  Catálogo de diretrizes, métodos e arquiteturas de proteção para consultar e aplicar nos projetos.
+                </p>
+              </div>
             </div>
-            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-foreground">
-              Segurança & Governança
-            </h1>
-            <p className="text-sm md:text-base text-zinc-400 max-w-2xl leading-relaxed">
-              Catálogo corporativo de playbooks técnicos, métodos de criptografia, sanitização e checklists de conformidade 
-              para projetos de engenharia e agentes de IA conectados ao protocolo MCP.
-            </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-3">
             <button
-              onClick={() => {
-                setNewContent(`# Novo Padrão de Segurança\n\n## 1. Visão Geral\nDescreva a ameaça mitigada e o escopo.\n\n## 2. Regras e Controles Mandatórios\n- Implemente proteção no gateway.\n- Valide parâmetros de entrada.`);
-                setIsCreateModalOpen(true);
-              }}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary text-primary-foreground font-semibold shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all duration-300 hover:scale-[1.02] cursor-pointer text-xs"
+              onClick={() => setIsCreateModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs transition-all shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
             >
               <Plus size={16} />
-              Cadastrar Método de Segurança
+              Nova Diretriz de Segurança
             </button>
           </div>
         </div>
 
-        {/* Resumo de Métricas de Segurança */}
+        {/* Estatísticas Rápidas */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-8 pt-6 border-t border-zinc-800/60">
-          <div className="space-y-1">
-            <span className="text-xs text-zinc-500 uppercase tracking-wider font-medium">Métodos Registrados</span>
-            <p className="text-2xl font-bold text-foreground">{items.length}</p>
+          <div className="p-4 rounded-2xl bg-zinc-900/40 border border-zinc-800/60">
+            <div className="text-[10px] uppercase font-mono tracking-wider text-zinc-500">Padrões Cadastrados</div>
+            <div className="text-2xl font-bold text-foreground mt-1">{items.length}</div>
           </div>
-          <div className="space-y-1">
-            <span className="text-xs text-zinc-500 uppercase tracking-wider font-medium">Severidade Crítica/Alta</span>
-            <p className="text-2xl font-bold text-rose-400">
+          <div className="p-4 rounded-2xl bg-zinc-900/40 border border-zinc-800/60">
+            <div className="text-[10px] uppercase font-mono tracking-wider text-zinc-500">Crítico & Alto Impacto</div>
+            <div className="text-2xl font-bold text-rose-400 mt-1">
               {items.filter(i => i.severity === 'critico' || i.severity === 'alto').length}
-            </p>
+            </div>
           </div>
-          <div className="space-y-1">
-            <span className="text-xs text-zinc-500 uppercase tracking-wider font-medium">Conformidade Ativa</span>
-            <p className="text-2xl font-bold text-emerald-400 flex items-center gap-1.5">
-              <FileCheck size={18} />
-              LGPD / OWASP
-            </p>
+          <div className="p-4 rounded-2xl bg-zinc-900/40 border border-zinc-800/60">
+            <div className="text-[10px] uppercase font-mono tracking-wider text-zinc-500">Categorias Ativas</div>
+            <div className="text-2xl font-bold text-primary mt-1">
+              {new Set(items.map(i => i.category)).size}
+            </div>
           </div>
-          <div className="space-y-1">
-            <span className="text-xs text-zinc-500 uppercase tracking-wider font-medium">Protocolo MCP</span>
-            <p className="text-2xl font-bold text-primary flex items-center gap-1.5">
-              <CheckCircle2 size={18} className="text-emerald-400" />
-              13 Tools Integradas
-            </p>
+          <div className="p-4 rounded-2xl bg-zinc-900/40 border border-zinc-800/60">
+            <div className="text-[10px] uppercase font-mono tracking-wider text-zinc-500">Conformidade</div>
+            <div className="text-2xl font-bold text-emerald-400 mt-1">OWASP & LGPD</div>
           </div>
         </div>
       </div>
 
-      {/* Barra de Filtros por Categoria e Severidade */}
+      {/* Barra de Filtros e Busca */}
       <div className="space-y-4">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          {/* Abas de Categorias com Framer Motion layoutId */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-2 lg:pb-0 scrollbar-none">
-            {CATEGORIES.map(cat => {
-              const isActive = selectedCategory === cat.id;
-              return (
-                <button
-                  key={cat.id}
-                  onClick={() => setSelectedCategory(cat.id)}
-                  className={`relative px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-300 cursor-pointer ${
-                    isActive ? 'text-primary-foreground' : 'text-zinc-400 hover:text-foreground hover:bg-white/5'
-                  }`}
-                >
-                  {isActive && (
-                    <motion.div
-                      layoutId="security-category-tab"
-                      className="absolute inset-0 bg-primary rounded-xl z-0"
-                      transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-                    />
-                  )}
-                  <span className="relative z-10">{cat.label}</span>
-                </button>
-              );
-            })}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          {/* Campo de Busca */}
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500" size={16} />
+            <input
+              type="text"
+              placeholder="Buscar por método de segurança, tag ou norma (ex: LGPD, OWASP, ABAC)..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-zinc-900/80 border border-zinc-800 text-xs text-foreground placeholder:text-zinc-500 focus:outline-none focus:border-primary/50 transition-colors shadow-inner"
+            />
           </div>
 
-          {/* Campo de Busca e Alternador de Modo de Visualização */}
-          <div className="flex items-center gap-3">
-            <div className="relative w-full sm:w-72">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500" size={15} />
-              <input
-                type="text"
-                placeholder="Buscar por nome, tag ou norma (LGPD, OWASP)..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 rounded-xl bg-zinc-900/80 border border-zinc-800 text-foreground placeholder:text-zinc-500 text-xs focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all"
-              />
-              {searchTerm && (
-                <button
-                  onClick={() => setSearchTerm('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-foreground"
-                >
-                  <X size={14} />
-                </button>
-              )}
-            </div>
+          {/* Filtro de Severidade e Modo de Visualização */}
+          <div className="flex items-center gap-2">
+            <select
+              value={selectedSeverity}
+              onChange={e => setSelectedSeverity(e.target.value)}
+              aria-label="Filtrar por severidade de segurança"
+              className="px-3 py-2.5 rounded-xl bg-zinc-900/80 border border-zinc-800 text-xs text-zinc-300 focus:outline-none focus:border-primary/50 cursor-pointer"
+            >
+              {SEVERITIES.map(s => (
+                <option key={s.id} value={s.id}>{s.label}</option>
+              ))}
+            </select>
 
-            <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl p-1 gap-1">
+            <div className="flex items-center bg-zinc-900/80 border border-zinc-800 rounded-xl p-0.5">
               <button
                 onClick={() => setViewMode('cards')}
-                className={`p-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
-                  viewMode === 'cards' ? 'bg-zinc-800 text-primary' : 'text-zinc-400 hover:text-zinc-200'
+                className={`p-2 rounded-lg transition-colors cursor-pointer ${
+                  viewMode === 'cards' ? 'bg-zinc-800 text-primary' : 'text-zinc-500 hover:text-zinc-300'
                 }`}
                 title="Visualização em Cards"
               >
-                <LayoutGrid size={16} />
+                <LayoutGrid size={15} />
               </button>
               <button
                 onClick={() => setViewMode('table')}
-                className={`p-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
-                  viewMode === 'table' ? 'bg-zinc-800 text-primary' : 'text-zinc-400 hover:text-zinc-200'
+                className={`p-2 rounded-lg transition-colors cursor-pointer ${
+                  viewMode === 'table' ? 'bg-zinc-800 text-primary' : 'text-zinc-500 hover:text-zinc-300'
                 }`}
                 title="Visualização em Tabela"
               >
-                <TableIcon size={16} />
+                <TableIcon size={15} />
               </button>
             </div>
           </div>
         </div>
 
-        {/* Filtro Secundário por Severidade */}
-        <div className="flex items-center gap-2 overflow-x-auto text-xs text-zinc-400">
-          <span className="font-medium text-zinc-500">Severidade:</span>
-          {SEVERITIES.map(sev => (
-            <button
-              key={sev.id}
-              onClick={() => setSelectedSeverity(sev.id)}
-              className={`px-2.5 py-1 rounded-lg border text-xs cursor-pointer transition-all ${
-                selectedSeverity === sev.id
-                  ? 'bg-zinc-800 border-primary/40 text-primary font-medium'
-                  : 'bg-zinc-900/50 border-zinc-800/80 text-zinc-400 hover:text-zinc-300'
-              }`}
-            >
-              {sev.label}
-            </button>
-          ))}
+        {/* Abas de Categorias */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+          {CATEGORIES.map(cat => {
+            const isSelected = selectedCategory === cat.id;
+            const count = cat.id === 'todas'
+              ? items.length
+              : items.filter(i => i.category === cat.id).length;
+
+            return (
+              <button
+                key={cat.id}
+                onClick={() => setSelectedCategory(cat.id)}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
+                  isSelected
+                    ? 'bg-zinc-800 text-primary border border-primary/30 shadow-sm'
+                    : 'bg-zinc-900/50 hover:bg-zinc-800/50 text-zinc-400 hover:text-zinc-200 border border-zinc-800/60'
+                }`}
+              >
+                <span>{cat.label}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                  isSelected ? 'bg-primary/20 text-primary' : 'bg-zinc-800 text-zinc-500'
+                }`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -606,15 +554,16 @@ export default function Security() {
       ) : filteredItems.length === 0 ? (
         <div className="py-16 text-center rounded-2xl border border-dashed border-zinc-800 bg-zinc-950/40 p-8">
           <ShieldAlert size={40} className="mx-auto text-zinc-600 mb-3" />
-          <h3 className="text-base font-semibold text-foreground">Nenhum método de segurança encontrado</h3>
+          <h3 className="text-base font-semibold text-foreground">Nenhuma diretriz de segurança encontrada</h3>
           <p className="text-xs text-zinc-500 mt-1 max-w-md mx-auto">
-            Tente alterar o termo de pesquisa, o filtro de severidade ou cadastre uma nova tecnologia de segurança.
+            Tente alterar o termo de pesquisa, o filtro de severidade ou cadastre uma nova diretriz.
           </p>
         </div>
       ) : viewMode === 'cards' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredItems.map(item => {
-            const fileCount = (item.files || []).filter(f => !f.deletedAt).length;
+            const docContent = item.content || (item.files?.[0]?.content) || item.description || '';
+            const isCopied = copiedItemId === item.id;
 
             return (
               <motion.div
@@ -657,7 +606,10 @@ export default function Security() {
                   </div>
 
                   {/* Nome e Descrição */}
-                  <h3 className="text-lg font-bold text-foreground group-hover:text-primary transition-colors">
+                  <h3
+                    onClick={() => handleOpenItemDetails(item, 'preview')}
+                    className="text-lg font-bold text-foreground group-hover:text-primary transition-colors cursor-pointer"
+                  >
                     {item.name}
                   </h3>
                   <p className="text-xs text-zinc-400 mt-2 line-clamp-3 leading-relaxed">
@@ -675,7 +627,7 @@ export default function Security() {
                     </div>
                   )}
 
-                  {/* Tags Dinâmicas com Adição e Remoção */}
+                  {/* Tags Dinâmicas */}
                   <div className="flex flex-wrap items-center gap-1.5 mt-3.5">
                     {item.tags.map(tag => (
                       <span
@@ -758,23 +710,24 @@ export default function Security() {
                   </div>
                 </div>
 
-                {/* Footer do Card */}
+                {/* Footer do Card com Ações Diretas */}
                 <div className="mt-6 pt-4 border-t border-zinc-800/60 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 text-xs text-zinc-500">
-                    <span className="flex items-center gap-1">
-                      <FolderOpen size={13} className="text-zinc-400" />
-                      {fileCount} {fileCount === 1 ? 'arquivo' : 'arquivos'}
-                    </span>
-                  </div>
+                  <button
+                    onClick={() => handleCopyDocument(docContent, item.id)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800/60 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 text-xs font-medium cursor-pointer transition-colors border border-zinc-700/40"
+                    title="Copiar diretriz para área de transferência"
+                  >
+                    {isCopied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+                    <span>{isCopied ? 'Copiado!' : 'Copiar'}</span>
+                  </button>
 
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleOpenItemDetails(item)}
-                      className="px-3.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium cursor-pointer transition-colors"
-                    >
-                      Abrir Diretrizes & Arquivos
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => handleOpenItemDetails(item, 'preview')}
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 text-xs font-semibold cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]"
+                  >
+                    <FileText size={13} />
+                    Consultar Diretriz
+                  </button>
                 </div>
               </motion.div>
             );
@@ -790,345 +743,227 @@ export default function Security() {
                 <th className="py-3 px-4">Categoria</th>
                 <th className="py-3 px-4">Severidade</th>
                 <th className="py-3 px-4">Conformidade</th>
-                <th className="py-3 px-4">Arquivos</th>
+                <th className="py-3 px-4">Tags</th>
                 <th className="py-3 px-4 text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800/60">
-              {filteredItems.map(item => (
-                <tr key={item.id} className="hover:bg-zinc-800/30 transition-colors">
-                  <td className="py-3 px-4">
-                    <div className="font-semibold text-foreground">{item.name}</div>
-                    <div className="text-[10px] font-mono text-zinc-500">{item.slug}</div>
-                  </td>
-                  <td className="py-3 px-4 text-zinc-400 capitalize">{item.category}</td>
-                  <td className="py-3 px-4">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium capitalize ${
-                      item.severity === 'critico' ? 'bg-rose-950 text-rose-400 border border-rose-800/60' :
-                      item.severity === 'alto' ? 'bg-amber-950 text-amber-400 border border-amber-800/60' :
-                      item.severity === 'medio' ? 'bg-blue-950 text-blue-400 border border-blue-800/60' :
-                      'bg-emerald-950 text-emerald-400 border border-emerald-800/60'
-                    }`}>
-                      {item.severity}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-zinc-400">
-                    {(item.complianceStandards || []).join(', ') || '-'}
-                  </td>
-                  <td className="py-3 px-4 text-zinc-400">{item.files?.length || 0}</td>
-                  <td className="py-3 px-4 text-right">
-                    <button
-                      onClick={() => handleOpenItemDetails(item)}
-                      className="px-2.5 py-1 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs cursor-pointer"
-                    >
-                      Detalhes
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {filteredItems.map(item => {
+                const docContent = item.content || (item.files?.[0]?.content) || item.description || '';
+                const isCopied = copiedItemId === item.id;
+
+                return (
+                  <tr key={item.id} className="hover:bg-zinc-800/30 transition-colors">
+                    <td className="py-3 px-4">
+                      <div className="font-semibold text-foreground cursor-pointer hover:text-primary transition-colors" onClick={() => handleOpenItemDetails(item, 'preview')}>
+                        {item.name}
+                      </div>
+                      <div className="text-[10px] font-mono text-zinc-500">{item.slug}</div>
+                    </td>
+                    <td className="py-3 px-4 text-zinc-400 capitalize">{item.category}</td>
+                    <td className="py-3 px-4">
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium capitalize ${
+                        item.severity === 'critico' ? 'bg-rose-950 text-rose-400 border border-rose-800/60' :
+                        item.severity === 'alto' ? 'bg-amber-950 text-amber-400 border border-amber-800/60' :
+                        item.severity === 'medio' ? 'bg-blue-950 text-blue-400 border border-blue-800/60' :
+                        'bg-emerald-950 text-emerald-400 border border-emerald-800/60'
+                      }`}>
+                        {item.severity}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-zinc-400">
+                      {(item.complianceStandards || []).join(', ') || '-'}
+                    </td>
+                    <td className="py-3 px-4 text-zinc-400 font-mono text-[10px]">
+                      {item.tags.map(t => `#${t}`).join(' ')}
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleCopyDocument(docContent, item.id)}
+                          className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 cursor-pointer transition-colors"
+                          title="Copiar documento"
+                        >
+                          {isCopied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+                        </button>
+                        <button
+                          onClick={() => handleOpenItemDetails(item, 'preview')}
+                          className="px-3 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 text-xs font-semibold cursor-pointer transition-colors"
+                        >
+                          Consultar
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       )}
 
-      {/* ==================================================================== */}
-      {/* MODAL COMPLETO DE GERENCIAMENTO DE ARQUIVOS E AUDITORIA */}
-      {/* ==================================================================== */}
+      {/* Modal de Detalhes e Documento Explicativo */}
       <AnimatePresence>
         {selectedItem && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 15 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              className="relative w-full max-w-5xl h-[85vh] flex flex-col rounded-3xl bg-zinc-950 border border-zinc-800 shadow-2xl overflow-hidden"
-            >
-              {/* Header do Modal */}
-              <div className="p-6 border-b border-zinc-800/80 bg-zinc-900/60 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
-                    <ShieldCheck size={20} />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-xl font-bold text-foreground">{selectedItem.name}</h2>
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300">
-                        {selectedItem.category}
-                      </span>
-                    </div>
-                    <p className="text-xs text-zinc-400 mt-0.5">{selectedItem.description}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setSelectedItem(null)}
-                    className="p-2 rounded-xl text-zinc-400 hover:text-foreground hover:bg-white/5 cursor-pointer"
-                    title="Fechar modal"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Sub-abas do Modal */}
-              <div className="px-6 py-2.5 border-b border-zinc-800/60 bg-zinc-900/40 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setActiveModalTab('files')}
-                    className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
-                      activeModalTab === 'files' ? 'bg-primary text-primary-foreground' : 'text-zinc-400 hover:text-zinc-200'
-                    }`}
-                  >
-                    <FileCode size={14} />
-                    Arquivos Técnicos ({selectedItem.files?.length || 0})
-                  </button>
-                  <button
-                    onClick={() => setActiveModalTab('audit')}
-                    className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
-                      activeModalTab === 'audit' ? 'bg-primary text-primary-foreground' : 'text-zinc-400 hover:text-zinc-200'
-                    }`}
-                  >
-                    <History size={14} />
-                    Trilha de Auditoria ({auditLogsList.length})
-                  </button>
-                </div>
-
-                {activeModalTab === 'files' && (
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center bg-zinc-900 rounded-lg p-0.5 border border-zinc-800 text-xs">
-                      <button
-                        onClick={() => setPreviewMode('edit')}
-                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-colors ${
-                          previewMode === 'edit' ? 'bg-zinc-800 text-primary font-medium' : 'text-zinc-400 hover:text-zinc-200'
-                        }`}
-                      >
-                        <Code2 size={13} />
-                        Código
-                      </button>
-                      <button
-                        onClick={() => setPreviewMode('preview')}
-                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-colors ${
-                          previewMode === 'preview' ? 'bg-zinc-800 text-primary font-medium' : 'text-zinc-400 hover:text-zinc-200'
-                        }`}
-                      >
-                        <Eye size={13} />
-                        Markdown
-                      </button>
-                    </div>
-
-                    <button
-                      onClick={handleCopyFileContent}
-                      className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200 text-xs flex items-center gap-1 cursor-pointer"
-                      title="Copiar conteúdo"
-                    >
-                      {copiedFile ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
-                    </button>
-
-                    <button
-                      onClick={handleSaveFileContent}
-                      disabled={isSavingFile}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold cursor-pointer transition-all shadow-md shadow-primary/20"
-                    >
-                      <Save size={13} />
-                      {isSavingFile ? 'Salvando...' : 'Salvar Alterações'}
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Corpo Principal do Modal */}
-              <div className="flex-1 flex overflow-hidden">
-                {activeModalTab === 'files' ? (
-                  <>
-                    {/* Árvore Lateral de Arquivos */}
-                    <div className="w-64 border-r border-zinc-800/80 bg-zinc-950 p-4 flex flex-col justify-between overflow-y-auto">
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between text-xs text-zinc-400 font-semibold uppercase tracking-wider px-1">
-                          <span>Arquivos</span>
-                          <button
-                            onClick={() => setIsAddFileModalOpen(true)}
-                            className="p-1 rounded-md hover:bg-zinc-800 text-zinc-400 hover:text-primary cursor-pointer transition-colors"
-                            title="Criar novo arquivo"
-                          >
-                            <Plus size={14} />
-                          </button>
-                        </div>
-
-                        <div className="space-y-1">
-                          {(selectedItem.files || [])
-                            .filter(f => !f.deletedAt)
-                            .map(file => {
-                              const isActive = activeFilePath === file.path;
-                              const isSecurityMd = file.path.toLowerCase() === 'security.md';
-
-                              return (
-                                <div
-                                  key={file.id || file.path}
-                                  onClick={() => handleSelectFile(file)}
-                                  className={`group flex items-center justify-between px-3 py-2 rounded-xl text-xs font-mono cursor-pointer transition-colors ${
-                                    isActive
-                                      ? 'bg-primary/10 border border-primary/30 text-primary font-bold'
-                                      : 'hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-transparent'
-                                  }`}
-                                >
-                                  <div className="flex items-center gap-2 overflow-hidden text-ellipsis whitespace-nowrap">
-                                    {isSecurityMd ? (
-                                      <Lock size={13} className="text-primary flex-shrink-0" />
-                                    ) : file.extension === '.json' ? (
-                                      <FileCode size={13} className="text-cyan-400 flex-shrink-0" />
-                                    ) : (
-                                      <FileText size={13} className="text-zinc-400 flex-shrink-0" />
-                                    )}
-                                    <span className="truncate">{file.path}</span>
-                                  </div>
-
-                                  {!isSecurityMd && (
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDeleteFile(file.path);
-                                      }}
-                                      className="opacity-0 group-hover:opacity-100 p-1 hover:text-rose-400 transition-opacity"
-                                      title="Excluir arquivo"
-                                    >
-                                      <Trash2 size={12} />
-                                    </button>
-                                  )}
-                                </div>
-                              );
-                            })}
-                        </div>
-                      </div>
-
-                      <div className="pt-4 border-t border-zinc-900 text-[10px] text-zinc-500 font-mono">
-                        Arquivo: {activeFilePath}
-                      </div>
-                    </div>
-
-                    {/* Editor / Visualizador Markdown */}
-                    <div className="flex-1 bg-zinc-900/30 p-6 overflow-y-auto">
-                      {previewMode === 'edit' ? (
-                        <textarea
-                          value={fileContentEditor}
-                          onChange={e => setFileContentEditor(e.target.value)}
-                          className="w-full h-full min-h-[500px] bg-transparent text-zinc-200 font-mono text-xs leading-relaxed focus:outline-none resize-none"
-                          placeholder="Digite as instruções e diretrizes de segurança..."
-                        />
-                      ) : (
-                        <div className="max-w-3xl mx-auto py-2">
-                          {renderMarkdownPreview(fileContentEditor)}
-                        </div>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  /* Aba de Auditoria */
-                  <div className="flex-1 p-6 overflow-y-auto bg-zinc-950">
-                    <h3 className="text-sm font-bold text-foreground mb-4 flex items-center gap-2">
-                      <History size={16} className="text-primary" />
-                      Trilha de Auditoria e Alterações Técnicas
-                    </h3>
-
-                    {auditLogsList.length === 0 ? (
-                      <p className="text-xs text-zinc-500">Nenhum registro de auditoria disponível.</p>
-                    ) : (
-                      <div className="space-y-3">
-                        {auditLogsList.map(log => (
-                          <div
-                            key={log.id}
-                            className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs space-y-1"
-                          >
-                            <div className="flex items-center justify-between text-zinc-400">
-                              <span className="font-semibold text-primary">{log.action}</span>
-                              <span className="font-mono text-[10px]">
-                                {new Date(log.createdAt).toLocaleString('pt-BR')}
-                              </span>
-                            </div>
-                            <p className="text-zinc-300">{log.details}</p>
-                            <span className="text-[10px] font-mono text-zinc-500 block">Autor: {log.actor}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Modal de Adicionar Novo Arquivo */}
-      <AnimatePresence>
-        {isAddFileModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-md rounded-2xl bg-zinc-950 border border-zinc-800 p-6 shadow-2xl space-y-4"
+              className="w-full max-w-4xl max-h-[92vh] flex flex-col rounded-3xl bg-zinc-950 border border-zinc-800 shadow-2xl overflow-hidden"
             >
-              <div className="flex items-center justify-between">
-                <h3 className="text-base font-bold text-foreground">Novo Arquivo Técnico</h3>
+              {/* Header do Modal */}
+              <div className="px-6 py-5 border-b border-zinc-800 flex items-start justify-between gap-4 bg-zinc-900/60">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-11 h-11 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary flex-shrink-0 mt-0.5 shadow-inner">
+                    <ShieldCheck size={22} />
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="text-lg sm:text-xl font-bold text-foreground">{selectedItem.name}</h2>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700/60">
+                        {selectedItem.category}
+                      </span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full capitalize font-semibold ${
+                        selectedItem.severity === 'critico' ? 'bg-rose-950/80 text-rose-400 border border-rose-800/60' :
+                        selectedItem.severity === 'alto' ? 'bg-amber-950/80 text-amber-400 border border-amber-800/60' :
+                        selectedItem.severity === 'medio' ? 'bg-blue-950/80 text-blue-400 border border-blue-800/60' :
+                        'bg-emerald-950/80 text-emerald-400 border border-emerald-800/60'
+                      }`}>
+                        {selectedItem.severity}
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-400 mt-1">{selectedItem.description}</p>
+
+                    {/* Normas e Tags */}
+                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                      {selectedItem.complianceStandards && selectedItem.complianceStandards.length > 0 && (
+                        <div className="flex items-center gap-1">
+                          {selectedItem.complianceStandards.map(comp => (
+                            <span key={comp} className="text-[10px] px-2 py-0.2 rounded bg-emerald-950/40 text-emerald-400 border border-emerald-800/40 font-mono">
+                              {comp}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <div className="flex items-center gap-1">
+                        {selectedItem.tags.map(t => (
+                          <span key={t} className="text-[10px] font-mono text-zinc-500">#{t}</span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <button
-                  onClick={() => setIsAddFileModalOpen(false)}
-                  className="p-1 rounded-lg text-zinc-400 hover:text-foreground"
+                  onClick={() => setSelectedItem(null)}
+                  className="p-2 rounded-xl text-zinc-400 hover:text-foreground hover:bg-white/5 cursor-pointer transition-colors"
+                  title="Fechar modal"
                 >
-                  <X size={16} />
+                  <X size={18} />
                 </button>
               </div>
 
-              <form onSubmit={handleCreateFileSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1">
-                    Caminho Relativo (ex: rules.json, checklist.md)
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="checklist.md"
-                    value={newFilePath}
-                    onChange={e => setNewFilePath(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-foreground focus:outline-none focus:border-primary/50"
-                  />
+              {/* Barra de Ferramentas do Documento Explicativo */}
+              <div className="px-6 py-3 border-b border-zinc-800/60 bg-zinc-900/40 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
+                    <FileText size={14} className="text-primary" />
+                    Documento Explicativo & Diretriz de Aplicação
+                  </span>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1">
-                    Conteúdo Inicial
-                  </label>
-                  <textarea
-                    rows={4}
-                    placeholder="# Conteúdo inicial do arquivo..."
-                    value={newFileContent}
-                    onChange={e => setNewFileContent(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-foreground focus:outline-none focus:border-primary/50 font-mono"
-                  />
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center bg-zinc-900 rounded-lg p-0.5 border border-zinc-800 text-xs">
+                    <button
+                      onClick={() => setPreviewMode('preview')}
+                      className={`flex items-center gap-1.5 px-3 py-1 rounded-md transition-colors cursor-pointer ${
+                        previewMode === 'preview' ? 'bg-zinc-800 text-primary font-semibold' : 'text-zinc-400 hover:text-zinc-200'
+                      }`}
+                    >
+                      <Eye size={13} />
+                      Visualizar
+                    </button>
+                    <button
+                      onClick={() => setPreviewMode('edit')}
+                      className={`flex items-center gap-1.5 px-3 py-1 rounded-md transition-colors cursor-pointer ${
+                        previewMode === 'edit' ? 'bg-zinc-800 text-primary font-semibold' : 'text-zinc-400 hover:text-zinc-200'
+                      }`}
+                    >
+                      <Code2 size={13} />
+                      Editar
+                    </button>
+                  </div>
+
+                  <button
+                    onClick={() => handleCopyDocument(documentEditorContent)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-zinc-100 text-xs font-medium cursor-pointer transition-colors"
+                    title="Copiar documento"
+                  >
+                    {copiedDocument ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+                    <span>{copiedDocument ? 'Copiado!' : 'Copiar'}</span>
+                  </button>
+
+                  {previewMode === 'edit' && (
+                    <button
+                      onClick={handleSaveDocumentContent}
+                      disabled={isSavingDocument}
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold cursor-pointer transition-all shadow-md shadow-primary/20"
+                    >
+                      <Save size={13} />
+                      {isSavingDocument ? 'Salvando...' : 'Salvar Alterações'}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Conteúdo do Documento */}
+              <div className="flex-1 overflow-y-auto p-6 sm:p-8 bg-zinc-950">
+                {previewMode === 'preview' ? (
+                  <div className="max-w-3xl mx-auto">
+                    {renderMarkdownPreview(documentEditorContent)}
+                  </div>
+                ) : (
+                  <div className="h-full flex flex-col">
+                    <textarea
+                      value={documentEditorContent}
+                      onChange={e => setDocumentEditorContent(e.target.value)}
+                      placeholder="Escreva a documentação explicativa e as diretrizes práticas de aplicação nos projetos..."
+                      rows={18}
+                      className="w-full h-full min-h-[420px] p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 text-xs text-foreground font-mono leading-relaxed focus:outline-none focus:border-primary/50 resize-y"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Rodapé do Modal */}
+              <div className="px-6 py-3.5 border-t border-zinc-800 bg-zinc-900/60 flex items-center justify-between text-xs text-zinc-500">
+                <div className="flex items-center gap-2">
+                  <span>Atualizado em: {new Date(selectedItem.updatedAt).toLocaleDateString('pt-BR')}</span>
                 </div>
 
-                <div className="flex items-center justify-end gap-2 pt-2">
+                <div className="flex items-center gap-3">
                   <button
-                    type="button"
-                    onClick={() => setIsAddFileModalOpen(false)}
-                    className="px-4 py-2 rounded-xl bg-zinc-800 text-zinc-300 text-xs font-medium"
+                    onClick={() => handleDeleteSecurityItem(selectedItem.id, selectedItem.name)}
+                    className="flex items-center gap-1 text-xs text-zinc-500 hover:text-rose-400 cursor-pointer transition-colors"
                   >
-                    Cancelar
+                    <Trash2 size={13} />
+                    Excluir Diretriz
                   </button>
                   <button
-                    type="submit"
-                    className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold"
+                    onClick={() => setSelectedItem(null)}
+                    className="px-4 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium cursor-pointer transition-colors"
                   >
-                    Criar Arquivo
+                    Fechar
                   </button>
                 </div>
-              </form>
+              </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* Modal de Cadastrar Nova Tecnologia de Segurança */}
+      {/* Modal de Cadastrar Nova Diretriz de Segurança (Sem Arquivos) */}
       <AnimatePresence>
         {isCreateModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
@@ -1144,8 +979,8 @@ export default function Security() {
                     <ShieldCheck size={20} />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-foreground">Cadastrar Tecnologia de Segurança</h3>
-                    <p className="text-xs text-zinc-400">Adicione uma nova diretriz técnica à biblioteca corporativa.</p>
+                    <h3 className="text-lg font-bold text-foreground">Nova Diretriz de Segurança</h3>
+                    <p className="text-xs text-zinc-400">Cadastre um documento explicativo para consulta e aplicação nos projetos.</p>
                   </div>
                 </div>
                 <button
@@ -1159,12 +994,12 @@ export default function Security() {
               <form onSubmit={handleCreateSecuritySubmit} className="space-y-4">
                 <div>
                   <label className="block text-xs font-medium text-zinc-400 mb-1">
-                    Nome da Tecnologia / Método
+                    Nome da Diretriz / Método de Segurança
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="Hardening de Headers HTTP e Helmet"
+                    placeholder="Ex: Proteção contra Injeção de SQL e Sanitização Zod"
                     value={newName}
                     onChange={e => setNewName(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-foreground focus:outline-none focus:border-primary/50"
@@ -1177,6 +1012,7 @@ export default function Security() {
                     <select
                       value={newCategory}
                       onChange={e => setNewCategory(e.target.value as any)}
+                      aria-label="Categoria técnica de segurança"
                       className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-foreground focus:outline-none focus:border-primary/50"
                     >
                       <option value="hardening">Hardening & Headers</option>
@@ -1190,10 +1026,11 @@ export default function Security() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-zinc-400 mb-1">Nível de Severidade</label>
+                    <label className="block text-xs font-medium text-zinc-400 mb-1">Nível de Severidade / Impacto</label>
                     <select
                       value={newSeverity}
                       onChange={e => setNewSeverity(e.target.value as any)}
+                      aria-label="Nível de severidade ou impacto de segurança"
                       className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-foreground focus:outline-none focus:border-primary/50"
                     >
                       <option value="critico">Crítico</option>
@@ -1206,11 +1043,11 @@ export default function Security() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1">Resumo Executivo</label>
+                  <label className="block text-xs font-medium text-zinc-400 mb-1">Resumo Conciso</label>
                   <textarea
                     rows={2}
                     required
-                    placeholder="Explicação concisa do objetivo desta segurança..."
+                    placeholder="Explicação rápida do objetivo desta diretriz..."
                     value={newDesc}
                     onChange={e => setNewDesc(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-foreground focus:outline-none focus:border-primary/50"
@@ -1224,7 +1061,7 @@ export default function Security() {
                     </label>
                     <input
                       type="text"
-                      placeholder="LGPD, OWASP Top 10, NIST"
+                      placeholder="LGPD, OWASP Top 10, NIST SP 800-53"
                       value={newCompliance}
                       onChange={e => setNewCompliance(e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-foreground focus:outline-none focus:border-primary/50"
@@ -1237,7 +1074,7 @@ export default function Security() {
                     </label>
                     <input
                       type="text"
-                      placeholder="node, express, seguranca"
+                      placeholder="sql, sanitizacao, prisma, zod"
                       value={newTags}
                       onChange={e => setNewTags(e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-foreground focus:outline-none focus:border-primary/50"
@@ -1247,12 +1084,13 @@ export default function Security() {
 
                 <div>
                   <label className="block text-xs font-medium text-zinc-400 mb-1">
-                    Conteúdo Inicial do SECURITY.md
+                    Documento Explicativo (Como funciona e como aplicar nos projetos)
                   </label>
                   <textarea
-                    rows={6}
-                    value={newContent}
-                    onChange={e => setNewContent(e.target.value)}
+                    rows={8}
+                    placeholder={`# Nome da Diretriz\n\n## 1. Visão Geral\nExplicação de como funciona o método...\n\n## 2. Como Aplicar nos Projetos\nInstruções práticas de implementação...`}
+                    value={newDocumentContent}
+                    onChange={e => setNewDocumentContent(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-foreground font-mono focus:outline-none focus:border-primary/50 leading-relaxed"
                   />
                 </div>
@@ -1270,7 +1108,7 @@ export default function Security() {
                     disabled={isSubmitting}
                     className="px-5 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold shadow-lg shadow-primary/20 cursor-pointer"
                   >
-                    {isSubmitting ? 'Cadastrando...' : 'Cadastrar Padrão'}
+                    {isSubmitting ? 'Cadastrando...' : 'Cadastrar Diretriz'}
                   </button>
                 </div>
               </form>

@@ -181,6 +181,14 @@ export interface ListSecurityFilter {
   query?: string;
 }
 
+function hydrateSecurityContent(s: SecurityItem): SecurityItem {
+  if (!s.content || s.content.trim() === '') {
+    const secFile = (s.files || []).find(f => f.path.toLowerCase() === 'security.md' && !f.deletedAt) || s.files?.[0];
+    s.content = secFile?.content || s.description || '';
+  }
+  return s;
+}
+
 export function listSecurityItems(filters: ListSecurityFilter = {}): SecurityItem[] {
   const db = readDb();
   let list = db.security_items || [];
@@ -213,7 +221,7 @@ export function listSecurityItems(filters: ListSecurityFilter = {}): SecurityIte
     );
   }
 
-  return list;
+  return list.map(hydrateSecurityContent);
 }
 
 export function getSecurityItem(idOrSlug: string): SecurityItem | null {
@@ -222,16 +230,19 @@ export function getSecurityItem(idOrSlug: string): SecurityItem | null {
   const list = db.security_items || [];
   const normalized = idOrSlug.trim().toLowerCase();
 
-  return list.find(s =>
+  const found = list.find(s =>
     s.id === idOrSlug ||
     s.slug === idOrSlug ||
     s.slug.toLowerCase() === normalized ||
     s.id.toLowerCase() === normalized
   ) || null;
+
+  return found ? hydrateSecurityContent(found) : null;
 }
 
 export type CreateSecurityItemPayload = Omit<Partial<SecurityItem>, 'files'> & {
   initialContent?: string;
+  content?: string;
   files?: Array<Partial<SecurityFile> & { name?: string; path?: string; content?: string }>;
 };
 
@@ -279,11 +290,12 @@ export function createSecurityItem(payload: CreateSecurityItemPayload, actor: st
     }
   }
 
+  const documentContent = payload.content || payload.initialContent || `# ${payload.name || 'Padrão de Segurança'}\n\n## Diretrizes e Requisitos\n${payload.description || ''}\n\n## Checklist de Implementação\n- [ ] Validação no código-fonte\n- [ ] Testes de conformidade\n`;
+
   // Garantir arquivo SECURITY.md obrigatório
   const hasSecurityMd = normalizedFiles.some(f => f.path.toLowerCase() === 'security.md' && !f.deletedAt);
 
   if (!hasSecurityMd) {
-    const defaultContent = payload.initialContent || `# ${payload.name || 'Padrão de Segurança'}\n\n## Diretrizes e Requisitos\n${payload.description || ''}\n\n## Checklist de Implementação\n- [ ] Validação no código-fonte\n- [ ] Testes de conformidade\n`;
     const secFile: SecurityFile = {
       id: `file_${id}_security_md`,
       securityId: id,
@@ -291,9 +303,9 @@ export function createSecurityItem(payload: CreateSecurityItemPayload, actor: st
       name: 'SECURITY.md',
       extension: '.md',
       contentType: 'text/markdown; charset=utf-8',
-      sizeBytes: Buffer.byteLength(defaultContent, 'utf8'),
-      sha256: computeSha256(defaultContent),
-      content: defaultContent,
+      sizeBytes: Buffer.byteLength(documentContent, 'utf8'),
+      sha256: computeSha256(documentContent),
+      content: documentContent,
       version: '1.0.0',
       createdAt: now,
       updatedAt: now,
@@ -313,6 +325,7 @@ export function createSecurityItem(payload: CreateSecurityItemPayload, actor: st
     status: payload.status || 'ativo',
     complianceStandards: payload.complianceStandards || ['OWASP Top 10'],
     mitigatedVulnerabilities: payload.mitigatedVulnerabilities || [],
+    content: documentContent,
     files: normalizedFiles,
     createdAt: now,
     updatedAt: now
@@ -346,6 +359,22 @@ export function updateSecurityItem(id: string, payload: Partial<SecurityItem>, a
     newSlug = cleanSlug;
   }
 
+  let updatedFiles = existing.files || [];
+  let updatedContent = existing.content || (existing.files?.[0]?.content) || existing.description || '';
+  if (payload.content !== undefined) {
+    updatedContent = payload.content;
+    const secFileIdx = updatedFiles.findIndex(f => f.path.toLowerCase() === 'security.md' && !f.deletedAt);
+    if (secFileIdx >= 0) {
+      updatedFiles[secFileIdx] = {
+        ...updatedFiles[secFileIdx],
+        content: payload.content,
+        sizeBytes: Buffer.byteLength(payload.content, 'utf8'),
+        sha256: computeSha256(payload.content),
+        updatedAt: now
+      };
+    }
+  }
+
   const updated: SecurityItem = {
     ...existing,
     name: payload.name !== undefined ? payload.name : existing.name,
@@ -357,6 +386,8 @@ export function updateSecurityItem(id: string, payload: Partial<SecurityItem>, a
     tags: payload.tags !== undefined ? payload.tags.map(t => t.toLowerCase().trim()) : existing.tags,
     complianceStandards: payload.complianceStandards !== undefined ? payload.complianceStandards : existing.complianceStandards,
     mitigatedVulnerabilities: payload.mitigatedVulnerabilities !== undefined ? payload.mitigatedVulnerabilities : existing.mitigatedVulnerabilities,
+    content: updatedContent,
+    files: updatedFiles,
     updatedAt: now
   };
 
