@@ -163,6 +163,14 @@ Seu objetivo é conduzir interações ágeis, seguras e orientadas a resultados 
 A Central conta com uma biblioteca de personas e procedimentos especializados.
 - **Descobrir Skills:** Execute \`firstsys_skills_list\` para ver personas prontas.
 - **Carregar Diretrizes da Skill:** Use \`firstsys_skills_get(skill_id)\` para ler as instruções detalhadas do arquivo \`SKILL.md\`.
+
+---
+
+## 3. Diretrizes e Padrões de Segurança Corporativos
+A Central Firstsys mantém uma base de conhecimento de segurança técnica e arquitetural (LGPD, OAuth/JWT, Rate Limit, Criptografia, etc.). Cada diretriz é estruturada como um documento explicativo completo em Markdown.
+- **Consultar Diretrizes:** Use \`firstsys_security_list\` para listar ou pesquisar padrões por categoria ou termo.
+- **Obter Diretriz Completa:** Execute \`firstsys_security_get(security_id)\` para receber o texto explicativo da diretriz diretamente na propriedade \`content\` / \`document\`.
+- **Criar/Atualizar Diretriz:** Utilize \`firstsys_security_create\` ou \`firstsys_security_update\` fornecendo \`content\` com a documentação explicativa em Markdown.
 `;
 fs.writeFileSync(path.join(OUTPUT_DIR, 'instructions.md'), systemInstructions, 'utf8');
 console.log('✅ instructions.md gerado.');
@@ -191,9 +199,10 @@ Este pacote reúne todas as especificações e instruções necessárias para co
 4. \`.mcp.json\`: Configuração de servidor MCP remoto.
 5. \`.app.json\`: Configuração de aplicativo OpenAI com vínculo ao \`asdk_app_6acb2a1e159c8191a53f5f2b3da33e8c\`.
 6. \`skills/*/SKILL.md\`: Coleção de Skills e instruções operacionais da Central Firstsys com YAML frontmatter.
-7. \`openapi.json\`: Especificação OpenAPI 3.1.0 completa das 40 ferramentas.
-8. \`instructions.md\`: Prompt mestre de diretrizes operacionais.
-9. \`tools_reference.md\`: Guia resumido de cada ferramenta disponível.
+7. \`security/*/SECURITY.md\`: Coleção de diretrizes explicativas e padrões técnicos de segurança corporativa.
+8. \`openapi.json\`: Especificação OpenAPI 3.1.0 completa das ferramentas.
+9. \`instructions.md\`: Prompt mestre de diretrizes operacionais.
+10. \`tools_reference.md\`: Guia resumido de cada ferramenta disponível.
 `;
 fs.writeFileSync(path.join(OUTPUT_DIR, 'README.md'), readmeContent, 'utf8');
 console.log('✅ README.md gerado.');

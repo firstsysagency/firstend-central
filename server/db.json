@@ -298,7 +298,7 @@
       "version": "1.0.1",
       "author": "Firstsys AI",
       "createdAt": "2026-10-14T10:00:00.000Z",
-      "updatedAt": "2026-10-17T05:32:12.651Z",
+      "updatedAt": "2026-10-17T05:49:06.520Z",
       "files": [
         {
           "id": "file_sdr_qualificacao_SKILL_md",
@@ -2822,6 +2822,41 @@
       ],
       "createdAt": "2026-10-17T05:32:12.651Z",
       "createdBy": "test-runner"
+    },
+    {
+      "id": "ver_4fbc4c3f_ff40_",
+      "skillId": "skill_sdr_qualificacao",
+      "version": "1.0.1",
+      "changelog": "Teste de versionamento",
+      "snapshotHash": "373f1991b965be5c14f53313f740be1bede7c76d263b67b27a29bf7c84e6bc15",
+      "filesSnapshot": [
+        {
+          "path": "SKILL.md",
+          "sha256": "1deb846884b3690a830ddf214957a1aba163b32a548c2d085b4a5dbc845a0bc6",
+          "sizeBytes": 1098,
+          "name": "SKILL.md"
+        },
+        {
+          "path": "rules.json",
+          "sha256": "087ff3c0cd16b469145ffeb87c54a1f1c9a7fc217852482382b7903b67db73f6",
+          "sizeBytes": 223,
+          "name": "rules.json"
+        },
+        {
+          "path": "prompts/qualification.md",
+          "sha256": "b60fb4346dee34a34c5e9ad2da88952026612e823e71e7bd07db74f5c8217e7a",
+          "sizeBytes": 484,
+          "name": "qualification.md"
+        },
+        {
+          "path": "templates/message-template.md",
+          "sha256": "11d0b24469f7709982bf450151c999da09c40d00f1dcd758372448a5a557c15f",
+          "sizeBytes": 355,
+          "name": "message-template.md"
+        }
+      ],
+      "createdAt": "2026-10-17T05:49:06.520Z",
+      "createdBy": "test-runner"
     }
   ],
   "skill_installations": [
@@ -3652,6 +3687,38 @@
       "action": "skill.uninstalled",
       "details": "Desinstalada do contexto [agent: Agente SDR Teste Unitário]",
       "createdAt": "2026-10-17T05:32:12.677Z"
+    },
+    {
+      "id": "audit_8c3ff907-fca5-4a79-8738-2c8ce2e080ef",
+      "skillId": "skill_sdr_qualificacao",
+      "actor": "test-runner",
+      "action": "file.restored",
+      "details": "Arquivo \"prompts/test-automated.md\" restaurado com sucesso",
+      "createdAt": "2026-10-17T05:49:06.505Z"
+    },
+    {
+      "id": "audit_527da8da-92c0-4361-a80e-954a29cd68c5",
+      "skillId": "skill_sdr_qualificacao",
+      "actor": "test-runner",
+      "action": "version.created",
+      "details": "Versão 1.0.1 registrada (Snapshot: 373f1991...)",
+      "createdAt": "2026-10-17T05:49:06.524Z"
+    },
+    {
+      "id": "audit_fb8b218b-4641-48ae-9800-0e0c2586bafa",
+      "skillId": "skill_sdr_qualificacao",
+      "actor": "test-runner",
+      "action": "skill.installed",
+      "details": "Skill vinculada com sucesso ao contexto [agent: Agente SDR Teste Unitário] na versão 1.0.0",
+      "createdAt": "2026-10-17T05:49:06.534Z"
+    },
+    {
+      "id": "audit_c1df8088-fdc9-43ed-81a5-a47d93528b94",
+      "skillId": "skill_sdr_qualificacao",
+      "actor": "test-runner",
+      "action": "skill.uninstalled",
+      "details": "Desinstalada do contexto [agent: Agente SDR Teste Unitário]",
+      "createdAt": "2026-10-17T05:49:06.545Z"
     }
   ],
   "security_items": [
@@ -3694,8 +3761,8 @@
           "sha256": "86f218729dfd0619f15691bc0f4a4115e988c4163cfbd18ba7f2a153b89d90f9",
           "content": "---\nname: hardening-headers-http\ndescription: Padrão oficial de cabeçalhos HTTP com Helmet para proteção de aplicações web.\nversion: 1.0.0\ncategory: hardening\nseverity: alto\ncompliance: OWASP Top 10 (A05)\n---\n\n# Hardening de Headers HTTP e Políticas de Navegador\n\n## Objetivo\nGarantir que todo tráfego web trafegue sob HTTPS estrito com cabeçalhos de segurança defensivos configurados via middleware oficial Helmet.\n\n## Diretrizes de Implementação\n1. **HSTS Obrigatório:** `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload`\n2. **Anti-Clickjacking:** `X-Frame-Options: SAMEORIGIN` ou `frame-ancestors 'self'` via Content Security Policy.\n3. **No-Sniff:** `X-Content-Type-Options: nosniff` para impedir interpretação de arquivos como scripts executáveis.\n4. **Política de Referrer:** `Referrer-Policy: strict-origin-when-cross-origin`.\n5. **Supressão de Fingerprinting:** Remover cabeçalho `X-Powered-By`.\n",
           "version": "1.0.0",
-          "createdAt": "2026-10-17T05:32:21.287Z",
-          "updatedAt": "2026-10-17T05:32:21.287Z",
+          "createdAt": "2026-10-17T05:49:10.858Z",
+          "updatedAt": "2026-10-17T05:49:10.858Z",
           "deletedAt": null
         },
         {
@@ -3709,8 +3776,8 @@
           "sha256": "35120b74a5ec795365c58be578e6c14caacc4739117dcbac7a35bbdce7138c82",
           "content": "{\n  \"enforce_https_only\": true,\n  \"hsts_max_age_seconds\": 31536000,\n  \"allow_inline_scripts\": false,\n  \"remove_powered_by\": true,\n  \"frame_options\": \"SAMEORIGIN\"\n}",
           "version": "1.0.0",
-          "createdAt": "2026-10-17T05:32:21.287Z",
-          "updatedAt": "2026-10-17T05:32:21.287Z",
+          "createdAt": "2026-10-17T05:49:10.859Z",
+          "updatedAt": "2026-10-17T05:49:10.859Z",
           "deletedAt": null
         },
         {
@@ -3724,13 +3791,13 @@
           "sha256": "aff96bc41784547f72ef197203b6b944aae80e4a9ffe76df25c649f335a2130d",
           "content": "# Checklist de Auditoria: Headers HTTP\n- [ ] O pacote `helmet` está instalado e ativado no topo da stack de middlewares.\n- [ ] O cabeçalho `X-Powered-By` está ausente nas respostas.\n- [ ] O HSTS está configurado com validade de pelo menos 1 ano (31536000s).\n- [ ] Teste de cabeçalhos com securityheaders.com atinge nota A+.\n",
           "version": "1.0.0",
-          "createdAt": "2026-10-17T05:32:21.287Z",
-          "updatedAt": "2026-10-17T05:32:21.287Z",
+          "createdAt": "2026-10-17T05:49:10.859Z",
+          "updatedAt": "2026-10-17T05:49:10.859Z",
           "deletedAt": null
         }
       ],
       "createdAt": "2026-10-17T02:21:49.287Z",
-      "updatedAt": "2026-10-17T05:32:21.286Z"
+      "updatedAt": "2026-10-17T05:49:10.858Z"
     },
     {
       "id": "sec_sanitizacao_validacao_zod",
@@ -3770,8 +3837,8 @@
           "sha256": "7062eb543ef4ab86f9e9fc5e0eaa4364c9e65b05042a373f7a2838c7b9fc0220",
           "content": "---\nname: sanitizacao-validacao-zod\ndescription: Validação defensiva de entrada baseada em contrato tipado estrito com Zod.\nversion: 1.0.0\ncategory: hardening\nseverity: critico\ncompliance: OWASP Top 10 (A03, A04)\n---\n\n# Sanitização de Entrada e Validação com Zod\n\n## Regras Inegociáveis\n1. **Schema Estrito (.strict()):** Nenhum campo extra desconhecido pode ser aceito em formulários ou payloads de API.\n2. **Validação Antes da Execução:** O safeParse deve rodar antes de qualquer processamento de negócio ou consulta ao banco.\n3. **Higienização de Strings:** Strings de texto livre devem ser aparadas (`.trim()`) e validadas contra limites de tamanho.\n",
           "version": "1.0.0",
-          "createdAt": "2026-10-17T05:32:21.287Z",
-          "updatedAt": "2026-10-17T05:32:21.287Z",
+          "createdAt": "2026-10-17T05:49:10.859Z",
+          "updatedAt": "2026-10-17T05:49:10.859Z",
           "deletedAt": null
         },
         {
@@ -3785,8 +3852,8 @@
           "sha256": "61c16c9fb778047e5051496a95ed8230effb9d11f73ed100f718cd582caa5eab",
           "content": "{\n  \"require_strict_mode\": true,\n  \"max_string_length_default\": 1000,\n  \"prohibit_prototype_keys\": [\n    \"__proto__\",\n    \"constructor\",\n    \"prototype\"\n  ]\n}",
           "version": "1.0.0",
-          "createdAt": "2026-10-17T05:32:21.287Z",
-          "updatedAt": "2026-10-17T05:32:21.287Z",
+          "createdAt": "2026-10-17T05:49:10.859Z",
+          "updatedAt": "2026-10-17T05:49:10.859Z",
           "deletedAt": null
         },
         {
@@ -3800,13 +3867,13 @@
           "sha256": "c6638708bb840a62258377d4652d55f97b4e70634d9ecbacc2e32b7705549f21",
           "content": "# Checklist de Validação Zod\n- [ ] Todo endpoint POST/PUT/PATCH possui schema Zod associado com `.strict()`.\n- [ ] Erros de validação retornam status 400 sem vazar stack trace.\n- [ ] Campos de identificador (UUID, slugs, IDs numéricos) usam regex específico.\n",
           "version": "1.0.0",
-          "createdAt": "2026-10-17T05:32:21.287Z",
-          "updatedAt": "2026-10-17T05:32:21.287Z",
+          "createdAt": "2026-10-17T05:49:10.859Z",
+          "updatedAt": "2026-10-17T05:49:10.859Z",
           "deletedAt": null
         }
       ],
       "createdAt": "2026-10-17T02:21:49.287Z",
-      "updatedAt": "2026-10-17T05:32:21.286Z"
+      "updatedAt": "2026-10-17T05:49:10.858Z"
     },
     {
       "id": "sec_prevencao_sql_injection",
@@ -3844,8 +3911,8 @@
           "sha256": "2a74ec32b8fa66476b2265989269b78d88c5c067fcd610eafe7e94a5b2a2c311",
           "content": "---\nname: prevencao-sql-injection\ndescription: Diretrizes de escrita de queries SQL com prepared statements e isolamento de banco.\nversion: 1.0.0\ncategory: banco_de_dados\nseverity: critico\ncompliance: OWASP Top 10 (A03)\n---\n\n# Prevenção contra SQL Injection\n\n## Práticas Obrigatórias\n- **Zero Concatenação de SQL:** Nunca utilize template strings (`${var}`) ou concatenação com `+` em consultas SQL.\n- **Parâmetros Tipados:** Sempre use placeholders posicionais (`$1, $2` no PostgreSQL) gerenciados pelo driver do banco.\n- **Usuário da Aplicação Sem Privilégios de DDL:** O usuário de conexão em produção não deve ter permissão de `DROP TABLE`, `ALTER TABLE` ou criar bancos.\n",
           "version": "1.0.0",
-          "createdAt": "2026-10-17T05:32:21.287Z",
-          "updatedAt": "2026-10-17T05:32:21.287Z",
+          "createdAt": "2026-10-17T05:49:10.859Z",
+          "updatedAt": "2026-10-17T05:49:10.859Z",
           "deletedAt": null
         },
         {
@@ -3859,13 +3926,13 @@
           "sha256": "e0cbbe67d488b39b1fe957a9b4d5ffd49cd975aa48d6c3413968f140307ba511",
           "content": "# Checklist contra SQL Injection\n- [ ] Todas as consultas SQL usam prepared statements ou ORM seguro.\n- [ ] Nenhum parâmetro de entrada do usuário é concatenado diretamente na cláusula WHERE ou ORDER BY.\n- [ ] Credenciais do banco não usam o usuário 'postgres' (superusuário) na aplicação.\n",
           "version": "1.0.0",
-          "createdAt": "2026-10-17T05:32:21.287Z",
-          "updatedAt": "2026-10-17T05:32:21.287Z",
+          "createdAt": "2026-10-17T05:49:10.859Z",
+          "updatedAt": "2026-10-17T05:49:10.859Z",
           "deletedAt": null
         }
       ],
       "createdAt": "2026-10-17T02:21:49.287Z",
-      "updatedAt": "2026-10-17T05:32:21.286Z"
+      "updatedAt": "2026-10-17T05:49:10.858Z"
     },
     {
       "id": "sec_protecao_anti_ssrf_webhooks",
@@ -3905,8 +3972,8 @@
           "sha256": "f59a353931fe2c750c88c25049c005cb7c72fc6d46d9120167abbc3b97f8dfc1",
           "content": "---\nname: protecao-anti-ssrf-webhooks\ndescription: Bloqueio estrito de SSRF para chamadas externas e validação criptográfica de webhooks.\nversion: 1.0.0\ncategory: rede_api\nseverity: critico\ncompliance: OWASP Top 10 (A10)\n---\n\n# Proteção Anti-SSRF e Validação de Webhooks\n\n## Regras de Requisições HTTP de Saída (Outbound)\n1. **Resolução DNS Antecipada:** Antes de fazer fetch, resolver o hostname e verificar se o IP resultante pertence a faixas privadas:\n   - `127.0.0.0/8` (Loopback)\n   - `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16` (RFC 1918)\n   - `169.254.169.254` (Link-Local / Metadados de Nuvem)\n2. **Apenas Protocolos HTTP e HTTPS:** Bloquear `file://`, `gopher://`, `ftp://`, etc.\n3. **Webhooks Assinados:** Todo webhook recebido deve verificar a assinatura HMAC SHA-256 no header com chave secreta compartilhada em tempo constante (`timingSafeEqual`).\n",
           "version": "1.0.0",
-          "createdAt": "2026-10-17T05:32:21.287Z",
-          "updatedAt": "2026-10-17T05:32:21.287Z",
+          "createdAt": "2026-10-17T05:49:10.859Z",
+          "updatedAt": "2026-10-17T05:49:10.859Z",
           "deletedAt": null
         },
         {
@@ -3920,13 +3987,13 @@
           "sha256": "b3e7e9d6c470818995460817107f4614ceba35693257ee765bb7486916978273",
           "content": "{\n  \"blocked_ips\": [\n    \"127.0.0.1\",\n    \"localhost\",\n    \"169.254.169.254\",\n    \"0.0.0.0\"\n  ],\n  \"blocked_cidr_ranges\": [\n    \"10.0.0.0/8\",\n    \"172.16.0.0/12\",\n    \"192.168.0.0/16\"\n  ],\n  \"allowed_protocols\": [\n    \"https:\",\n    \"http:\"\n  ],\n  \"require_hmac_sha256_webhook_verification\": true\n}",
           "version": "1.0.0",
-          "createdAt": "2026-10-17T05:32:21.287Z",
-          "updatedAt": "2026-10-17T05:32:21.287Z",
+          "createdAt": "2026-10-17T05:49:10.859Z",
+          "updatedAt": "2026-10-17T05:49:10.859Z",
           "deletedAt": null
         }
       ],
       "createdAt": "2026-10-17T02:21:49.287Z",
-      "updatedAt": "2026-10-17T05:32:21.286Z"
+      "updatedAt": "2026-10-17T05:49:10.858Z"
     },
     {
       "id": "sec_criptografia_aes_gcm",
@@ -3966,8 +4033,8 @@
           "sha256": "b199b4d9dd8562d1095ff6e4e6f8e57c37520b5a51cc23b81429a02a77d9d1b4",
           "content": "---\nname: criptografia-aes-gcm\ndescription: Criptografia autenticada AES-256-GCM para armazenamento seguro de chaves e dados sensíveis.\nversion: 1.0.0\ncategory: criptografia\nseverity: critico\ncompliance: NIST SP 800-38D, LGPD\n---\n\n# Criptografia de Dados Sensíveis AES-256-GCM\n\n## Requisitos Criptográficos\n- **Algoritmo:** `aes-256-gcm`\n- **Tamanho da Chave:** 256 bits (32 bytes binários derivados via PBKDF2 ou chave mestra de alta entropia).\n- **Initialization Vector (IV):** 12 bytes (96 bits) gerados aleatoriamente com CSPRNG (`crypto.randomBytes(12)`) para **cada** operação de criptografia. Nunca reusar o mesmo IV.\n- **Tag de Autenticação:** 16 bytes (128 bits) gerada pelo GCM e validada na decifragem antes de liberar o plaintext.\n- **Formato de Armazenamento:** `iv_hex:auth_tag_hex:ciphertext_hex`.\n",
           "version": "1.0.0",
-          "createdAt": "2026-10-17T05:32:21.287Z",
-          "updatedAt": "2026-10-17T05:32:21.287Z",
+          "createdAt": "2026-10-17T05:49:10.859Z",
+          "updatedAt": "2026-10-17T05:49:10.859Z",
           "deletedAt": null
         },
         {
@@ -3981,13 +4048,13 @@
           "sha256": "020e784d0e4c28dcebabd595868f799bef2599cca2b0e351173341f62e7a93ca",
           "content": "{\n  \"algorithm\": \"aes-256-gcm\",\n  \"iv_length_bytes\": 12,\n  \"auth_tag_length_bytes\": 16,\n  \"key_length_bytes\": 32,\n  \"prohibit_weak_ciphers\": [\n    \"des\",\n    \"3des\",\n    \"rc4\",\n    \"aes-ecb\"\n  ]\n}",
           "version": "1.0.0",
-          "createdAt": "2026-10-17T05:32:21.287Z",
-          "updatedAt": "2026-10-17T05:32:21.287Z",
+          "createdAt": "2026-10-17T05:49:10.859Z",
+          "updatedAt": "2026-10-17T05:49:10.859Z",
           "deletedAt": null
         }
       ],
       "createdAt": "2026-10-17T02:21:49.287Z",
-      "updatedAt": "2026-10-17T05:32:21.286Z"
+      "updatedAt": "2026-10-17T05:49:10.858Z"
     },
     {
       "id": "sec_rate_limiting_defesa_bruteforce",
@@ -4026,8 +4093,8 @@
           "sha256": "1efea53712803bbec8824dbe1abe8eb781ec3b167cf8ac722870c4f8be24e029",
           "content": "---\nname: rate_limiting_defesa_bruteforce\ndescription: Estratégia de rate limit escalonada por sensibilidade de endpoint.\nversion: 1.0.0\ncategory: rede_api\nseverity: alto\ncompliance: OWASP API4\n---\n\n# Controle de Taxa (Rate Limit) e Defesa Brute Force\n\n## Escalonamento de Limites\n1. **Rotas Críticas de Autenticação (/login, /oauth/token, /mfa):**\n   - Limite: 5 requisições por janela de 15 minutos por IP/usuário.\n   - Resposta: HTTP 429 Too Many Requests com cabeçalho `Retry-After`.\n2. **Rotas Gerais de API (/api/*, /mcp/*):**\n   - Limite: 100 a 300 requisições por minuto por chave/token.\n3. **Cabeçalhos Padrão RFC 6585:**\n   - `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-Reset`.\n",
           "version": "1.0.0",
-          "createdAt": "2026-10-17T05:32:21.287Z",
-          "updatedAt": "2026-10-17T05:32:21.287Z",
+          "createdAt": "2026-10-17T05:49:10.859Z",
+          "updatedAt": "2026-10-17T05:49:10.859Z",
           "deletedAt": null
         },
         {
@@ -4041,13 +4108,13 @@
           "sha256": "9f93cc2b49d59e7a9857912807517d65e069ed752a9e04113245d1f3d74d5a50",
           "content": "{\n  \"auth_window_minutes\": 15,\n  \"auth_max_attempts\": 5,\n  \"api_window_minutes\": 1,\n  \"api_max_requests\": 120,\n  \"standard_headers\": true\n}",
           "version": "1.0.0",
-          "createdAt": "2026-10-17T05:32:21.287Z",
-          "updatedAt": "2026-10-17T05:32:21.287Z",
+          "createdAt": "2026-10-17T05:49:10.859Z",
+          "updatedAt": "2026-10-17T05:49:10.859Z",
           "deletedAt": null
         }
       ],
       "createdAt": "2026-10-17T02:21:49.287Z",
-      "updatedAt": "2026-10-17T05:32:21.286Z"
+      "updatedAt": "2026-10-17T05:49:10.858Z"
     },
     {
       "id": "sec_autenticacao_mfa_totp",
@@ -4090,8 +4157,8 @@
           "sha256": "9d48fe9b234285986a4979edc6690479c7644155183e43304e8b8f3c089c0b9c",
           "content": "---\nname: autenticacao-mfa-totp\ndescription: Padrão corporativo de autenticação multifator e sessões OAuth 2.1 protegidas com PKCE.\nversion: 1.0.0\ncategory: autenticacao\nseverity: critico\ncompliance: NIST SP 800-63B, OAuth 2.1\n---\n\n# Autenticação Segura MFA / TOTP e OAuth 2.1\n\n## Padrões de Segurança\n- **TOTP (RFC 6238):** Passo de tempo de 30 segundos, algoritmo HMAC SHA-1/SHA-256 com janela de tolerância máxima de ±1 passo.\n- **Armazenamento de Segredos TOTP:** O segredo base32 deve ser criptografado em repouso com o cofre AES-256-GCM.\n- **OAuth 2.1 com PKCE Obrigatório:**\n  - Código de autorização de uso único com expiração em 5 minutos.\n  - `code_challenge_method=S256` obrigatório para clientes confidenciais e públicos.\n  - Rotação estrita de refresh token com invalidação automática de toda a família de tokens caso um token antigo seja reutilizado.\n",
           "version": "1.0.0",
-          "createdAt": "2026-10-17T05:32:21.287Z",
-          "updatedAt": "2026-10-17T05:32:21.287Z",
+          "createdAt": "2026-10-17T05:49:10.859Z",
+          "updatedAt": "2026-10-17T05:49:10.859Z",
           "deletedAt": null
         },
         {
@@ -4105,13 +4172,13 @@
           "sha256": "ce07e23a43e8f026239ef7de034afb4bf75cfd03ca92da6fb04d0bfa0c7da987",
           "content": "{\n  \"totp_window_step_seconds\": 30,\n  \"totp_tolerance_steps\": 1,\n  \"oauth_code_lifetime_seconds\": 300,\n  \"jwt_access_token_lifetime_seconds\": 3600,\n  \"enforce_pkce_s256\": true,\n  \"enforce_refresh_token_rotation\": true\n}",
           "version": "1.0.0",
-          "createdAt": "2026-10-17T05:32:21.287Z",
-          "updatedAt": "2026-10-17T05:32:21.287Z",
+          "createdAt": "2026-10-17T05:49:10.859Z",
+          "updatedAt": "2026-10-17T05:49:10.859Z",
           "deletedAt": null
         }
       ],
       "createdAt": "2026-10-17T02:21:49.287Z",
-      "updatedAt": "2026-10-17T05:32:21.286Z"
+      "updatedAt": "2026-10-17T05:49:10.858Z"
     },
     {
       "id": "sec_postgres_rls_multitenant",
@@ -4150,8 +4217,8 @@
           "sha256": "94c683d46b6005fc69a50aec9e53a71cfa3de16d107d02c0d1e6a8f969b816db",
           "content": "---\nname: postgres-rls-multitenant\ndescription: Isolamento absoluto de dados multitenant usando Row Level Security no PostgreSQL.\nversion: 1.0.0\ncategory: banco_de_dados\nseverity: critico\ncompliance: OWASP A01, LGPD\n---\n\n# Row Level Security (RLS) no PostgreSQL\n\n## Arquitetura de Isolamento\n1. **Ativação de RLS na Tabela:**\n   ```sql\n   ALTER TABLE leads ENABLE ROW LEVEL SECURITY;\n   ALTER TABLE leads FORCE ROW LEVEL SECURITY;\n   ```\n2. **Definição de Política por Tenant Context:**\n   ```sql\n   CREATE POLICY tenant_isolation_policy ON leads\n     FOR ALL\n     USING (organization_id = NULLIF(current_setting('app.current_org_id', true), ''))\n     WITH CHECK (organization_id = NULLIF(current_setting('app.current_org_id', true), ''));\n   ```\n3. **Injeção de Contexto no Pool de Conexões:**\n   - Antes de cada query, a aplicação executa: `SET LOCAL app.current_org_id = 'org_xyz';`.\n",
           "version": "1.0.0",
-          "createdAt": "2026-10-17T05:32:21.287Z",
-          "updatedAt": "2026-10-17T05:32:21.287Z",
+          "createdAt": "2026-10-17T05:49:10.859Z",
+          "updatedAt": "2026-10-17T05:49:10.859Z",
           "deletedAt": null
         },
         {
@@ -4165,13 +4232,13 @@
           "sha256": "801fe4dddb9219456aa0bd506dc948d16c3b1eeb2edf7679ad4873786856cfb2",
           "content": "{\n  \"enforce_force_rls\": true,\n  \"tenant_setting_key\": \"app.current_org_id\",\n  \"require_tenant_id_in_all_primary_tables\": true\n}",
           "version": "1.0.0",
-          "createdAt": "2026-10-17T05:32:21.287Z",
-          "updatedAt": "2026-10-17T05:32:21.287Z",
+          "createdAt": "2026-10-17T05:49:10.859Z",
+          "updatedAt": "2026-10-17T05:49:10.859Z",
           "deletedAt": null
         }
       ],
       "createdAt": "2026-10-17T02:21:49.287Z",
-      "updatedAt": "2026-10-17T05:32:21.286Z"
+      "updatedAt": "2026-10-17T05:49:10.858Z"
     }
   ],
   "security_audit_logs": [
@@ -4486,6 +4553,110 @@
       "action": "deleted",
       "details": "Método de segurança 'Controle de Acesso Baseado em Atributos (ABAC)' removido permanentemente",
       "createdAt": "2026-10-17T05:32:21.381Z"
+    },
+    {
+      "id": "sec_audit_89dcd040-f9b0-4c39-93fd-02f84f44636d",
+      "securityId": "sec_331fe034_926a_45",
+      "actor": "test-runner",
+      "action": "created",
+      "details": "Método de segurança 'Controle de Acesso Baseado em Atributos (ABAC)' criado via Central",
+      "metadata": {
+        "slug": "controle-de-acesso-baseado-em-atributos-abac",
+        "filesCount": 1
+      },
+      "createdAt": "2026-10-17T05:49:10.874Z"
+    },
+    {
+      "id": "sec_audit_e7ec85fa-e6bd-4461-8c86-ff6d0568e516",
+      "securityId": "sec_331fe034_926a_45",
+      "actor": "test-runner",
+      "action": "updated",
+      "details": "Método de segurança 'Controle de Acesso Baseado em Atributos (ABAC)' atualizado",
+      "metadata": {
+        "changedKeys": [
+          "tags"
+        ]
+      },
+      "createdAt": "2026-10-17T05:49:10.888Z"
+    },
+    {
+      "id": "sec_audit_c50444ca-598e-4868-90b6-936272bacb2b",
+      "securityId": "sec_331fe034_926a_45",
+      "actor": "test-runner",
+      "action": "tag_added",
+      "details": "Tag '#auditoria-estrita' adicionada ao item",
+      "metadata": {
+        "tag": "auditoria-estrita"
+      },
+      "createdAt": "2026-10-17T05:49:10.892Z"
+    },
+    {
+      "id": "sec_audit_275d23a1-0061-4d69-b8eb-db2a46e31ed5",
+      "securityId": "sec_331fe034_926a_45",
+      "actor": "test-runner",
+      "action": "updated",
+      "details": "Método de segurança 'Controle de Acesso Baseado em Atributos (ABAC)' atualizado",
+      "metadata": {
+        "changedKeys": [
+          "tags"
+        ]
+      },
+      "createdAt": "2026-10-17T05:49:10.903Z"
+    },
+    {
+      "id": "sec_audit_76365432-4a37-4323-a102-4fdf0c17308f",
+      "securityId": "sec_331fe034_926a_45",
+      "actor": "test-runner",
+      "action": "tag_removed",
+      "details": "Tag '#auditoria-estrita' removida do item",
+      "metadata": {
+        "tag": "auditoria-estrita"
+      },
+      "createdAt": "2026-10-17T05:49:10.908Z"
+    },
+    {
+      "id": "sec_audit_7bd47ef4-bc93-455b-8db0-56ce836107e3",
+      "securityId": "sec_331fe034_926a_45",
+      "actor": "test-runner",
+      "action": "file_created",
+      "details": "Arquivo 'checklist.md' criado (80 bytes)",
+      "metadata": {
+        "path": "checklist.md",
+        "sizeBytes": 80,
+        "sha256": "b40acc3372721d8f3c54bbcbfa7bd7bcbe5a50fece89b69b5e883bbd358d414e"
+      },
+      "createdAt": "2026-10-17T05:49:10.917Z"
+    },
+    {
+      "id": "sec_audit_708e5eba-ec3e-4300-8e8c-58d18b57f34b",
+      "securityId": "sec_331fe034_926a_45",
+      "actor": "test-runner",
+      "action": "file_deleted",
+      "details": "Arquivo 'checklist.md' movido para a lixeira",
+      "metadata": {
+        "path": "checklist.md",
+        "permanent": false
+      },
+      "createdAt": "2026-10-17T05:49:10.933Z"
+    },
+    {
+      "id": "sec_audit_af600cf5-db77-4048-ae71-077c27650ac1",
+      "securityId": "sec_331fe034_926a_45",
+      "actor": "test-runner",
+      "action": "file_restored",
+      "details": "Arquivo 'checklist.md' restaurado da lixeira",
+      "metadata": {
+        "path": "checklist.md"
+      },
+      "createdAt": "2026-10-17T05:49:10.944Z"
+    },
+    {
+      "id": "sec_audit_cf0d3894-b918-4668-a9fc-d25530ec1996",
+      "securityId": "sec_331fe034_926a_45",
+      "actor": "test-runner",
+      "action": "deleted",
+      "details": "Método de segurança 'Controle de Acesso Baseado em Atributos (ABAC)' removido permanentemente",
+      "createdAt": "2026-10-17T05:49:10.955Z"
     }
   ]
 }

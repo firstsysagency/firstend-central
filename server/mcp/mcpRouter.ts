@@ -1684,13 +1684,13 @@ export const MCP_TOOLS_CATALOG = [
   },
   {
     name: 'firstsys_security_get',
-    title: 'Consultar Método de Segurança',
-    description: 'Retorna a especificação completa de segurança, checklists, regras técnicas, conformidade e arquivos vinculados.',
+    title: 'Consultar Diretriz de Segurança',
+    description: 'Retorna a especificação e o documento explicativo completo em Markdown da diretriz de segurança para consulta e aplicação nos projetos.',
     inputSchema: {
       type: 'object',
       required: ['security_id'],
       properties: {
-        security_id: { type: 'string', description: 'ID ou slug do padrão de segurança' }
+        security_id: { type: 'string', description: 'ID ou slug do padrão/diretriz de segurança' }
       }
     },
     securitySchemes: [
@@ -1701,20 +1701,21 @@ export const MCP_TOOLS_CATALOG = [
   },
   {
     name: 'firstsys_security_create',
-    title: 'Cadastrar Tecnologia de Segurança',
-    description: 'Cadastra um novo método, diretriz técnica ou padrão de segurança corporativa com arquivos e normas de conformidade.',
+    title: 'Cadastrar Diretriz de Segurança',
+    description: 'Cadastra uma nova diretriz de segurança corporativa com documento explicativo e normas de conformidade.',
     inputSchema: {
       type: 'object',
       required: ['name', 'description'],
       properties: {
         name: { type: 'string', description: 'Nome do padrão de segurança' },
-        description: { type: 'string', description: 'Resumo executivo do padrão' },
+        description: { type: 'string', description: 'Resumo executivo da diretriz' },
         detailedDescription: { type: 'string', description: 'Detalhamento arquitetural' },
         category: { type: 'string', enum: ['hardening', 'autenticacao', 'criptografia', 'banco_de_dados', 'conformidade', 'rede_api', 'auditoria'], description: 'Categoria' },
         severity: { type: 'string', enum: ['critico', 'alto', 'medio', 'baixo', 'informativo'], description: 'Nível de severidade/risco' },
         complianceStandards: { type: 'array', items: { type: 'string' }, description: 'Normas de conformidade (LGPD, OWASP, NIST, etc.)' },
         tags: { type: 'array', items: { type: 'string' }, description: 'Tags de indexação' },
-        initialContent: { type: 'string', description: 'Conteúdo markdown inicial do SECURITY.md' }
+        content: { type: 'string', description: 'Documento explicativo em Markdown contendo visão geral, regras e como aplicar no projeto' },
+        initialContent: { type: 'string', description: 'Conteúdo markdown inicial alternativo' }
       }
     },
     securitySchemes: [
@@ -1725,8 +1726,8 @@ export const MCP_TOOLS_CATALOG = [
   },
   {
     name: 'firstsys_security_update',
-    title: 'Atualizar Método de Segurança',
-    description: 'Atualiza metadados, categoria, nível de severidade ou normas de conformidade de uma diretriz de segurança.',
+    title: 'Atualizar Diretriz de Segurança',
+    description: 'Atualiza o documento explicativo de segurança, categoria, severidade ou normas de conformidade de uma diretriz.',
     inputSchema: {
       type: 'object',
       required: ['security_id'],
@@ -1738,6 +1739,7 @@ export const MCP_TOOLS_CATALOG = [
         category: { type: 'string', description: 'Nova categoria' },
         severity: { type: 'string', description: 'Novo nível de severidade' },
         complianceStandards: { type: 'array', items: { type: 'string' }, description: 'Normas de conformidade' },
+        content: { type: 'string', description: 'Novo documento explicativo em Markdown contendo as diretrizes de segurança' },
         status: { type: 'string', description: 'Status operacional' }
       }
     },
@@ -3996,6 +3998,7 @@ async function executeToolDirectly(name: string, rawArgs: any, user: OAuthJwtPay
       }
 
       const auditLogs = listSecurityAuditLogs(item.id);
+      const documentContent = item.content || (item.files?.[0]?.content) || item.description || '';
 
       return {
         ok: true,
@@ -4010,6 +4013,8 @@ async function executeToolDirectly(name: string, rawArgs: any, user: OAuthJwtPay
           compliance_standards: item.complianceStandards,
           tags: item.tags,
           status: item.status,
+          content: documentContent,
+          document: documentContent,
           files: (item.files || []).filter(f => !f.deletedAt).map(f => ({
             path: f.path,
             name: f.name,
@@ -4036,8 +4041,9 @@ async function executeToolDirectly(name: string, rawArgs: any, user: OAuthJwtPay
         });
       }
 
-      const { name, description, detailedDescription, category, severity, complianceStandards, tags, initialContent } = parseResult.data;
-      const initialFiles = initialContent ? [{ name: 'SECURITY.md', path: 'SECURITY.md', content: initialContent }] : [];
+      const { name, description, detailedDescription, category, severity, complianceStandards, tags, content, initialContent } = parseResult.data;
+      const docContent = content || initialContent || '';
+      const initialFiles = docContent ? [{ name: 'SECURITY.md', path: 'SECURITY.md', content: docContent }] : [];
 
       const created = createSecurityItem({
         name,
@@ -4046,19 +4052,21 @@ async function executeToolDirectly(name: string, rawArgs: any, user: OAuthJwtPay
         severity: severity as any,
         complianceStandards: complianceStandards || [],
         tags: tags || [],
-        initialContent,
+        content: docContent,
+        initialContent: docContent,
         files: initialFiles
       }, user.sub || 'mcp-agent');
 
       return {
         ok: true,
-        message: `Método de segurança '${created.name}' cadastrado com sucesso.`,
+        message: `Diretriz de segurança '${created.name}' cadastrada com sucesso.`,
         item: {
           id: created.id,
           slug: created.slug,
           name: created.name,
           category: created.category,
-          severity: created.severity
+          severity: created.severity,
+          content: created.content
         }
       };
     }
@@ -4074,7 +4082,7 @@ async function executeToolDirectly(name: string, rawArgs: any, user: OAuthJwtPay
         });
       }
 
-      const { security_id, name, description, detailedDescription, category, severity, complianceStandards, status } = parseResult.data;
+      const { security_id, name, description, detailedDescription, category, severity, complianceStandards, status, content } = parseResult.data;
       const patch: any = {};
       if (name !== undefined) patch.name = name;
       if (description !== undefined) patch.description = description;
@@ -4083,11 +4091,12 @@ async function executeToolDirectly(name: string, rawArgs: any, user: OAuthJwtPay
       if (severity !== undefined) patch.severity = severity;
       if (complianceStandards !== undefined) patch.complianceStandards = complianceStandards;
       if (status !== undefined) patch.status = status;
+      if (content !== undefined) patch.content = content;
 
       const updated = updateSecurityItem(security_id, patch, user.sub || 'mcp-agent');
       return {
         ok: true,
-        message: `Item de segurança '${updated.name}' atualizado com sucesso.`,
+        message: `Diretriz de segurança '${updated.name}' atualizada com sucesso.`,
         item: {
           id: updated.id,
           slug: updated.slug,

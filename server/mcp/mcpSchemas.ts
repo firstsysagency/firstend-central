@@ -436,6 +436,7 @@ export const SecurityCreateSchema = z.object({
   severity: z.enum(['critico', 'alto', 'medio', 'baixo', 'informativo']).default('medio'),
   complianceStandards: z.array(z.string().max(50)).default([]),
   tags: z.array(z.string().max(50)).default([]),
+  content: z.string().max(1000000).optional(),
   initialContent: z.string().max(1000000).optional()
 }).strict();
 
@@ -448,7 +449,8 @@ export const SecurityUpdateSchema = z.object({
   category: z.enum(['hardening', 'autenticacao', 'criptografia', 'banco_de_dados', 'conformidade', 'rede_api', 'auditoria']).optional(),
   severity: z.enum(['critico', 'alto', 'medio', 'baixo', 'informativo']).optional(),
   complianceStandards: z.array(z.string().max(50)).optional(),
-  status: z.enum(['ativo', 'rascunho', 'arquivado', 'obsoleto']).optional()
+  status: z.enum(['ativo', 'rascunho', 'arquivado', 'obsoleto']).optional(),
+  content: z.string().max(1000000).optional()
 }).strict();
 
 // 12.5 firstsys_security_delete
