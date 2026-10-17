@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { Skill, SkillFile, SkillVersion, SkillInstallation, SkillAuditLog } from './skillTypes.js';
 import { computeSha256, isExecutablePath, detectContentType } from './skillsStore.js';
+import { seedCreativeSkills } from './seedCreativeSkills.js';
 
 const DB_PATH = path.join(process.cwd(), 'server', 'db.json');
 
@@ -613,4 +614,11 @@ Padrões de comunicação via MCP (Model Context Protocol) e JSON-RPC local.
 
   fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2), 'utf8');
   console.log('✅ Catálogo das 7 skills de referência migrado e inicializado com sucesso no db.json.');
+
+  // Inicializar as 9 skills criativas da biblioteca Notion
+  try {
+    seedCreativeSkills();
+  } catch (err) {
+    console.warn('Aviso ao carregar seedCreativeSkills:', err);
+  }
 }
